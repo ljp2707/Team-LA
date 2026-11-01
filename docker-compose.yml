@@ -1,0 +1,12 @@
+# Runs the whole app locally with one command: docker compose up --build
+# Uses port 8080 so it does not clash with anything else on port 8000.
+services:
+  web:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "8080"
+      APP_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:8080
+    ports:
+      - "8080:8080"
