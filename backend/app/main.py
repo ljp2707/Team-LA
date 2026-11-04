@@ -9,19 +9,26 @@ from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.airtable.client import warn_about_schema_problems
+from app.auth.google import callback_url
 from app.config import get_settings
 from app.routers import (
+    admin,
     archive,
     auth,
     health,
+    links,
     me,
     projects,
+    public,
+    reminders,
+    sites,
     tasks,
     templates,
     users,
 )
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("app")
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SESSION_DAYS = 7
@@ -31,6 +38,10 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    logger.info(
+        "Google sign in redirect URI: %s. This must be listed on the Google OAuth client.",
+        callback_url(),
+    )
     if not settings.is_production:
         warn_about_schema_problems()
     yield
@@ -47,8 +58,23 @@ app.add_middleware(
     https_only=settings.is_production,
 )
 
-for module in (auth, me, health, projects, tasks, templates, users, archive):
+for module in (
+    auth,
+    me,
+    health,
+    public,
+    projects,
+    tasks,
+    links,
+    reminders,
+    templates,
+    users,
+    archive,
+    sites,
+    admin,
+):
     app.include_router(module.router)
+app.include_router(users.roles_router)
 
 
 @app.get("/{path:path}", include_in_schema=False)

@@ -26,6 +26,14 @@ class CurrentUser(SessionUser):
     view: View
 
     @property
+    def id(self) -> str:
+        return self.airtable_record_id
+
+    @property
+    def name(self) -> str:
+        return " ".join(p for p in (self.first_name, self.last_name) if p) or self.email
+
+    @property
     def actor(self) -> Actor:
         return Actor(access_level=self.access_level, view=self.view)
 
@@ -66,6 +74,15 @@ def find_active_user_by_email(email: str) -> SessionUser | None:
             and fields.get(Users.STATUS) == "Active"
         ):
             return _to_session_user(record)
+    return None
+
+
+def find_user_record_by_email(email: str) -> dict[str, Any] | None:
+    """Find the Users row for an email whatever its Status, ignoring case."""
+    wanted = email.strip().lower()
+    for record in client.all_records(Users.TABLE):
+        if record["fields"].get(Users.EMAIL, "").strip().lower() == wanted:
+            return record
     return None
 
 

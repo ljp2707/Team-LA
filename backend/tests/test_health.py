@@ -27,7 +27,7 @@ def test_airtable_health_lists_every_table(client, sign_in):
     body = client.get("/api/health/airtable").json()
     assert body["connected"] is True
     assert [t["table"] for t in body["tables"]] == [t.TABLE for t in ALL_TABLES]
-    assert body["tables"][0]["count"] == 5
+    assert body["tables"][0]["count"] == 6
 
 
 def test_airtable_health_reports_a_failing_table(client, sign_in, monkeypatch):
@@ -112,7 +112,7 @@ def test_dev_switch_lets_staff_use_admin_view(client, sign_in, settings):
     me = client.post("/api/me/view", json={"view": "admin"}).json()
     assert me["view"] == "admin"
     assert me["dev_mode"] is True
-    assert client.get("/api/archive").status_code == 501
+    assert client.get("/api/archive").status_code == 200
 
 
 def test_frontend_fallback_serves_index_but_not_api_paths(
@@ -130,16 +130,24 @@ def test_frontend_fallback_serves_index_but_not_api_paths(
     assert "secret" not in client.get("/..%2Fsecret.txt").text
 
 
-def test_reminder_job_runs_as_a_dry_run():
+def test_reminder_job_runs_as_a_dry_run(capsys):
+    from jobs import send_reminders
+
+    assert send_reminders.main([]) == 0
+    assert "Dry run" in capsys.readouterr().out
+
+
+def test_reminder_job_module_starts():
+    """The cron command itself can start (it prints help without touching Airtable)."""
     backend = Path(__file__).resolve().parents[1]
     result = subprocess.run(
-        [sys.executable, "-m", "jobs.send_reminders"],
+        [sys.executable, "-m", "jobs.send_reminders", "--help"],
         cwd=backend,
         capture_output=True,
         text=True,
     )
     assert result.returncode == 0
-    assert "Dry run" in result.stdout
+    assert "--dry-run" in result.stdout
 
 
 def test_google_callback_without_matching_state_is_rejected(client):

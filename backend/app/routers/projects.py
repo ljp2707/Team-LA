@@ -1,53 +1,303 @@
-"""Projects. Stub: every route answers 501 after checking permissions.
+"""Projects: the dashboard, starting a launch, a project's page, Day 1 and closing.
 
-Dashboard, /dashboard (admin view):
-  One card per active project with site, program type, Day 1, % complete, overdue
-  count, next milestone and lead instructor. A summary row (active launches, overdue,
-  blocked, next Day 1). Sort and filter. Clicking a card opens the project.
-
-Projects, /projects (staff view):
-  The same cards as the dashboard, read only.
-
-New project, /projects/new (admin):
-  Start from a template or a past launch. Program type, site, site type, program
-  name, Day 1, program hours, location, lead instructors, partner contact, Google
-  Drive folder link. Site profile pre-fills. Preview of the generated task list with
-  default owner by role and an optional person per task. Add a one-off task. Create.
-
-Project detail, /projects/:id:
-  Summary (Day 1, % complete, overdue, hours, lead instructor). Move Day 1, which
-  shifts open due dates and reminders and keeps finished tasks' dates, with an undo
-  notice. Tasks grouped before, during and after the program. Late tasks show how
-  many tasks depend on them. One-off tasks. Partner contact and Drive link. History log.
+Dashboard (/dashboard, admin) and Projects (/projects, staff, read only) use
+GET /api/projects. Partners get only the projects they are listed on.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
-from app.auth.deps import current_user, require_admin
+from app import permissions
+from app.airtable import client
+from app.airtable.schema import Links, Work
+from app.auth.deps import current_user, require_admin, require_internal
+from app.models.project import (
+    CloseIn,
+    MoveDayOneIn,
+    ProjectCreateIn,
+    ProjectDetailsIn,
+    ProjectPreviewIn,
+    UndoIn,
+)
+from app.models.task import LinkIn, OneOffTaskIn
 from app.models.user import CurrentUser
+from app.services import history, logic, projects, reminders, timeline
+from app.services.links import link_kind
+from app.services.records import load_reminders, safe
+from app.services.views import (
+    World,
+    check_project_access,
+    dashboard_summary,
+    history_dict,
+    link_dict,
+    project_card,
+    sort_cards,
+    task_row,
+    visible_projects,
+)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
-
-def _not_built():
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "Projects are not built yet")
+HISTORY_PAGE_SIZE = 20
+HISTORY_ON_PAGE = 5
 
 
 @router.get("")
-def list_projects(_: CurrentUser = Depends(current_user)):
-    _not_built()
+def list_projects(
+    status_filter: str = Query("active", alias="status", pattern="^(active|closed)$"),
+    sort: str | None = Query(None, pattern="^(day1|overdue|type)$"),
+    region: str | None = None,
+    user: CurrentUser = Depends(current_user),
+):
+    if status_filter == "closed" and not permissions.can_see_archive(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can see closed launches")
+    world = World()
+    wanted_closed = status_filter == "closed"
+    cards = [
+        project_card(world, p)
+        for p in visible_projects(world, user)
+        if p.closed == wanted_closed
+    ]
+    regions = sorted(
+        {(c["region_id"], c["region"]) for c in cards if c["region_id"]}, key=lambda r: r[1]
+    )
+    types = sorted({c["program_type"] for c in cards})
+    if region:
+        cards = [c for c in cards if c["region_id"] == region]
+    return {
+        "projects": sort_cards(cards, sort),
+        "summary": dashboard_summary(cards, world.today),
+        "regions": [{"id": r[0], "name": r[1]} for r in regions],
+        "program_types": types,
+    }
 
 
-@router.post("")
-def create_project(_: CurrentUser = Depends(require_admin)):
-    _not_built()
+@router.post("/preview")
+def preview_project(body: ProjectPreviewIn, _: CurrentUser = Depends(require_admin)):
+    """The task list a new launch would get. Writes nothing."""
+    return projects.preview(World(), body)
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_project(
+    body: ProjectCreateIn,
+    background: BackgroundTasks,
+    user: CurrentUser = Depends(require_admin),
+):
+    project_id, by_user = projects.create(World(), body, user)
+    background.add_task(reminders.send_assignment_emails, by_user, user.name)
+    return {"id": project_id}
+
+
+def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
+    project = world.project(project_id)
+    check_project_access(user, project)
+    card = project_card(world, project)
+    tasks = sorted(
+        world.tasks_by_project.get(project.id, []),
+        key=lambda t: (t.due is None, t.due, t.sort_order or 0, t.name),
+    )
+    rows = [task_row(world, t, user) for t in tasks]
+    groups = [
+        {"phase": phase, "tasks": [r for r in rows if r["phase"] == phase]}
+        for phase in logic.PHASES
+    ]
+    site = world.sites.get(project.site_id or "")
+    template = world.templates.get(project.template_id or "")
+    can_see_history = permissions.can_see_history(user.actor)
+    log = history.for_project(project.id, user.actor, world.log) if can_see_history else []
+    is_admin = permissions.can_manage_projects(user.actor)
+    return {
+        **card,
+        "template_version": project.template_version or (template.version if template else None),
+        "program_hours": project.hours,
+        "location": project.location or (site.location if site else ""),
+        "partner": {
+            "name": project.partner_name,
+            "email": project.partner_email,
+            "phone": project.partner_phone,
+        },
+        "shipping_address": project.shipping_address,
+        "drive_folder": project.drive_folder,
+        "groups": groups,
+        "links": [
+            link_dict(world, link, is_admin)
+            for link in world.links
+            if link.session_id == project.id and not link.work_id
+        ],
+        "history": [history_dict(world, r) for r in log[:HISTORY_ON_PAGE]],
+        "history_count": len(log),
+        "can_see_history": can_see_history,
+        "team": [
+            {
+                "role_id": t.role_id,
+                "role": world.role_name(t.role_id),
+                "user_id": t.user_id,
+                "user": world.user_short(t.user_id),
+            }
+            for t in world.team_for(project.id)
+        ],
+        "partners": [
+            {"id": u, "name": world.user_name(u)} for u in project.partner_ids if u in world.users
+        ],
+        "open_tasks": sum(1 for t in tasks if logic.is_open(t.status)),
+        "can_manage": is_admin,
+        "can_close": is_admin
+        and not project.closed
+        and project.start is not None
+        and project.start <= world.today,
+        "edit": {
+            "name": project.name,
+            "site_id": project.site_id,
+            "site_type": project.site_type,
+            "day_one": project.start.isoformat() if project.start else None,
+            "end_date": project.end.isoformat() if project.end else None,
+            "program_hours": project.hours,
+            "location": project.location,
+            "instructor_ids": project.instructor_ids,
+            "partner_name": project.partner_name,
+            "partner_email": project.partner_email,
+            "partner_phone": project.partner_phone,
+            "shipping_address": project.shipping_address,
+            "drive_folder": project.drive_folder,
+            "partner_ids": project.partner_ids,
+        }
+        if is_admin
+        else None,
+    }
 
 
 @router.get("/{project_id}")
-def get_project(project_id: str, _: CurrentUser = Depends(current_user)):
-    _not_built()
+def get_project(project_id: str, user: CurrentUser = Depends(current_user)):
+    return _project_detail(World(), project_id, user)
+
+
+@router.patch("/{project_id}")
+def update_project(
+    project_id: str, body: ProjectDetailsIn, user: CurrentUser = Depends(require_admin)
+):
+    world = World()
+    projects.update_details(world, world.project(project_id), body, user)
+    return _project_detail(World(), project_id, user)
 
 
 @router.post("/{project_id}/move-day-one")
-def move_day_one(project_id: str, _: CurrentUser = Depends(require_admin)):
-    _not_built()
+def move_day_one(
+    project_id: str, body: MoveDayOneIn, user: CurrentUser = Depends(require_admin)
+):
+    world = World()
+    project = world.project(project_id)
+    if project.closed:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Reopen the launch before moving Day 1")
+    if body.preview:
+        plan = timeline.plan_shift(project, world.tasks, safe(load_reminders), body.new_day_one)
+        return {
+            "moved_tasks": len(plan.moved),
+            "kept_tasks": len(plan.kept),
+            "moved_reminders": len(plan.reminder_ids),
+            "delta_days": plan.delta,
+            "message": plan.preview_text(),
+        }
+    return timeline.shift_day_one(project_id, body.new_day_one, user.id)
+
+
+@router.post("/{project_id}/move-day-one/undo")
+def undo_move_day_one(project_id: str, body: UndoIn, user: CurrentUser = Depends(require_admin)):
+    return timeline.undo_shift(project_id, body.batch, user.id)
+
+
+@router.post("/{project_id}/tasks", status_code=status.HTTP_201_CREATED)
+def add_one_off_task(
+    project_id: str,
+    body: OneOffTaskIn,
+    background: BackgroundTasks,
+    user: CurrentUser = Depends(require_admin),
+):
+    world = World()
+    project = world.project(project_id)
+    if body.role_id and body.role_id not in world.roles:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick a role from the list")
+    if body.user_id and body.user_id not in world.users:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick a person from the list")
+    mine = {t.id for t in world.tasks_by_project.get(project.id, [])}
+    if any(d not in mine for d in body.needs_first):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Needs first must be a task in this project"
+        )
+    fields = {
+        Work.SESSION: [project.id],
+        Work.TASK_NAME: body.name.strip(),
+        Work.ANCHOR: "Start",
+        Work.DAYS_BEFORE_ANCHOR: (project.start - body.due_date).days if project.start else 0,
+        Work.DUE_DATE_OVERRIDE: body.due_date.isoformat(),
+        Work.STATUS: "Not Started",
+        Work.ONE_OFF: True,
+        Work.SORT_ORDER: float(len(mine)),
+    }
+    user_id = body.user_id
+    if not user_id and body.role_id:
+        team = [t.user_id for t in world.team_for(project.id) if t.role_id == body.role_id and t.user_id]
+        user_id = team[0] if team else None
+    if body.role_id:
+        fields[Work.ROLE] = [body.role_id]
+    if user_id:
+        fields[Work.ASSIGNED_TO] = [user_id]
+    if body.needs_first:
+        fields[Work.DEPENDS_ON] = list(body.needs_first)
+    created = client.create_record(Work.TABLE, fields, typecast=True)
+    history.log_event(
+        project.id, created["id"], user.id, "Task Added", f"added the one-off task {body.name.strip()}"
+    )
+    if user_id and user_id != user.id:
+        background.add_task(reminders.send_assignment_emails, {user_id: [created["id"]]}, user.name)
+    return {"id": created["id"]}
+
+
+@router.post("/{project_id}/close")
+def close_project(project_id: str, body: CloseIn, user: CurrentUser = Depends(require_admin)):
+    world = World()
+    return projects.close(world, world.project(project_id), body.skip_open, user)
+
+
+@router.post("/{project_id}/reopen")
+def reopen_project(project_id: str, user: CurrentUser = Depends(require_admin)):
+    world = World()
+    projects.reopen(world.project(project_id), user)
+    return {"reopened": True}
+
+
+@router.get("/{project_id}/history")
+def project_history(
+    project_id: str,
+    page: int = Query(1, ge=1),
+    user: CurrentUser = Depends(require_internal),
+):
+    world = World()
+    project = world.project(project_id)
+    rows = history.for_project(project.id, user.actor, world.log)
+    start = (page - 1) * HISTORY_PAGE_SIZE
+    return {
+        "entries": [history_dict(world, r) for r in rows[start : start + HISTORY_PAGE_SIZE]],
+        "page": page,
+        "pages": max(1, -(-len(rows) // HISTORY_PAGE_SIZE)),
+        "total": len(rows),
+    }
+
+
+@router.post("/{project_id}/links", status_code=status.HTTP_201_CREATED)
+def add_project_link(project_id: str, body: LinkIn, user: CurrentUser = Depends(require_admin)):
+    world = World()
+    project = world.project(project_id)
+    kind = link_kind(body.url)
+    created = client.create_record(
+        Links.TABLE,
+        {
+            Links.TITLE: body.title.strip(),
+            Links.URL: body.url,
+            Links.KIND: kind,
+            Links.SESSION: [project.id],
+            Links.ADDED_BY: [user.id],
+        },
+        typecast=True,
+    )
+    history.log_event(project.id, None, user.id, "Link", f"added the link {body.title.strip()}")
+    return {"id": created["id"], "kind": kind}

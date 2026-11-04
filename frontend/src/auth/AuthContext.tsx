@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 import { api } from "../api/client";
 
-export type View = "admin" | "staff";
+export type View = "admin" | "staff" | "partner";
 
 /** The answer from GET /api/me. */
 export interface Me {

@@ -29,6 +29,20 @@
   --tag-idle-bg: #edf1f5;
   --tag-idle-text: #3e5266;
 
+  /* Avatar tints, from the wireframe avatars */
+  --tint-green-bg: #dff2e7;
+  --tint-green-text: #1b6b45;
+  --tint-peach-bg: #fbe3d6;
+  --tint-peach-text: #8a3c14;
+  --tint-sand-bg: #f8edc9;
+  --tint-sand-text: #6b5310;
+  --tint-lilac-bg: #e6e5f8;
+  --tint-lilac-text: #43408f;
+
+  /* Overlays */
+  --backdrop: rgba(13, 36, 56, 0.45);
+  --shadow-pop: 0 8px 24px rgba(13, 36, 56, 0.16);
+
   /* Home page water */
   --water-sky: #d4eafa;
   --water-light: #a9d3f3;
@@ -55,4 +69,5 @@
   /* Layout */
   --sidebar-width: 232px;
   --control-height: 44px;
+  --content-max: 1200px;
 }

@@ -1,0 +1,128 @@
+import { Link } from "react-router-dom";
+import type { TaskRow as Task, TaskStatus } from "../api/types";
+import { setStatus } from "../api/tasks";
+import { StatusMenu } from "./ui/StatusMenu";
+import { StatusTag } from "./ui/StatusTag";
+import { formatDate } from "../lib/dates";
+
+const isFinished = (status: TaskStatus) => status === "Done" || status === "Skipped";
+
+/**
+ * Change a task's status right away on screen, then save it.
+ * If saving fails the old status comes back and the error is shown.
+ */
+export async function changeStatus(
+  task: Task,
+  status: TaskStatus,
+  update: (id: string, change: Partial<Task> | null, saved?: Task) => void,
+  onError: (message: string) => void,
+) {
+  const before = { status: task.status, display_status: task.display_status };
+  update(task.id, { status, display_status: status });
+  try {
+    const saved = await setStatus(task.id, status);
+    update(task.id, null, saved);
+  } catch (caught) {
+    update(task.id, before);
+    onError(caught instanceof Error ? caught.message : "That status did not save.");
+  }
+}
+
+/** A row on My Tasks: a done circle, the task, its due date and a status menu. */
+export function MyTaskRow({ task, onStatus }: { task: Task; onStatus: (task: Task, status: TaskStatus) => void }) {
+  const done = isFinished(task.status);
+  const subtitle = task.waiting_text ? (
+    <span className="row-sub is-late">{task.waiting_text}</span>
+  ) : (
+    <span className="row-sub">
+      {[task.site || task.project_name, task.program_type].filter(Boolean).join(" · ")}
+      {task.shared_with.length > 0 && ` · shared with ${task.shared_with.join(", ")}`}
+      {task.one_off && " · one-off"}
+    </span>
+  );
+  return (
+    <li className={`task-row${done ? " is-done" : ""}`}>
+      {task.can_edit ? (
+        <button
+          type="button"
+          className={`check${done ? " is-checked" : ""}`}
+          aria-pressed={task.status === "Done"}
+          aria-label={task.status === "Done" ? `Mark ${task.name} not done` : `Mark ${task.name} done`}
+          onClick={() => onStatus(task, task.status === "Done" ? "In Progress" : "Done")}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M3 7.5 6 10.5 11 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+      ) : (
+        <span className="check check--static" aria-hidden="true" />
+      )}
+      <div className="row-main">
+        <Link to={`/tasks/${task.id}`} className="row-title">
+          {task.name}
+        </Link>
+        {subtitle}
+      </div>
+      <span className={`row-due${task.overdue ? " is-late" : ""}`}>
+        {task.status === "Done" && task.completed ? `Done ${formatDate(task.completed)}` : task.due_text}
+      </span>
+      <StatusMenu
+        status={task.display_status}
+        taskName={task.name}
+        canEdit={task.can_edit}
+        onChange={(status) => onStatus(task, status)}
+      />
+    </li>
+  );
+}
+
+/** A row on the project page: status tag, task, role and person, due date. */
+export function ProjectTaskRow({
+  task,
+  onStatus,
+}: {
+  task: Task;
+  onStatus: (task: Task, status: TaskStatus) => void;
+}) {
+  const late = task.overdue && !isFinished(task.status);
+  const blocked = task.display_status === "Blocked";
+  const note = task.waiting_text
+    ? task.waiting_text
+    : late && task.dependents > 0
+      ? `${task.dependents} ${task.dependents === 1 ? "task depends" : "tasks depend"} on this`
+      : task.one_off
+        ? "One-off task, only this project"
+        : !task.assignee
+          ? "Needs an owner"
+          : null;
+  const noteLate = Boolean(task.waiting_text) || (late && task.dependents > 0);
+  const who = [task.role, task.assignee?.name].filter(Boolean).join(" · ") || "No owner yet";
+
+  return (
+    <li className={`project-row${blocked ? " is-blocked" : ""}${task.status === "Done" ? " is-done" : ""}`}>
+      <span className="project-row-status">
+        {task.can_edit ? (
+          <StatusMenu
+            status={task.display_status}
+            taskName={task.name}
+            canEdit
+            onChange={(status) => onStatus(task, status)}
+          />
+        ) : (
+          <StatusTag status={task.display_status} late={late} />
+        )}
+      </span>
+      <div className="row-main">
+        <Link to={`/tasks/${task.id}`} className="row-title">
+          {task.name}
+        </Link>
+        {note && <span className={`row-sub${noteLate ? " is-late" : ""}`}>{note}</span>}
+      </div>
+      <span className="row-who">{who}</span>
+      <span className={`row-due${late ? " is-late" : ""}`}>
+        {late && <span className="visually-hidden">Late, due </span>}
+        {task.due_short}
+      </span>
+    </li>
+  );
+}

@@ -52,7 +52,7 @@ def test_project_lead_is_treated_as_admin_for_now():
     assert p.can_edit_setup(LEAD_ACTOR)
 
 
-@pytest.mark.parametrize("level", [None, "", "Partner"])
+@pytest.mark.parametrize("level", [None, "", "Guest"])
 def test_unknown_access_level_gets_least_access(level):
     assert p.base_view(level) == STAFF
     assert not p.can_update_own_tasks(Actor(level, STAFF))
@@ -101,23 +101,25 @@ def test_admin_can_reach_admin_routes_until_switching_view(
     client, sign_in, method, path
 ):
     sign_in("admin@example.org")
-    assert client.request(method, path).status_code in (200, 501)
+    # Past the permission check: 200, or 422/404 because the request has no body.
+    assert client.request(method, path).status_code in (200, 404, 422)
 
     client.post("/api/me/view", json={"view": "staff"})
     assert client.request(method, path).status_code == 403
 
     client.post("/api/me/view", json={"view": "admin"})
-    assert client.request(method, path).status_code in (200, 501)
+    assert client.request(method, path).status_code in (200, 404, 422)
 
 
-def test_viewer_cannot_update_tasks_but_staff_reaches_the_stub(client, sign_in):
+def test_viewer_cannot_update_tasks_but_staff_gets_past_the_check(client, sign_in):
     sign_in("viewer@example.org")
-    assert client.patch("/api/tasks/rec1").status_code == 403
+    assert client.patch("/api/tasks/rec1", json={"status": "Done"}).status_code == 403
     sign_in("staff@example.org")
-    assert client.patch("/api/tasks/rec1").status_code == 501
+    assert client.patch("/api/tasks/rec1", json={"status": "Done"}).status_code == 404
 
 
-def test_everyone_signed_in_can_reach_read_stubs(client, sign_in):
+def test_everyone_signed_in_can_read_projects_and_tasks(client, sign_in):
     sign_in("viewer@example.org")
-    for path in ("/api/projects", "/api/projects/rec1", "/api/tasks/mine"):
-        assert client.get(path).status_code == 501
+    assert client.get("/api/projects").status_code == 200
+    assert client.get("/api/projects/rec1").status_code == 404
+    assert client.get("/api/tasks/mine").status_code == 200

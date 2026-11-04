@@ -65,3 +65,10 @@ def require_can_edit(user: CurrentUser = Depends(current_user)) -> CurrentUser:
     if not permissions.can_update_own_tasks(user.actor):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Read only access")
     return user
+
+
+def require_internal(user: CurrentUser = Depends(current_user)) -> CurrentUser:
+    """Allow NMU staff and admins, but not partners."""
+    if user.view == permissions.PARTNER:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not available to partners")
+    return user

@@ -9,12 +9,35 @@ export class ApiError extends Error {
   }
 }
 
+/** Turn FastAPI's error body into one plain sentence. */
+function detailMessage(body: unknown, status: number): string {
+  if (body && typeof body === "object" && "detail" in body) {
+    const detail = (body as { detail: unknown }).detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail) && detail.length > 0) {
+      const first = detail[0] as { msg?: string; loc?: unknown[] };
+      const message = (first.msg ?? "Check the form").replace(/^Value error, /, "");
+      const field = Array.isArray(first.loc) ? String(first.loc[first.loc.length - 1]) : "";
+      return field && field !== "body" ? `${field.replace(/_/g, " ")}: ${message}` : message;
+    }
+  }
+  if (status === 403) return "You do not have access to do that.";
+  if (status === 404) return "That could not be found.";
+  if (status >= 500) return "Something went wrong on the server. Please try again.";
+  return "That did not work. Please try again.";
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    ...options,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...options.headers },
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...options.headers },
+    });
+  } catch {
+    throw new ApiError(0, "Could not reach NMU Launches. Check your connection.");
+  }
 
   if (!response.ok) {
     // A session that ended sends the person back to sign in. /api/me is the
@@ -22,7 +45,25 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     if (response.status === 401 && path !== "/api/me") {
       window.location.assign("/");
     }
-    throw new ApiError(response.status, `Request failed: ${path}`);
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+    throw new ApiError(response.status, detailMessage(body, response.status));
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+export const get = <T>(path: string) => api<T>(path);
+
+export const send = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown) =>
+  api<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+
+/** Build a query string, leaving out empty values. */
+export function query(params: Record<string, string | null | undefined>): string {
+  const entries = Object.entries(params).filter(([, v]) => v) as [string, string][];
+  return entries.length ? `?${new URLSearchParams(entries).toString()}` : "";
 }

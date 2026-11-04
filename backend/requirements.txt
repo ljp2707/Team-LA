@@ -5,6 +5,10 @@ pyairtable==3.5.0.post1
 authlib==1.9.1
 httpx==0.28.1
 itsdangerous==2.2.0
+# Time zone data for zoneinfo, which the slim Docker image does not include
+tzdata==2026.6
+# Only used by python -m jobs.authorize_gmail, run once on a laptop
+google-auth-oauthlib==1.5.0
 
 # Testing
 pytest==9.2.0

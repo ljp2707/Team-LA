@@ -85,7 +85,7 @@ This only works on localhost. The app refuses to start if `DEV_LOGIN_EMAIL` is s
 ## Create the Airtable token
 
 1. Go to https://airtable.com/create/tokens and choose **Create token**.
-2. Add these three scopes: `data.records:read`, `data.records:write`, `schema.bases:read`.
+2. Add these four scopes: `data.records:read`, `data.records:write`, `schema.bases:read`, `schema.bases:write`. The last one is only used by the migration script that adds new fields (see **Updating the Airtable base**).
 3. Under **Access**, add the NMU base.
 4. Copy the token into `AIRTABLE_TOKEN`.
 
@@ -99,23 +99,68 @@ To find the base ID, open the base in your browser. The address looks like `airt
 
 ## Create the Google sign in client
 
-1. Go to https://console.cloud.google.com and create or choose a project.
-2. Open **APIs and Services > OAuth consent screen**. Choose **Internal** if everyone is on the NMU Google Workspace. Otherwise choose **External** and add test users.
-3. Open **APIs and Services > Credentials > Create credentials > OAuth client ID**. Choose **Web application**.
-4. Under **Authorized redirect URIs**, add all of these:
-   - Two terminals: `http://localhost:8000/auth/callback`
-   - Docker: `http://localhost:8080/auth/callback`
-   - Production: `https://YOUR-APP-DOMAIN/auth/callback`
-5. Copy the client ID and secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+Google now calls this part of the console **Google Auth Platform**.
+
+1. Sign in to https://console.cloud.google.com with the Google account that will own the app (for now avanthi.arun@gmail.com, and an NMU-owned account at handoff). Create a project named **NMU Launches**.
+2. Open **Google Auth Platform**, then **Branding**. Set the app name to **NMU Launches** and choose a support email. Leave the logo empty, because a logo triggers brand verification.
+3. **Audience:** choose **External**.
+4. **Data Access:** add the `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile` scopes.
+5. **Clients**, then **Create client**, then **Web application**. Under **Authorized redirect URIs**, add these, matching exactly with no trailing slash except on the last one:
+   - `http://localhost:8000/auth/callback` for the two-terminal setup
+   - `http://localhost:8080/auth/callback` for Docker
+   - `https://YOUR-RAILWAY-DOMAIN/auth/callback` for production
+   - `http://localhost:8765/` for the one-time Gmail authorization in **Set up email**, where the trailing slash is required
+6. Copy the client ID and the secret right away, because the secret is only shown in full once. Put them in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+7. **Audience**, then **Publish app**, to set the status to **In production**. Sign in only uses basic scopes, so no verification is needed. In Testing mode only listed test users can sign in. Publishing also stops the Gmail refresh token from expiring every 7 days.
+8. Leave `ALLOWED_EMAIL_DOMAIN` blank. Any Google account can try to sign in, and the Airtable Users table decides who gets in.
+
+When the backend starts, it prints the redirect URI it uses, for example `Google sign in redirect URI: http://localhost:8000/auth/callback`. That exact address must be on the client. Admins can also see it on **Users and roles > System**.
+
+`BOOTSTRAP_ADMIN_EMAILS` makes sure the first admin can get in: if one of those emails has no row in the Users table, signing in creates an Active Admin row for it. An existing row is never changed.
+
+| What you see | Fix |
+|---|---|
+| `Error 400: redirect_uri_mismatch` | The URI the server logged on startup is not on the client. Add it exactly. Changes can take a few minutes to apply. |
+| `Error 401: invalid_client` | The client ID or secret is wrong or still the placeholder. |
+| `Access blocked: app has not completed verification` or `access_denied` | The app is still in Testing. Publish it, or add the person as a test user. |
+| `mismatching_state` / sent back to Not Authorized with `reason=google` | The sign in started on `127.0.0.1` and finished on `localhost`, or the other way round. Always open `http://localhost:5173` (or `:8080`). |
+| "You do not have access yet" | That Google email has no Active row in Users. Add the row, or sign in with the right account. |
+
+## Set up email
+
+All email (reminders, the weekly digest, assignment and welcome emails) goes through the Gmail API. Railway blocks outbound SMTP below its Pro plan, and the Gmail API works over HTTPS on any plan.
+
+1. In the same Google Cloud project, open **APIs and Services**, then **Library**, then **Gmail API**, and click **Enable**.
+2. Make sure `http://localhost:8765/` is on the OAuth client's redirect URIs, and that the app is **In production** (Audience page).
+3. On your computer, with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, run `python -m jobs.authorize_gmail` from `backend`. Sign in as the account that should send the emails (for now avanthi.arun@gmail.com, and later an NMU-owned account), then click through the unverified-app screen (**Advanced**, then **Go to NMU Launches**). This screen appears once, only for the sender, because `gmail.send` is a sensitive scope. Staff signing in never see it.
+4. Put the printed token in `GMAIL_REFRESH_TOKEN`, set `GMAIL_SENDER` to that same address, and set `REMINDERS_DRY_RUN=false`.
+5. In the app, go to **Users and roles**, then **System**, then **Send me a test email**.
+6. When the app is deployed later, set the same variables on **both** Railway services, the web service and the cron service.
+7. To change the sender later, run step 3 again with the new account and replace both variables.
+8. The refresh token stops working if the sender changes their Google password, revokes access, or does not use it for 6 months. The daily job uses it, so the last case should not happen.
+
+**Trying the reminder job.** From `backend`, `python -m jobs.send_reminders --dry-run --date 2026-11-09` prints every email that would go out that day. `--only weekly`, `--only auto` or `--only custom` limits it to one kind. The job writes a Reminders row for every email it sends, fails or skips, so running it twice never sends anything twice. It exits with an error if any email failed.
+
+**Decision for NMU: overdue follow-up.** The midterm left open what happens after a task goes overdue. For now, overdue tasks are listed first in the Monday weekly digest, and there is no separate overdue email. This is the `OVERDUE_FOLLOW_UP` constant in `backend/app/services/reminders.py`.
+
+## Updating the Airtable base
+
+The app needs some fields and tables the original base did not have: the Links, Reminders and Template Versions tables, and fields such as Due Date Override and One-off on tasks and Program Name and Duration on sessions. A script adds them. It only adds; it never changes or deletes existing fields or rows.
+
+1. Make sure your token has the `schema.bases:write` scope.
+2. From `backend`, run `python -m jobs.migrate_airtable` to see what it would add. Nothing changes yet.
+3. Run `python -m jobs.migrate_airtable --apply` to add them. Running it again prints "Nothing to add".
+4. `python -m jobs.dump_schema` rewrites `docs/airtable-schema.md` from the live base, so you can check the result.
+
+On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds demo people, sites, templates and launches, all with `@example.org` emails. It refuses to run in production, and refuses to run twice.
+
+`docs/data-model.md` explains every table and field the app uses.
 
 ## Adding and removing people
 
-There is no signup page. The Airtable **Users** table decides who can get in.
+Admins add people on **Users and roles > Add a person**. The new person gets a welcome email and can then click **Sign in with Google**, with no password to set. **Edit > Deactivate** stops someone signing in. Before deactivating someone, use **Hand off tasks** to move their open tasks to someone else.
 
-- **To add someone,** create a row with their Google email as Email Address, their First Name and Last Name, Status set to **Active**, and an Access Level. They can then click **Sign in with Google**, with no password to set.
-- **To remove someone,** set their Status to **Inactive**.
-
-Both changes apply within about 30 seconds.
+You can also do this straight in the Airtable **Users** table: a row with their Google email as Email Address, First Name, Last Name, Status **Active** and an Access Level lets them in, and Status **Inactive** keeps them out. Changes apply within about 30 seconds.
 
 ## Deploy on Railway
 
@@ -131,6 +176,7 @@ The live site needs real Google sign in, because the test login only works on yo
    - `SESSION_SECRET`: a new random string of at least 32 characters. The app will not start without one. You can make one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
    - `DEV_ALLOW_VIEW_SWITCH=false`
    - `DEV_LOGIN_EMAIL`: leave this out or blank
+   - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email
 3. Under **Settings > Networking**, choose **Generate Domain**.
 4. Set both `APP_URL` and `FRONTEND_URL` to that domain, starting with `https://`.
 5. Add `https://YOUR-APP-DOMAIN/auth/callback` to the Google OAuth client's redirect URIs.
@@ -143,7 +189,7 @@ After changing a variable in Railway, click **Deploy** if it asks you to apply t
 2. Under **Settings > Config-as-code**, set the config file path to `/railway.cron.json`. This runs `python -m jobs.send_reminders` on the schedule `0 15 * * *`, and leaves out the web health check.
 3. Copy the variables from the web service.
 
-Railway schedules in UTC, so `0 15 * * *` is 8 AM Pacific during daylight time and 7 AM in winter. For now the job is a dry run that only prints, so it sends nothing.
+Railway schedules in UTC, so `0 15 * * *` is 8 AM Pacific during daylight time and 7 AM in winter. While `REMINDERS_DRY_RUN=true` the job only prints. Set it to `false` once the test email works.
 
 ## Roles and the view switch
 
@@ -155,6 +201,7 @@ Each person's **Access Level** in the Airtable Users table sets what they can do
 | Project Lead | Admin view | Assumption, still being decided |
 | Staff | Staff view | Can update their own tasks |
 | Viewer | Staff view | Read only |
+| Partner | Partner view | Sees only the launches they are added to, and updates their own tasks. Never sees internal notes or history |
 | Blank or anything else | Staff view | Read only |
 
 Admins and Project Leads can use the switch in the sidebar to see the app exactly as staff do. While in staff view they have staff permissions, on the server as well as on screen.
@@ -165,17 +212,6 @@ Changes to someone's Status or Access Level in Airtable apply within about 30 se
 
 For demos, setting `DEV_ALLOW_VIEW_SWITCH=true` lets **anyone** signed in use admin view, with real admin permissions. Keep it `false` in production.
 
-## Airtable fields to add later
-
-The wireframes need these, but the base does not have them yet. They were not added in this pass:
-
-- Google Drive link on tasks and on projects
-- Canva link on tasks
-- Partner contact on projects
-- Site type on sites
-- Template versions
-- Custom reminders
-
 ## Project structure
 
 | Folder | What is in it |
@@ -185,13 +221,14 @@ The wireframes need these, but the base does not have them yet. They were not ad
 | `backend/app/auth/` | Google sign in, sessions, and the checks that protect routes |
 | `backend/app/models/` | The shapes of users, projects, tasks and templates |
 | `backend/app/routers/` | The URLs the app answers |
-| `backend/app/services/` | Timeline, history and reminder logic (not built yet) |
-| `backend/app/email/` | Sending email through Gmail (not built yet) |
-| `backend/jobs/` | The daily reminder job |
+| `backend/app/services/` | The rules: timelines and Day 1 moves, history, reminders, templates, dates in Pacific time |
+| `backend/app/email/` | Sending email through the Gmail API, and the wording of every email |
+| `backend/jobs/` | The daily reminder job, Gmail authorization, the Airtable migration, the schema dump and demo data |
 | `backend/tests/` | Automated tests |
 | `frontend/src/api/` | How the website calls the backend |
 | `frontend/src/auth/` | Who is signed in, and the page guards |
-| `frontend/src/components/` | The sidebar and shared pieces like buttons and cards |
+| `frontend/src/components/` | The sidebar and shared pieces: status menu, task rows, project cards, dialogs, form fields, toasts |
 | `frontend/src/pages/` | One file per page |
 | `frontend/src/styles/` | Colors, fonts and spacing (`tokens.css`) and page styles |
+| `docs/` | The user guide, admin runbook, data model, decisions and next steps to production |
 | `docs/design/` | The wireframes |

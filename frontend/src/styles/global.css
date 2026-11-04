@@ -322,24 +322,6 @@ a {
   padding: var(--space-6);
 }
 
-/* Coming soon card */
-.coming-soon h2 {
-  margin-bottom: var(--space-1);
-}
-
-.coming-soon p {
-  color: var(--color-muted);
-}
-
-.coming-soon ul {
-  margin: var(--space-4) 0 0;
-  padding-left: var(--space-5);
-}
-
-.coming-soon li + li {
-  margin-top: var(--space-2);
-}
-
 /* Airtable status card */
 .status-card {
   display: flex;
@@ -374,63 +356,6 @@ a {
 
 .standalone p {
   color: var(--color-muted);
-}
-
-/* Phone layout: the sidebar becomes a top bar */
-@media (max-width: 759px) {
-  .shell {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-    width: 100%;
-    height: auto;
-    padding: var(--space-3) var(--space-4);
-    overflow: visible;
-  }
-
-  .sidebar-nav {
-    order: 3;
-    flex: 1 0 100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
-
-  .sidebar-foot {
-    display: contents;
-  }
-
-  .user-block {
-    display: none;
-  }
-
-  .sign-out {
-    align-self: center;
-    margin-left: auto;
-  }
-
-  .view-switch-group {
-    order: 4;
-    flex: 1 0 100%;
-  }
-
-  .main {
-    padding: var(--space-4);
-  }
-
-  .page-header {
-    flex-direction: column;
-  }
-
-  .page-header h1 {
-    font-size: 32px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

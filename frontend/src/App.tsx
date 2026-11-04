@@ -25,7 +25,6 @@ export function App() {
         <Route element={<AppShell />}>
           <Route path="/my-tasks" element={<MyTasks />} />
           <Route path="/projects" element={<Projects />} />
-          <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/tasks/:id" element={<TaskDetail />} />
 
           <Route element={<RequireAdmin />}>
@@ -35,6 +34,8 @@ export function App() {
             <Route path="/users" element={<Users />} />
             <Route path="/archive" element={<Archive />} />
           </Route>
+
+          <Route path="/projects/:id" element={<ProjectDetail />} />
         </Route>
       </Route>
 

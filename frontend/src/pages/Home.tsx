@@ -1,16 +1,12 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { seasonStats } from "../api/archive";
+import type { SeasonStats } from "../api/archive";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { LogoMark } from "../components/ui/LogoMark";
 import "../styles/home.css";
-
-// TODO: load these numbers from the API once projects are built.
-const SEASON_YEAR = 2026;
-const SITES_TO_LAUNCH = 13;
-const SITES_LAUNCHED = 6;
-const TASKS_DONE_THIS_WEEK = 31;
 
 // One row per line of the dot grid: b = done, p = pulsing, - = empty.
 const DOT_ROWS = ["bbbbbbbpbb--", "bbbbbb-bbb--", "bbbbb-bb-bp-"];
@@ -62,40 +58,53 @@ function LifeRing() {
   );
 }
 
-function SeasonCard() {
+/** Season numbers from /api/public/season-stats. The cards are hidden if they do not load. */
+function useSeasonStats(): SeasonStats | null {
+  const [stats, setStats] = useState<SeasonStats | null>(null);
+  useEffect(() => {
+    seasonStats()
+      .then(setStats)
+      .catch(() => setStats(null));
+  }, []);
+  return stats;
+}
+
+function SeasonCard({ stats }: { stats: SeasonStats }) {
+  const toLaunch = stats.sites_to_launch;
+  const launched = stats.sites_launched;
   return (
     <Card className="stat-card">
-      <h2>{SEASON_YEAR} season</h2>
+      <h2>{stats.year} season</h2>
       <div className="stat-row">
         <div>
-          <span className="stat-number">{SITES_TO_LAUNCH}</span>
+          <span className="stat-number">{toLaunch}</span>
           <span className="stat-label">sites to launch</span>
         </div>
         <div>
-          <span className="stat-number">{SITES_LAUNCHED}</span>
+          <span className="stat-number">{launched}</span>
           <span className="stat-label">launched so far</span>
         </div>
       </div>
       <div
         className="season-bar"
         role="img"
-        aria-label={`${SITES_LAUNCHED} of ${SITES_TO_LAUNCH} sites launched`}
+        aria-label={`${launched} of ${toLaunch} sites launched`}
       >
-        {Array.from({ length: SITES_TO_LAUNCH }, (_, index) => (
-          <span key={index} className={index < SITES_LAUNCHED ? "is-done" : undefined} />
+        {Array.from({ length: toLaunch }, (_, index) => (
+          <span key={index} className={index < launched ? "is-done" : undefined} />
         ))}
       </div>
     </Card>
   );
 }
 
-function TasksCard() {
+function TasksCard({ done }: { done: number }) {
   const dotClass: Record<string, string | undefined> = { b: "is-done", p: "is-pulsing" };
   return (
     <Card className="stat-card">
       <h2>Tasks done this week</h2>
       <div className="stat-row">
-        <span className="stat-number">{TASKS_DONE_THIS_WEEK}</span>
+        <span className="stat-number">{done}</span>
       </div>
       <div className="dot-grid" aria-hidden="true">
         {DOT_ROWS.join("")
@@ -112,6 +121,7 @@ export function Home() {
   const { me } = useAuth();
   const howItWorks = useRef<HTMLDialogElement>(null);
   const help = useRef<HTMLDialogElement>(null);
+  const stats = useSeasonStats();
 
   if (me) return <Navigate to={me.home} replace />;
 
@@ -159,13 +169,15 @@ export function Home() {
                   />
                 </svg>
               </Button>
-              <span>Use your NMU Google account</span>
+              <span>Use the Google account your admin added</span>
             </div>
           </div>
-          <div className="hero-stats">
-            <SeasonCard />
-            <TasksCard />
-          </div>
+          {stats && (
+            <div className="hero-stats">
+              <SeasonCard stats={stats} />
+              <TasksCard done={stats.tasks_done_this_week} />
+            </div>
+          )}
         </div>
 
         <LifeRing />
@@ -212,7 +224,7 @@ export function Home() {
       <dialog ref={help} className="home-dialog" aria-labelledby="help-title">
         <h2 id="help-title">Help</h2>
         <p>
-          Sign in with your NMU Google account. If you cannot get in, ask an admin to add you.
+          Sign in with the Google account your admin added. If you cannot get in, ask an admin to add you.
         </p>
         <form method="dialog">
           <Button type="submit">Close</Button>

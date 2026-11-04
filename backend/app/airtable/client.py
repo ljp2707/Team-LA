@@ -87,6 +87,75 @@ def clear_cache() -> None:
         _cache.clear()
 
 
+BATCH_SIZE = 10  # Airtable accepts at most 10 records per write request
+
+
+def _chunks(items: list, size: int = BATCH_SIZE):
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
+
+
+def create_records(
+    table_name: str, rows: list[dict[str, Any]], typecast: bool = False
+) -> list[dict[str, Any]]:
+    """Create rows (field dicts) in batches of 10. Returns the created records."""
+    created: list[dict[str, Any]] = []
+    if not rows:
+        return created
+    table = get_base().table(table_name)
+    try:
+        for chunk in _chunks(rows):
+            _wait_for_turn()
+            created.extend(table.batch_create(chunk, typecast=typecast))
+    finally:
+        clear_cache()
+    return created
+
+
+def create_record(
+    table_name: str, fields: dict[str, Any], typecast: bool = False
+) -> dict[str, Any]:
+    return create_records(table_name, [fields], typecast=typecast)[0]
+
+
+def update_records(
+    table_name: str, updates: list[dict[str, Any]], typecast: bool = False
+) -> list[dict[str, Any]]:
+    """Update records given as {"id": ..., "fields": {...}}, in batches of 10."""
+    updated: list[dict[str, Any]] = []
+    if not updates:
+        return updated
+    table = get_base().table(table_name)
+    try:
+        for chunk in _chunks(updates):
+            _wait_for_turn()
+            updated.extend(table.batch_update(chunk, typecast=typecast))
+    finally:
+        clear_cache()
+    return updated
+
+
+def update_record(
+    table_name: str, record_id: str, fields: dict[str, Any], typecast: bool = False
+) -> dict[str, Any]:
+    return update_records(
+        table_name, [{"id": record_id, "fields": fields}], typecast=typecast
+    )[0]
+
+
+def delete_records(table_name: str, record_ids: list[str]) -> None:
+    """Delete rows the app owns (links and notes). Never used on projects or tasks."""
+    if not record_ids:
+        return
+    table = get_base().table(table_name)
+    try:
+        for chunk in _chunks(record_ids):
+            _wait_for_turn()
+            table.batch_delete(chunk)
+    finally:
+        clear_cache()
+
+
 def table_counts() -> list[dict[str, Any]]:
     """Return the record count for each table, or an error for that table."""
     results = []
