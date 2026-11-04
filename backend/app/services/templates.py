@@ -511,7 +511,7 @@ def insights(template_id: str, projects=None, tasks=None, steps=None) -> dict:
             "name": added_names[key],
             "count": len(offsets),
             "days_before": int(statistics.median(offsets)),
-            "text": f"Added as a one-off in {len(offsets)} of {total}",
+            "text": f"Added by hand in {len(offsets)} of {total}",
             "in_template": added_names[key].lower() in live_names,
         }
         for key, offsets in added.items()

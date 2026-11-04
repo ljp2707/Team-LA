@@ -31,6 +31,7 @@ import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
 import { Tag } from "../components/ui/Tag";
 import { useToast } from "../components/ui/Toast";
 import { LinkDialog } from "../components/LinkDialog";
+import { PeoplePicker } from "../components/PeoplePicker";
 import { useApi } from "../hooks/useApi";
 import { formatDate, todayIso } from "../lib/dates";
 
@@ -92,6 +93,7 @@ export function ProjectDetail() {
     .filter(Boolean)
     .join(" · ");
   const taskCount = p.groups.reduce((sum, g) => sum + g.tasks.length, 0);
+  const dateProblems = p.groups.flatMap((g) => g.tasks).filter((t) => t.date_warning);
 
   return (
     <div className="page">
@@ -115,12 +117,15 @@ export function ProjectDetail() {
               <Button variant="outline" onClick={() => setOpen("move")}>
                 Move Day 1
               </Button>
-              <Button onClick={() => setOpen("oneoff")}>Add a one-off task</Button>
+              <Button onClick={() => setOpen("oneoff")}>Add task</Button>
             </>
           ) : p.can_manage && p.closed ? (
             <>
               <Button variant="outline" onClick={() => setOpen("template")}>
                 Save as a template
+              </Button>
+              <Button variant="outline" onClick={() => setOpen("oneoff")}>
+                Add task
               </Button>
               <Button to={`/projects/new?from=${p.id}`}>Start a new launch from this</Button>
             </>
@@ -136,6 +141,24 @@ export function ProjectDetail() {
         <StatTile value={<span className="stat-small">{p.lead_instructor || "Not set"}</span>} label="Lead instructor" />
       </Card>
 
+      {dateProblems.length > 0 && (
+        <div className="note-box note-box--late" role="note">
+          <strong>
+            {dateProblems.length === 1
+              ? "1 task is due before a task it needs first."
+              : `${dateProblems.length} tasks are due before a task they need first.`}
+          </strong>{" "}
+          No dates were moved. Open each one to fix the date that is wrong:{" "}
+          {dateProblems.map((t, i) => (
+            <span key={t.id}>
+              {i > 0 && ", "}
+              <Link to={`/tasks/${t.id}`}>{t.name}</Link>
+            </span>
+          ))}
+          .
+        </div>
+      )}
+
       {moved && (
         <UndoBanner message={moved.message} onUndo={moved.batch ? () => void undo() : undefined} onDismiss={() => setMoved(null)} busy={undoing} />
       )}
@@ -143,7 +166,7 @@ export function ProjectDetail() {
       <div className="two-col">
         <Card className="task-card">
           {taskCount === 0 ? (
-            <EmptyState title="No tasks yet">{p.can_manage ? "Add a one-off task to get started." : "An admin has not added tasks yet."}</EmptyState>
+            <EmptyState title="No tasks yet">{p.can_manage ? "Add a task to get started." : "An admin has not added tasks yet."}</EmptyState>
           ) : (
             p.groups.map(
               (group) =>
@@ -310,9 +333,9 @@ export function ProjectDetail() {
             open={open === "oneoff"}
             project={p}
             onClose={close}
-            onAdded={(name) => {
+            onAdded={(name, warnings) => {
               close();
-              toast.show(`Added ${name}.`);
+              toast.show(warnings.length ? `Added ${name}. ${warnings.join(" ")} No dates were moved.` : `Added ${name}.`);
               void project.reload();
             }}
           />
@@ -479,18 +502,32 @@ function OneOffDialog({
   open: boolean;
   project: Project;
   onClose: () => void;
-  onAdded: (name: string) => void;
+  onAdded: (name: string, warnings: string[]) => void;
 }) {
   const [name, setName] = useState("");
   const [due, setDue] = useState("");
   const [roleId, setRoleId] = useState("");
-  const [userId, setUserId] = useState("");
+  const [userIds, setUserIds] = useState<string[]>([]);
   const [needsFirst, setNeedsFirst] = useState("");
+  const [comesBefore, setComesBefore] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const roles = useApi(() => (open ? listRoles() : Promise.resolve(null)), [open]);
   const people = useApi(() => (open ? listPeople(false) : Promise.resolve(null)), [open]);
   const tasks = project.groups.flatMap((g) => g.tasks);
+  const isOpenTask = (t: TaskRow) => t.status !== "Done" && t.status !== "Skipped";
+  const first = tasks.find((t) => t.id === needsFirst);
+  const later = tasks.find((t) => t.id === comesBefore);
+  const shown = name.trim() || "This task";
+  const warnings = [
+    due && first?.due && isOpenTask(first) && first.due > due
+      ? `${shown} would be due before ${first.name} (${first.due_short}), which it needs first.`
+      : null,
+    due && later?.due && later.due < due
+      ? `${later.name} (${later.due_short}) would be due before ${shown}, which it would wait on.`
+      : null,
+  ].filter((w): w is string => Boolean(w));
+  const label = (t: TaskRow) => `${t.name} (${t.due_short || "no date"})`;
 
   async function save() {
     if (!name.trim() || !due) {
@@ -500,19 +537,21 @@ function OneOffDialog({
     setBusy(true);
     setError(null);
     try {
-      await addOneOff(project.id, {
+      const result = await addOneOff(project.id, {
         name: name.trim(),
         due_date: due,
         role_id: roleId || null,
-        user_id: userId || null,
+        user_ids: userIds.filter(Boolean),
         needs_first: needsFirst ? [needsFirst] : [],
+        comes_before: comesBefore ? [comesBefore] : [],
       });
-      onAdded(name.trim());
+      onAdded(name.trim(), result.warnings ?? []);
       setName("");
       setDue("");
       setRoleId("");
-      setUserId("");
+      setUserIds([]);
       setNeedsFirst("");
+      setComesBefore("");
     } catch (caught) {
       setError(errorText(caught));
     } finally {
@@ -523,8 +562,12 @@ function OneOffDialog({
   return (
     <Dialog
       open={open}
-      title="Add a one-off task"
-      description="Only this launch gets it. The template stays the same."
+      title="Add task"
+      description={
+        project.closed
+          ? "This launch is closed, so the task gets no reminders or emails. The template stays the same."
+          : "Only this launch gets it. The template stays the same."
+      }
       onClose={onClose}
       actions={
         <>
@@ -546,31 +589,48 @@ function OneOffDialog({
         }}
       >
         <TextInput label="Task name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} />
-        <DateInput label="Due date" value={due} onChange={(e) => setDue(e.target.value)} required min={todayIso()} />
-        <div className="form-grid">
-          <Select
-            label="Role"
-            value={roleId}
-            onChange={(e) => setRoleId(e.target.value)}
-            placeholder="No role"
-            options={(roles.data?.roles ?? []).filter((r) => r.active).map((r) => ({ value: r.id, label: r.name }))}
-          />
-          <Select
-            label="Assign to"
-            hint="Leave blank to use the person on the team for that role."
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="Nobody yet"
-            options={(people.data?.people ?? []).map((u) => ({ value: u.id, label: u.name }))}
-          />
-        </div>
+        <DateInput
+          label="Due date"
+          value={due}
+          onChange={(e) => setDue(e.target.value)}
+          required
+          min={project.closed ? undefined : todayIso()}
+        />
+        <Select
+          label="Role"
+          value={roleId}
+          onChange={(e) => setRoleId(e.target.value)}
+          placeholder="No role"
+          options={(roles.data?.roles ?? []).filter((r) => r.active).map((r) => ({ value: r.id, label: r.name }))}
+        />
+        <PeoplePicker
+          label="Assign to"
+          hint="Leave blank to use the person on the team for that role."
+          emptyLabel="Nobody yet"
+          people={(people.data?.people ?? []).map((u) => ({ id: u.id, name: u.name }))}
+          value={userIds}
+          onChange={setUserIds}
+        />
         <Select
           label="Needs first (optional)"
           value={needsFirst}
           onChange={(e) => setNeedsFirst(e.target.value)}
           placeholder="Nothing"
-          options={tasks.map((t) => ({ value: t.id, label: t.name }))}
+          options={tasks.filter((t) => t.id !== comesBefore).map((t) => ({ value: t.id, label: label(t) }))}
         />
+        <Select
+          label="Comes before (optional)"
+          hint="That task will wait on this one. Its due date does not change."
+          value={comesBefore}
+          onChange={(e) => setComesBefore(e.target.value)}
+          placeholder="Nothing"
+          options={tasks.filter((t) => isOpenTask(t) && t.id !== needsFirst).map((t) => ({ value: t.id, label: label(t) }))}
+        />
+        {warnings.length > 0 && (
+          <div className="note-box note-box--late" role="note">
+            {warnings.join(" ")} You can still add it. No dates will move.
+          </div>
+        )}
         {error && (
           <p className="field-error" role="alert">
             {error}
@@ -765,7 +825,7 @@ function TemplateDialog({ open, project, onClose }: { open: boolean; project: Pr
     <Dialog
       open={open}
       title="Save as a template"
-      description={`Makes a new template from the ${project.site || project.name} tasks and their timing, one-off tasks included.`}
+      description={`Makes a new template from the ${project.site || project.name} tasks and their timing, including tasks added to this launch.`}
       onClose={onClose}
       actions={
         <>

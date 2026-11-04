@@ -28,6 +28,12 @@ Where the real Airtable base, the wireframes and the build plan disagreed, these
 
 **Blocked means waiting on an open task.** Any open task that depends on another open task shows as Blocked, whatever its stored status, with "Waiting on …" underneath. This follows the build plan. It means the dashboard's "tasks blocked" count includes tasks that are not due for weeks. If NMU would rather see only tasks someone marked Blocked, change `display_status` in `backend/app/services/logic.py`.
 
+**Dates never move on their own, except with Move Day 1.** Changing one task's date, or adding a task in between two others, does not move the tasks after it. NMU asked for this because moving other people's deadlines silently causes problems. Instead, a task due before a task it needs first shows a warning on its row, on its page, in the date and add-task dialogs, and in a banner on the launch page. The admin decides which date to change.
+
+**A task can have several people.** The base's `Assigned To` already allows more than one person, so the app now uses all of them. Everyone on a task sees it in My Tasks, can update it, and gets its reminders. Places with room for one name show the first person and "and N more". Starting a launch still gives each task the one person who fills its role; add more people on the task afterward.
+
+**Tasks can be added to a closed launch.** Admins can add a task to a launch after it is closed, for example to record follow-up work. Closed launches send no reminders, so the person gets no new-task email either, and the due date can be in the past.
+
 **Overdue follow-up is the weekly digest only.** The midterm left open what happens after a task goes overdue. For now overdue tasks are listed first in the Monday digest and there is no separate overdue email. This is `OVERDUE_FOLLOW_UP` in `backend/app/services/reminders.py`.
 
 **Viewers cannot set reminders.** Viewers are read only, and a reminder is a row the app writes, so they cannot set one. Everyone else who can see a task can set a reminder for themselves.

@@ -1849,3 +1849,26 @@ a.row-title:hover {
 .table--archive tbody th .row-sub {
   font-weight: 500;
 }
+
+/* People picker: one or more people on a task */
+.people-picker {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+.people-picker-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.people-picker-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.people-picker-remove {
+  padding-bottom: var(--space-2);
+}

@@ -14,8 +14,9 @@ export const updateTask = (
   body: { due_date?: string; name?: string; depends_on?: string[] },
 ) => send<TaskRow>("PATCH", `/api/tasks/${id}`, body);
 
-export const assignTask = (id: string, userId: string | null) =>
-  send<TaskRow>("POST", `/api/tasks/${id}/assign`, { user_id: userId });
+/** Sets everyone on the task. An empty list leaves it with nobody. */
+export const assignTask = (id: string, userIds: string[]) =>
+  send<TaskRow>("POST", `/api/tasks/${id}/assign`, { user_ids: userIds });
 
 export const addNote = (id: string, text: string) =>
   send<{ notes: Note[] }>("POST", `/api/tasks/${id}/notes`, { text });

@@ -429,7 +429,7 @@ class TaskRec:
     status: str = "Not Started"
     due: date | None = None
     completed: date | None = None
-    assigned_to: str | None = None
+    assigned_to: str | None = None  # The first person, kept for places that show one name
     role_id: str | None = None
     anchor: str = "Start"
     days_before: int | None = None
@@ -441,6 +441,16 @@ class TaskRec:
     description: str = ""
     resource_link: str = ""
     has_override: bool = False
+    assignees: list[str] = field(default_factory=list)  # Everyone on the task, in order
+
+    def __post_init__(self) -> None:
+        if not self.assignees and self.assigned_to:
+            self.assignees = [self.assigned_to]
+        self.assignees = list(dict.fromkeys(self.assignees))
+        self.assigned_to = self.assignees[0] if self.assignees else None
+
+    def is_assigned(self, user_id: str | None) -> bool:
+        return bool(user_id) and user_id in self.assignees
 
 
 def load_tasks(steps: list[StepRec] | None = None) -> list[TaskRec]:
@@ -462,7 +472,7 @@ def load_tasks(steps: list[StepRec] | None = None) -> list[TaskRec]:
                 status=f.get(Work.STATUS) or "Not Started",
                 due=due,
                 completed=parse_date(f.get(Work.COMPLETED_DATE)),
-                assigned_to=_first(f.get(Work.ASSIGNED_TO)),
+                assignees=list(f.get(Work.ASSIGNED_TO) or []),
                 role_id=_first(f.get(Work.ROLE)) or (step.role_id if step else None),
                 anchor=f.get(Work.ANCHOR) or (step.anchor if step else "Start"),
                 days_before=_int(f.get(Work.DAYS_BEFORE_ANCHOR))

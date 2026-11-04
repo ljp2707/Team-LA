@@ -179,7 +179,7 @@ Used by: My Tasks, Task page, Project page, reminders.
 | Completed Date | Set when the task is marked Done. |
 | Assignee | A lookup of the step's roles, not a person. The app does not use it for assignment. |
 | Notes | A notes field from the original base. The app keeps notes in the Activity Log instead. |
-| Assigned To | The person doing the task. |
+| Assigned To | The people doing the task. Usually one, but can be several; each gets the reminders. |
 | Task Name | Shown in the app. |
 | Anchor | Text: Start or End |
 | Days Before Anchor | Read and written by the app. |

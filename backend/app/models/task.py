@@ -21,6 +21,7 @@ class TaskUpdateIn(BaseModel):
 
 class AssignIn(BaseModel):
     user_id: str | None = None
+    user_ids: list[str] | None = None  # Everyone on the task. Takes priority over user_id.
 
 
 class NoteIn(BaseModel):
@@ -61,4 +62,6 @@ class OneOffTaskIn(BaseModel):
     due_date: date
     role_id: str | None = None
     user_id: str | None = None
+    user_ids: list[str] = []  # More people besides user_id
     needs_first: list[str] = []
+    comes_before: list[str] = []

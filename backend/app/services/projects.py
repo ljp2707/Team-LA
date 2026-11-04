@@ -241,8 +241,9 @@ def create(world: World, body: ProjectCreateIn, user: CurrentUser) -> tuple[str,
 
     by_user: dict[str, list[str]] = defaultdict(list)
     for task in World().tasks_by_project.get(session_id, []):
-        if task.assigned_to and task.assigned_to != user.id:
-            by_user[task.assigned_to].append(task.id)
+        for uid in task.assignees:
+            if uid != user.id:
+                by_user[uid].append(task.id)
     return session_id, dict(by_user)
 
 

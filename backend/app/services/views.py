@@ -181,7 +181,7 @@ def task_row(world: World, task: TaskRec, user: CurrentUser) -> dict:
         shared = [
             world.user_short(t.user_id)
             for t in world.team_for(project.id)
-            if t.role_id == task.role_id and t.user_id and t.user_id != task.assigned_to
+            if t.role_id == task.role_id and t.user_id and not task.is_assigned(t.user_id)
         ]
     today = world.today
     return {
@@ -199,8 +199,13 @@ def task_row(world: World, task: TaskRec, user: CurrentUser) -> dict:
         "overdue": logic.is_overdue(task, today),
         "days_late": logic.days_late(task, today),
         "waiting_text": logic.waiting_text(waiting),
+        "date_warning": logic.date_warning(task, world.tasks_by_id, today),
         "waiting_on": [
-            {"id": w.id, "name": w.name, "assignee": world.user_short(w.assigned_to)}
+            {
+                "id": w.id,
+                "name": w.name,
+                "assignee": logic.name_list([world.user_short(a) for a in w.assignees if world.user_short(a)], 2) or None,
+            }
             for w in waiting
         ],
         "at_risk": logic.is_at_risk(task, world.tasks_by_id, today),
@@ -213,8 +218,11 @@ def task_row(world: World, task: TaskRec, user: CurrentUser) -> dict:
             if task.assigned_to and task.assigned_to in world.users
             else None
         ),
+        "assignees": [
+            {"id": a, "name": world.user_short(a)} for a in task.assignees if a in world.users
+        ],
         "shared_with": [s for s in shared if s],
-        "can_edit": permissions.can_edit_task(user.actor, user.id, task.assigned_to),
+        "can_edit": permissions.can_edit_task(user.actor, user.id, task.assignees),
         "phase": logic.phase_for(task.due, project.start if project else None, project.end if project else None),
         "completed": task.completed.isoformat() if task.completed else None,
     }

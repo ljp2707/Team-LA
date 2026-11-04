@@ -27,8 +27,9 @@ def _open_counts(world: World) -> dict[str, int]:
     counts: dict[str, int] = defaultdict(int)
     for t in world.tasks:
         project = world.projects.get(t.session_id or "")
-        if t.assigned_to and logic.is_open(t.status) and project and not project.closed:
-            counts[t.assigned_to] += 1
+        if logic.is_open(t.status) and project and not project.closed:
+            for uid in t.assignees:
+                counts[uid] += 1
     return counts
 
 
@@ -173,7 +174,7 @@ def hand_off(body: HandOffIn, background: BackgroundTasks, user: CurrentUser = D
         (
             t
             for t in world.tasks
-            if t.assigned_to == giver.id
+            if t.is_assigned(giver.id)
             and logic.is_open(t.status)
             and t.session_id in world.projects
             and not world.projects[t.session_id].closed
@@ -198,7 +199,12 @@ def hand_off(body: HandOffIn, background: BackgroundTasks, user: CurrentUser = D
     if not tasks and not (body.replace_on_teams and teams):
         raise HTTPException(status.HTTP_409_CONFLICT, f"{giver.short_name} has no open tasks to hand off")
     client.update_records(
-        Work.TABLE, [{"id": t.id, "fields": {Work.ASSIGNED_TO: [taker.id]}} for t in tasks]
+        Work.TABLE,
+        [
+            # Swap the giver for the taker and keep anyone else on the task.
+            {"id": t.id, "fields": {Work.ASSIGNED_TO: list(dict.fromkeys(taker.id if a == giver.id else a for a in t.assignees))}}
+            for t in tasks
+        ],
     )
     events = [
         history.Event(

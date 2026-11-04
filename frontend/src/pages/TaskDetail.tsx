@@ -18,7 +18,7 @@ import { Avatar } from "../components/ui/Bits";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Dialog } from "../components/ui/Dialog";
-import { DateInput, Select, TextInput } from "../components/ui/Field";
+import { DateInput, TextInput } from "../components/ui/Field";
 import { PageHeader } from "../components/ui/PageHeader";
 import { ErrorState, LoadingState } from "../components/ui/States";
 import { StatusTag } from "../components/ui/StatusTag";
@@ -26,6 +26,7 @@ import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { addDays, formatDate } from "../lib/dates";
 import { LinkDialog } from "../components/LinkDialog";
+import { PeoplePicker } from "../components/PeoplePicker";
 
 const SEGMENTS: { value: TaskStatus; label: string }[] = [
   { value: "Not Started", label: "Not started" },
@@ -101,7 +102,7 @@ export function TaskDetail() {
                 </strong>
               </>
             )}
-            {t.one_off && " · One-off task"}
+            {t.one_off && " · Added to this launch only"}
           </>
         }
         action={
@@ -293,7 +294,7 @@ export function TaskDetail() {
               <div>
                 <dt>Assigned to</dt>
                 <dd>
-                  {t.assignee?.name || "Nobody yet"}
+                  {t.assignees.length ? t.assignees.map((a) => a.name).join(", ") : "Nobody yet"}
                   {t.can_admin && (
                     <button type="button" className="text-button" onClick={() => setOpen("assign")}>
                       Change
@@ -341,6 +342,11 @@ export function TaskDetail() {
                   ))}
                 </ul>
               </>
+            )}
+            {t.date_warnings.length > 0 && (
+              <p className="note-box note-box--late" role="note">
+                {t.date_warnings.join(" ")} No dates were moved. Change the date that is wrong.
+              </p>
             )}
             {t.risk_note && (
               <p className="note-box note-box--late" role="note">
@@ -516,7 +522,7 @@ function AssignDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [userId, setUserId] = useState<string>(task.assignee?.id ?? "");
+  const [userIds, setUserIds] = useState<string[]>(task.assignees.map((a) => a.id));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -524,7 +530,7 @@ function AssignDialog({
     setBusy(true);
     setError(null);
     try {
-      await assignTask(task.id, userId || null);
+      await assignTask(task.id, userIds.filter(Boolean));
       onSaved();
     } catch (caught) {
       setError(errorText(caught));
@@ -537,7 +543,7 @@ function AssignDialog({
     <Dialog
       open={open}
       title="Assign this task"
-      description="The new person gets an email about it."
+      description="Anyone you add gets an email about it, and everyone on the task gets its reminders."
       onClose={onClose}
       actions={
         <>
@@ -550,14 +556,7 @@ function AssignDialog({
         </>
       }
     >
-      <Select
-        label="Assigned to"
-        value={userId}
-        onChange={(e) => setUserId(e.target.value)}
-        placeholder="Nobody"
-        options={task.people.map((p) => ({ value: p.id, label: p.name }))}
-        error={error}
-      />
+      <PeoplePicker people={task.people} value={userIds} onChange={setUserIds} error={error} />
     </Dialog>
   );
 }
@@ -576,6 +575,17 @@ function DueDialog({
   const [date, setDate] = useState(task.due ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isOpenStatus = (s: string) => s !== "Done" && s !== "Skipped";
+  const warnings = date
+    ? [
+        ...task.needs_first
+          .filter((d) => isOpenStatus(d.status) && d.due && d.due > date)
+          .map((d) => `This would be due before ${d.name} (${d.due_short}), which it needs first.`),
+        ...task.waiting_on_this
+          .filter((d) => isOpenStatus(d.status) && d.due && d.due < date)
+          .map((d) => `${d.name} (${d.due_short}) waits on this but would be due first.`),
+      ]
+    : [];
 
   async function save() {
     if (!date) return;
@@ -609,6 +619,11 @@ function DueDialog({
       }
     >
       <DateInput label="Due date" value={date} onChange={(e) => setDate(e.target.value)} error={error} />
+      {warnings.length > 0 && (
+        <div className="note-box note-box--late" role="note">
+          {warnings.join(" ")} You can still save it. The other tasks keep their dates.
+        </div>
+      )}
     </Dialog>
   );
 }

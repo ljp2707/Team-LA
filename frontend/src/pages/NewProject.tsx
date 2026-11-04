@@ -382,7 +382,7 @@ export function NewProject() {
                               task.due ? task.due_text : null,
                               task.role,
                               task.after.length ? `after ${task.after.join(", ")}` : null,
-                              task.one_off ? "one-off" : null,
+                              task.one_off ? "added here" : null,
                             ]
                               .filter(Boolean)
                               .join(" · ")}
@@ -422,9 +422,9 @@ export function NewProject() {
               )}
               {oneOffs.length > 0 && (
                 <p className="muted small">
-                  {oneOffs.length} one-off {oneOffs.length === 1 ? "task" : "tasks"} added.{" "}
+                  {oneOffs.length} added {oneOffs.length === 1 ? "task" : "tasks"}.{" "}
                   <button type="button" className="text-button" onClick={() => setOneOffs([])}>
-                    Remove one-offs
+                    Remove added tasks
                   </button>
                 </p>
               )}
@@ -438,7 +438,7 @@ export function NewProject() {
           )}
           <div className="card-actions card-actions--split">
             <Button variant="outline" onClick={() => setDialog("oneoff")}>
-              Add a one-off task
+              Add task
             </Button>
             <Button type="submit" form="new-project" disabled={busy || !preview}>
               {busy ? "Creating" : "Create launch"}
@@ -508,7 +508,7 @@ function OneOffDraftDialog({
   return (
     <Dialog
       open={open}
-      title="Add a one-off task"
+      title="Add task"
       description="Only this launch gets it. The template stays the same."
       onClose={onClose}
       actions={

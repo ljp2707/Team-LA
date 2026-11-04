@@ -17,6 +17,8 @@ export interface TaskRow {
   overdue: boolean;
   days_late: number;
   waiting_text: string | null;
+  /** Set when this task is due before a task it needs first. Dates never move on their own. */
+  date_warning: string | null;
   waiting_on: { id: string; name: string; assignee: string | null }[];
   at_risk: boolean;
   dependents: number;
@@ -24,6 +26,8 @@ export interface TaskRow {
   role: string | null;
   role_id: string | null;
   assignee: { id: string; name: string } | null;
+  /** Everyone on the task. `assignee` is the first of them. */
+  assignees: { id: string; name: string }[];
   shared_with: string[];
   can_edit: boolean;
   phase: string;
@@ -161,8 +165,9 @@ export interface TaskDetail extends TaskRow {
   timing: string;
   site_type: string | null;
   day_one: string | null;
-  needs_first: { id: string; name: string; status: TaskStatus; overdue: boolean }[];
-  waiting_on_this: { id: string; name: string; status: TaskStatus }[];
+  needs_first: { id: string; name: string; status: TaskStatus; overdue: boolean; due: string | null; due_short: string }[];
+  waiting_on_this: { id: string; name: string; status: TaskStatus; due: string | null; due_short: string }[];
+  date_warnings: string[];
   risk_note: string | null;
   notes: Note[];
   links: LinkItem[];

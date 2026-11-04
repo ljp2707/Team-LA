@@ -37,7 +37,7 @@ def _visible_task(world: World, task_id: str, user: CurrentUser) -> TaskRec:
 
 
 def _require_edit(task: TaskRec, user: CurrentUser) -> None:
-    if not permissions.can_edit_task(user.actor, user.id, task.assigned_to):
+    if not permissions.can_edit_task(user.actor, user.id, task.assignees):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "You can only change tasks assigned to you"
         )
@@ -55,7 +55,7 @@ def my_tasks(
     mine = [
         t
         for t in world.tasks
-        if t.assigned_to == user.id
+        if t.is_assigned(user.id)
         and t.session_id in world.projects
         and not world.projects[t.session_id].closed
         and permissions.can_view_project(user.actor, user.id, world.projects[t.session_id].partner_ids)
@@ -143,11 +143,19 @@ def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
             "name": d.name,
             "status": d.status,
             "overdue": logic.is_overdue(d, today),
+            "due": d.due.isoformat() if d.due else None,
+            "due_short": logic.fmt_date(d.due, today) if d.due else "",
         }
         for d in (world.tasks_by_id[i] for i in task.depends_on if i in world.tasks_by_id)
     ]
     waiting_on_this = [
-        {"id": d.id, "name": d.name, "status": d.status}
+        {
+            "id": d.id,
+            "name": d.name,
+            "status": d.status,
+            "due": d.due.isoformat() if d.due else None,
+            "due_short": logic.fmt_date(d.due, today) if d.due else "",
+        }
         for d in world.dependents.get(task.id, [])
     ]
     open_waiting = [d for d in waiting_on_this if logic.is_open(d["status"])]
@@ -188,6 +196,15 @@ def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
             if open_waiting and logic.is_open(task.status)
             else None
         ),
+        "date_warnings": [
+            f"Due before {d.name} ({logic.fmt_date(d.due, today)}), which it needs first."
+            for d in logic.due_too_early(task, world.tasks_by_id)
+        ]
+        + [
+            f"Due after {d.name} ({logic.fmt_date(d.due, today)}), which waits on it."
+            for d in sorted(world.dependents.get(task.id, []), key=lambda d: (d.due or today, d.name))
+            if task.id in {x.id for x in logic.due_too_early(d, world.tasks_by_id)}
+        ],
         "notes": [note_dict(world, n, user) for n in notes],
         "links": links,
         "reminders": reminders.task_panel(task, user.id, today),
@@ -200,7 +217,7 @@ def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
         "can_share_notes": permissions.can_share_notes(user.actor) and can_edit,
         "back": (
             {"label": "My Tasks", "to": "/my-tasks"}
-            if task.assigned_to == user.id
+            if task.is_assigned(user.id)
             else {"label": world.site_name(project), "to": f"/projects/{project.id}"}
         ),
         "people": (
@@ -306,18 +323,36 @@ def assign_task(
 ):
     world = World()
     task = world.task(task_id)
-    if body.user_id and (body.user_id not in world.users or not world.users[body.user_id].active):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick an active person")
-    if body.user_id == task.assigned_to:
+    # user_ids sets everyone on the task. user_id (one person) still works.
+    if body.user_ids is not None:
+        wanted = list(dict.fromkeys(i for i in body.user_ids if i))
+    else:
+        wanted = [body.user_id] if body.user_id else []
+    for uid in wanted:
+        # Someone already on the task can stay even if they have since been deactivated.
+        if uid not in world.users or (not world.users[uid].active and uid not in task.assignees):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick active people")
+    if wanted == task.assignees:
         return task_row(world, task, user)
-    client.update_record(Work.TABLE, task.id, {Work.ASSIGNED_TO: [body.user_id] if body.user_id else []})
-    old = world.user_name(task.assigned_to) or "Nobody"
-    new = world.user_name(body.user_id) or "Nobody"
-    history.log_event(
-        task.session_id, task.id, user.id, "Reassignment", f"gave {task.name} to {new}", old, new
-    )
-    if body.user_id and body.user_id != user.id and logic.is_open(task.status):
-        background.add_task(reminders.send_assignment_emails, {body.user_id: [task.id]}, user.name)
+    client.update_record(Work.TABLE, task.id, {Work.ASSIGNED_TO: wanted})
+    names = lambda ids: logic.name_list([world.user_name(i) or "Someone" for i in ids], 3)  # noqa: E731
+    old = names(task.assignees) if task.assignees else "Nobody"
+    new = names(wanted) if wanted else "Nobody"
+    added = [i for i in wanted if i not in task.assignees]
+    removed = [i for i in task.assignees if i not in wanted]
+    if not task.assignees or not wanted or not (set(wanted) & set(task.assignees)):
+        text = f"gave {task.name} to {new}"
+    elif added and not removed:
+        text = f"added {names(added)} to {task.name}"
+    elif removed and not added:
+        text = f"took {names(removed)} off {task.name}"
+    else:
+        text = f"gave {task.name} to {new}"
+    history.log_event(task.session_id, task.id, user.id, "Reassignment", text, old, new)
+    project = world.projects.get(task.session_id or "")
+    emails = {i: [task.id] for i in added if i != user.id}
+    if emails and logic.is_open(task.status) and project and not project.closed:
+        background.add_task(reminders.send_assignment_emails, emails, user.name)
     fresh = World()
     return task_row(fresh, fresh.task(task.id), user)
 

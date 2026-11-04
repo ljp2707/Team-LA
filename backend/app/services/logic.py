@@ -65,6 +65,29 @@ def dependents_map(tasks: Iterable[TaskRec]) -> dict[str, list[TaskRec]]:
     return out
 
 
+def due_too_early(task: TaskRec, tasks_by_id: dict[str, TaskRec]) -> list[TaskRec]:
+    """Open tasks this one needs first that are due after it, latest first.
+
+    The app never moves dates on its own when this happens. It only warns, so a
+    person can decide which date is wrong.
+    """
+    if not is_open(task.status) or task.due is None:
+        return []
+    deps = [tasks_by_id[i] for i in task.depends_on if i in tasks_by_id]
+    late = [d for d in deps if is_open(d.status) and d.due is not None and d.due > task.due]
+    return sorted(late, key=lambda d: (d.due, d.name), reverse=True)
+
+
+def date_warning(task: TaskRec, tasks_by_id: dict[str, TaskRec], today: date) -> str | None:
+    """"Due before Order caps (Nov 12), which it needs first"."""
+    early = due_too_early(task, tasks_by_id)
+    if not early:
+        return None
+    first = early[0]
+    more = f" and {len(early) - 1} more" if len(early) > 1 else ""
+    return f"Due before {first.name} ({fmt_date(first.due, today)}){more}, which it needs first"
+
+
 def is_at_risk(task: TaskRec, tasks_by_id: dict[str, TaskRec], today: date) -> bool:
     """An open task with a dependency that is overdue."""
     if not is_open(task.status):
@@ -215,6 +238,8 @@ def name_list(names: list[str], limit: int = 2) -> str:
     """"A, B and 4 more"."""
     if not names:
         return ""
+    if len(names) == 1:
+        return names[0]
     if len(names) <= limit:
-        return " and ".join(names) if len(names) == 2 else names[0]
+        return f"{', '.join(names[:-1])} and {names[-1]}"
     return f"{', '.join(names[:limit])} and {len(names) - limit} more"

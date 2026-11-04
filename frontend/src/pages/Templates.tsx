@@ -939,7 +939,7 @@ function FromProjectDialog({
     <Dialog
       open={open}
       title="Save a project as a template"
-      description="Copies the launch's tasks, roles, order and timing, one-off tasks included."
+      description="Copies the launch's tasks, roles, order and timing, including tasks added to the launch."
       onClose={onClose}
       actions={
         <>

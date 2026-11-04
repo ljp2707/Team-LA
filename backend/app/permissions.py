@@ -138,14 +138,15 @@ def can_assign_tasks(actor: Actor) -> bool:
     return actor.is_admin
 
 
-def can_edit_task(actor: Actor, user_id: str, assigned_to: str | None) -> bool:
+def can_edit_task(actor: Actor, user_id: str, assigned_to: str | list[str] | None) -> bool:
     """Change a task's status, or add notes and links to it.
 
     Admins may change any task. Staff and partners only their own. Viewers none.
     """
     if actor.is_admin:
         return True
-    return can_update_own_tasks(actor) and bool(assigned_to) and assigned_to == user_id
+    people = assigned_to if isinstance(assigned_to, list) else [assigned_to] if assigned_to else []
+    return can_update_own_tasks(actor) and bool(user_id) and user_id in people
 
 
 def can_edit_task_details(actor: Actor) -> bool:

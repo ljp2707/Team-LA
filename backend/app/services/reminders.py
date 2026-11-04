@@ -120,8 +120,8 @@ class Context:
         )
 
     def recipients(self, task: TaskRec) -> list[UserRec]:
-        """The assignee, or else the project team for the task's role. Active only."""
-        ids = [task.assigned_to] if task.assigned_to else []
+        """Everyone assigned, or else the project team for the task's role. Active only."""
+        ids = list(task.assignees)
         if not ids and task.session_id and task.role_id:
             ids = self.team.get((task.session_id, task.role_id), [])
         return [self.users[i] for i in ids if i in self.users and self.users[i].active]
@@ -543,7 +543,7 @@ def mine(user_id: str, today: date, tasks: list[TaskRec], active_ids: set[str]) 
                     }
                 )
     for task in tasks:
-        if task.assigned_to != user_id or not is_open(task.status) or task.due is None:
+        if not task.is_assigned(user_id) or not is_open(task.status) or task.due is None:
             continue
         if task.session_id not in active_ids:
             continue

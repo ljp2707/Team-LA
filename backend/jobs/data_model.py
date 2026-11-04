@@ -63,7 +63,7 @@ FIELDS: dict[tuple[str, str], str] = {
     ("Work", "DUE_DATE"): "A formula: the override if there is one, otherwise the calculated date.",
     ("Work", "DUE_DATE_OVERRIDE"): "The due date the app writes. Moving Day 1 and changing a due date both write here.",
     ("Work", "ASSIGNEE"): "A lookup of the step's roles, not a person. The app does not use it for assignment.",
-    ("Work", "ASSIGNED_TO"): "The person doing the task.",
+    ("Work", "ASSIGNED_TO"): "The people doing the task. Usually one, but can be several; each gets the reminders.",
     ("Work", "STATUS"): "Not Started, In Progress, Blocked, Done or Skipped.",
     ("Work", "COMPLETED_DATE"): "Set when the task is marked Done.",
     ("Work", "COMPLETED_BY"): "Who marked it Done.",

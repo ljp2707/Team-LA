@@ -37,7 +37,7 @@ export function MyTaskRow({ task, onStatus }: { task: Task; onStatus: (task: Tas
     <span className="row-sub">
       {[task.site || task.project_name, task.program_type].filter(Boolean).join(" · ")}
       {task.shared_with.length > 0 && ` · shared with ${task.shared_with.join(", ")}`}
-      {task.one_off && " · one-off"}
+      {task.one_off && " · added to this launch"}
     </span>
   );
   return (
@@ -86,17 +86,21 @@ export function ProjectTaskRow({
 }) {
   const late = task.overdue && !isFinished(task.status);
   const blocked = task.display_status === "Blocked";
-  const note = task.waiting_text
+  const note = task.date_warning
+    ? task.date_warning
+    : task.waiting_text
     ? task.waiting_text
     : late && task.dependents > 0
       ? `${task.dependents} ${task.dependents === 1 ? "task depends" : "tasks depend"} on this`
       : task.one_off
-        ? "One-off task, only this project"
+        ? "Added to this launch only"
         : !task.assignee
           ? "Needs an owner"
           : null;
-  const noteLate = Boolean(task.waiting_text) || (late && task.dependents > 0);
-  const who = [task.role, task.assignee?.name].filter(Boolean).join(" · ") || "No owner yet";
+  const noteLate = Boolean(task.date_warning || task.waiting_text) || (late && task.dependents > 0);
+  const names = (task.assignees ?? []).map((a) => a.name);
+  const people = names.length > 2 ? `${names[0]} and ${names.length - 1} more` : names.join(" and ");
+  const who = [task.role, people].filter(Boolean).join(" · ") || "No owner yet";
 
   return (
     <li className={`project-row${blocked ? " is-blocked" : ""}${task.status === "Done" ? " is-done" : ""}`}>

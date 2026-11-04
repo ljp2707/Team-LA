@@ -24,7 +24,7 @@ def remove_link(link_id: str, user: CurrentUser = Depends(require_can_edit)):
     if link.work_id:
         task = world.task(link.work_id)
         check_project_access(user, world.project(task.session_id or ""))
-        if not permissions.can_edit_task(user.actor, user.id, task.assigned_to):
+        if not permissions.can_edit_task(user.actor, user.id, task.assignees):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only change tasks assigned to you")
         session_id = task.session_id
         what = f"removed the link {link.title} from {task.name}"
@@ -75,7 +75,7 @@ def share_note(note_id: str, body: NoteVisibilityIn, user: CurrentUser = Depends
     row = _note(world, note_id, user)
     task = world.tasks_by_id.get(row.work_id or "")
     if not permissions.can_share_notes(user.actor) or (
-        task and not permissions.can_edit_task(user.actor, user.id, task.assigned_to)
+        task and not permissions.can_edit_task(user.actor, user.id, task.assignees)
     ):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot change who sees this note")
     if body.visibility != row.visibility:

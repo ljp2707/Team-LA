@@ -14,7 +14,9 @@ export interface OneOffInput {
   due_date: string;
   role_id?: string | null;
   user_id?: string | null;
+  user_ids?: string[];
   needs_first?: string[];
+  comes_before?: string[];
 }
 
 export interface PreviewInput {
@@ -59,7 +61,7 @@ export const undoDayOne = (id: string, batch: string) =>
   send<{ message: string }>("POST", `/api/projects/${id}/move-day-one/undo`, { batch });
 
 export const addOneOff = (id: string, body: OneOffInput) =>
-  send<{ id: string }>("POST", `/api/projects/${id}/tasks`, body);
+  send<{ id: string; warnings: string[] }>("POST", `/api/projects/${id}/tasks`, body);
 
 export const closeProject = (id: string, skipOpen: boolean) =>
   send<{ closed: boolean }>("POST", `/api/projects/${id}/close`, { skip_open: skipOpen });

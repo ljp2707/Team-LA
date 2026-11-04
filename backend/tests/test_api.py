@@ -183,6 +183,130 @@ def test_one_off_task_and_close_and_reopen(client, sign_in, project, fixed_clock
     assert fields(project, Session.TABLE, "recProj")[Session.STATUS] == "In progress"
 
 
+def test_one_off_in_between_warns_but_moves_nothing(client, sign_in, project):
+    sign_in("admin@example.org")
+    before = fields(project, Work.TABLE, "recT3")[Work.DUE_DATE_OVERRIDE]
+    response = client.post(
+        "/api/projects/recProj/tasks",
+        json={"name": "Print flyers", "due_date": "2026-11-10", "needs_first": ["recT2"], "comes_before": ["recT3"]},
+    )
+    assert response.status_code == 201
+    new_id = response.json()["id"]
+    assert response.json()["warnings"] == [
+        "Community outreach (Nov 6) is due before Print flyers, which it now waits on."
+    ]
+    later = fields(project, Work.TABLE, "recT3")
+    assert later[Work.DEPENDS_ON] == ["recT2", new_id]
+    assert later[Work.DUE_DATE_OVERRIDE] == before  # Nothing moved
+
+    row = client.get("/api/tasks/recT3").json()
+    assert row["date_warning"] == "Due before Print flyers (Nov 10), which it needs first"
+    assert row["date_warnings"] == ["Due before Print flyers (Nov 10), which it needs first."]
+    assert client.get(f"/api/tasks/{new_id}").json()["date_warnings"] == [
+        "Due after Community outreach (Nov 6), which waits on it."
+    ]
+
+
+def test_one_off_in_between_refuses_a_circle(client, sign_in, project):
+    sign_in("admin@example.org")
+    response = client.post(
+        "/api/projects/recProj/tasks",
+        json={"name": "Loop", "due_date": "2026-11-10", "needs_first": ["recT3"], "comes_before": ["recT2"]},
+    )
+    assert response.status_code == 422
+
+
+def test_changing_a_due_date_only_warns(client, sign_in, project):
+    sign_in("admin@example.org")
+    assert client.get("/api/tasks/recT3").json()["date_warning"] is None
+    client.patch("/api/tasks/recT2", json={"due_date": "2026-11-20"})
+    assert fields(project, Work.TABLE, "recT3")[Work.DUE_DATE_OVERRIDE] == "2026-11-06"
+    assert client.get("/api/tasks/recT3").json()["date_warning"] == (
+        "Due before Design flyer (Nov 20), which it needs first"
+    )
+
+
+def test_one_off_on_a_closed_launch_sends_no_email(client, sign_in, project, fixed_clock, monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.services import reminders
+
+    sent = []
+    monkeypatch.setattr(reminders, "send_assignment_emails", lambda *a, **k: sent.append(a))
+    sign_in("admin@example.org")
+    fixed_clock(datetime(2026, 11, 30, 9, tzinfo=ZoneInfo("America/Los_Angeles")))
+    assert client.post("/api/projects/recProj/close", json={}).status_code == 200
+    response = client.post(
+        "/api/projects/recProj/tasks",
+        json={"name": "Return the lane ropes", "due_date": "2026-11-25", "user_id": "recStaff"},
+    )
+    assert response.status_code == 201
+    assert sent == []
+
+
+def test_a_task_can_have_several_people(client, sign_in, project, monkeypatch):
+    from app.services import reminders
+
+    sent = []
+    monkeypatch.setattr(reminders, "send_assignment_emails", lambda by_user, *a: sent.append(by_user))
+    sign_in("admin@example.org")
+    response = client.post("/api/tasks/recT3/assign", json={"user_ids": ["recStaff", "recAdmin"]})
+    assert response.status_code == 200
+    assert [a["id"] for a in response.json()["assignees"]] == ["recStaff", "recAdmin"]
+    assert fields(project, Work.TABLE, "recT3")[Work.ASSIGNED_TO] == ["recStaff", "recAdmin"]
+    assert sent == []  # recStaff was already on it, and admins are not emailed about their own changes
+
+    # Both people see it in My Tasks and can update it
+    assert "Community outreach" in [t["name"] for t in client.get("/api/tasks/mine").json()["groups"]["this_week"]]
+    sign_in("staff@example.org")
+    assert "Community outreach" in [t["name"] for t in client.get("/api/tasks/mine").json()["groups"]["this_week"]]
+    assert client.get("/api/tasks/recT3").json()["can_edit"] is True
+
+    # Taking one person off keeps the other
+    sign_in("admin@example.org")
+    client.post("/api/tasks/recT3/assign", json={"user_ids": ["recAdmin"]})
+    assert fields(project, Work.TABLE, "recT3")[Work.ASSIGNED_TO] == ["recAdmin"]
+    sign_in("staff@example.org")
+    assert client.get("/api/tasks/recT3").json()["can_edit"] is False
+
+
+def test_adding_a_person_emails_only_the_new_person(client, sign_in, project, monkeypatch):
+    from app.services import reminders
+
+    sent = []
+    monkeypatch.setattr(reminders, "send_assignment_emails", lambda by_user, *a: sent.append(by_user))
+    sign_in("admin@example.org")
+    client.post("/api/tasks/recT1/assign", json={"user_ids": []})
+    client.post("/api/tasks/recT3/assign", json={"user_ids": ["recAdmin"]})
+    sent.clear()
+    client.post("/api/tasks/recT3/assign", json={"user_ids": ["recAdmin", "recStaff"]})
+    assert sent == [{"recStaff": ["recT3"]}]
+
+
+def test_reminders_go_to_everyone_on_a_task(project):
+    from datetime import date
+
+    from app.services.records import TaskRec
+    from app.services.reminders import Context
+
+    ctx = Context.load(date(2026, 11, 4))
+    task = TaskRec(id="x", name="X", session_id="recProj", assignees=["recStaff", "recAdmin"])
+    assert [u.id for u in ctx.recipients(task)] == ["recStaff", "recAdmin"]
+    assert task.assigned_to == "recStaff" and task.is_assigned("recAdmin")
+
+
+def test_hand_off_keeps_the_other_people_on_a_task(client, sign_in, project):
+    sign_in("admin@example.org")
+    client.post("/api/tasks/recT3/assign", json={"user_ids": ["recStaff", "recAdmin"]})
+    response = client.post(
+        "/api/users/hand-off",
+        json={"from_user": "recAdmin", "to_user": "recStaff", "replace_on_teams": False},
+    )
+    assert response.status_code == 200, response.text
+    assert fields(project, Work.TABLE, "recT3")[Work.ASSIGNED_TO] == ["recStaff"]
+
+
 # --- My Tasks and task detail ----------------------------------------------------
 
 

@@ -1,6 +1,6 @@
 # NMU Launches user guide
 
-NMU Launches keeps track of everything that has to happen to open a swim program at a new site. Each launch has a list of tasks, each task has one person responsible and a due date, and the app reminds people by email before things are due.
+NMU Launches keeps track of everything that has to happen to open a swim program at a new site. Each launch has a list of tasks, each task has a due date and one or more people responsible, and the app reminds people by email before things are due.
 
 ## For everyone
 
@@ -82,7 +82,7 @@ Click **Start a launch**.
 3. Pick **Day 1**. Every due date is worked out from it.
 4. Check the program name, hours, location, lead instructors, partner contact and Drive folder. Tick **Partner access** for any partner who should see this launch.
 5. On the right, **Your task list** shows every task with its due date. Open **Owners by role** to choose who fills each role. To give one task to someone else, change the person on that task.
-6. **Add a one-off task** adds a task to this launch only. The template does not change.
+6. **Add task** adds a task to this launch only. The template does not change.
 7. Click **Create launch**. Everyone who got a task receives one email listing their new tasks.
 
 Leave **Save the partner contact and shipping address to the site profile** ticked to reuse them next time.
@@ -92,14 +92,16 @@ Leave **Save the partner contact and shipping address to the site profile** tick
 On a launch's page:
 
 - **Move Day 1** asks for the new date and tells you what will happen before anything changes: "12 open tasks and their reminders will move a week later. 6 finished tasks keep their dates." After you confirm, a blue banner offers **Undo**. You can undo the latest move within 24 hours.
-- **Add a one-off task** adds a task with its own name, due date, role, person and, if you like, a task it needs first.
+- **Add task** adds a task with its own name, due date, role and person. To put it between two tasks, pick what it **Needs first** and what it **Comes before**. The task after it then waits on the new one.
+- Changing a due date, or adding a task in between, never moves other tasks. If a task ends up due before a task it needs first, the app warns you on the launch page, on the task, and in the dialog before you save. Change whichever date is wrong.
 - Click a task's status tag to change it, or open the task to change its due date, rename it, reassign it or skip it for this launch.
+- A task can have more than one person. Open it, click **Change** next to **Assigned to**, and click **Add another person**. Everyone on it sees it in My Tasks, can update it and gets its reminders. Only the people you add get a new-task email.
 - **Edit details** changes the program name, hours, location, instructors, partner contact, shipping address, Drive folder and partner access.
 - **History** lists every change. **See all** opens the full list.
 
 ### Closing a launch
 
-Once Day 1 has passed, **Close launch** (in Site and partner) moves the launch to the Archive and stops its reminders. If tasks are still open, you can mark them all skipped at the same time. **Reopen** brings a closed launch back.
+Once Day 1 has passed, **Close launch** (in Site and partner) moves the launch to the Archive and stops its reminders. If tasks are still open, you can mark them all skipped at the same time. **Reopen** brings a closed launch back. You can still **Add task** on a closed launch, for example to record follow-up work. It gets no reminders or emails.
 
 ### The archive
 
@@ -113,7 +115,7 @@ A template is the list of tasks for one kind of launch, with when each is due an
 - **Publish** makes the draft the new live version. Launches already running keep the tasks they were made with. Only new launches use the new version.
 - **Discard** throws the draft away.
 - **Version history** shows every version, who published it and what changed.
-- **Duplicate** copies a template. **New template** starts a new one from a copy. **Save a project as a template** turns a launch, one-off tasks included, into a template.
+- **Duplicate** copies a template. **New template** starts a new one from a copy. **Save a project as a template** turns a launch, including tasks added to it, into a template.
 - **Make inactive** hides a template from Start a launch without deleting it.
 - **From past launches** appears once a template has three finished launches. It shows tasks that are often late, often skipped, or often added by hand. **Add to this template** puts an often-added task into the draft.
 
@@ -122,7 +124,7 @@ A template is the list of tasks for one kind of launch, with when each is due an
 - **Add a person** with their Google email, access level and roles. They get a welcome email and can sign in straight away.
 - **Edit** changes someone's name, access level and roles, or deactivates them so they can no longer sign in. You cannot remove your own admin access, and the last admin cannot be removed.
 - **Manage roles** adds, renames and deactivates roles. A role that tasks or teams use cannot be deleted, only made inactive.
-- **Hand off tasks** moves all of one person's open tasks to someone else, for example when they go on leave. It shows the tasks first. Leave **Also put them on those launch teams** ticked so future reminders go to the new person too.
+- **Hand off tasks** moves all of one person's open tasks to someone else, for example when they go on leave. Anyone else on those tasks stays on them. It shows the tasks first. Leave **Also put them on those launch teams** ticked so future reminders go to the new person too.
 - **What each level can do** shows the permissions of Admin, Staff and Partner.
 - **System** shows whether Airtable, Google sign in and email are set up. **Send me a test email** checks that email works.
 

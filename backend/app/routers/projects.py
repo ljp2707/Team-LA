@@ -216,12 +216,31 @@ def add_one_off_task(
     project = world.project(project_id)
     if body.role_id and body.role_id not in world.roles:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick a role from the list")
-    if body.user_id and body.user_id not in world.users:
+    picked = list(dict.fromkeys([*([body.user_id] if body.user_id else []), *body.user_ids]))
+    if any(u not in world.users for u in picked):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pick a person from the list")
-    mine = {t.id for t in world.tasks_by_project.get(project.id, [])}
-    if any(d not in mine for d in body.needs_first):
+    in_project = {t.id: t for t in world.tasks_by_project.get(project.id, [])}
+    mine = set(in_project)
+    needs_first = list(dict.fromkeys(body.needs_first))
+    comes_before = list(dict.fromkeys(body.comes_before))
+    if any(d not in mine for d in needs_first):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "Needs first must be a task in this project"
+        )
+    if any(d not in mine for d in comes_before):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Comes before must be a task in this project"
+        )
+    # The new task sits between the two: it waits on needs_first, and every
+    # comes_before task waits on it. Refuse anything that makes a circle.
+    edges = {t.id: list(t.depends_on) for t in in_project.values()}
+    edges["new"] = needs_first
+    for d in comes_before:
+        edges[d] = [*edges[d], "new"]
+    if timeline.find_cycle(edges):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "That would make the tasks wait on each other in a circle.",
         )
     fields = {
         Work.SESSION: [project.id],
@@ -233,23 +252,39 @@ def add_one_off_task(
         Work.ONE_OFF: True,
         Work.SORT_ORDER: float(len(mine)),
     }
-    user_id = body.user_id
-    if not user_id and body.role_id:
+    if not picked and body.role_id:
         team = [t.user_id for t in world.team_for(project.id) if t.role_id == body.role_id and t.user_id]
-        user_id = team[0] if team else None
+        picked = team[:1]
     if body.role_id:
         fields[Work.ROLE] = [body.role_id]
-    if user_id:
-        fields[Work.ASSIGNED_TO] = [user_id]
-    if body.needs_first:
-        fields[Work.DEPENDS_ON] = list(body.needs_first)
+    if picked:
+        fields[Work.ASSIGNED_TO] = picked
+    if needs_first:
+        fields[Work.DEPENDS_ON] = needs_first
     created = client.create_record(Work.TABLE, fields, typecast=True)
-    history.log_event(
-        project.id, created["id"], user.id, "Task Added", f"added the one-off task {body.name.strip()}"
-    )
-    if user_id and user_id != user.id:
-        background.add_task(reminders.send_assignment_emails, {user_id: [created["id"]]}, user.name)
-    return {"id": created["id"]}
+    for d in comes_before:
+        later = in_project[d]
+        client.update_record(Work.TABLE, d, {Work.DEPENDS_ON: [*later.depends_on, created["id"]]})
+    text = f"added the task {body.name.strip()}"
+    if comes_before:
+        text += f" before {logic.name_list([in_project[d].name for d in comes_before], 3)}"
+    history.log_event(project.id, created["id"], user.id, "Task Added", text)
+    # A closed launch sends no reminders, so it sends no new-task email either.
+    emails = {u: [created["id"]] for u in picked if u != user.id}
+    if emails and not project.closed:
+        background.add_task(reminders.send_assignment_emails, emails, user.name)
+    # Dates never move on their own. Say which ones are now out of order instead.
+    name = body.name.strip()
+    warnings = [
+        f"{name} is due before {in_project[d].name} ({logic.fmt_date(in_project[d].due, world.today)}), which it needs first."
+        for d in needs_first
+        if logic.is_open(in_project[d].status) and in_project[d].due and in_project[d].due > body.due_date
+    ] + [
+        f"{in_project[d].name} ({logic.fmt_date(in_project[d].due, world.today)}) is due before {name}, which it now waits on."
+        for d in comes_before
+        if logic.is_open(in_project[d].status) and in_project[d].due and in_project[d].due < body.due_date
+    ]
+    return {"id": created["id"], "warnings": warnings}
 
 
 @router.post("/{project_id}/close")
