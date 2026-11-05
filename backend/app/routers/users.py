@@ -343,3 +343,100 @@ def update_role(role_id: str, body: RoleUpdateIn, user: CurrentUser = Depends(re
 
 
 __all__ = ["router", "roles_router", "directory_router", "INACTIVE"]
+
+
+FORMER_FIRST = "Former"
+FORMER_LAST = "team member"
+
+
+@router.post("/{user_id}/erase")
+def erase_person(user_id: str, user: CurrentUser = Depends(require_admin)):
+    """Remove a deactivated person's name and email everywhere, for a deletion request.
+
+    The Users row stays so the work they did still links to someone, but it is
+    renamed "Former team member" and its email is replaced with an address that
+    cannot receive mail or sign in. Their name and email are also taken out of
+    the history text, partner access and any partner contact fields that hold
+    their email. Their scheduled reminders are cancelled.
+    """
+    world = World()
+    target = world.users.get(user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Person not found")
+    if target.id == user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You cannot remove your own details.")
+    if target.active:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Deactivate them first, then remove their details.")
+    open_count = _open_counts(world).get(target.id, 0)
+    if open_count:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{target.short_name} still has {logic.plural(open_count, 'open task')}. Hand them off first.",
+        )
+    if target.first_name == FORMER_FIRST and target.last_name == FORMER_LAST:
+        return {"erased": True, "history_rows": 0}
+
+    from app.airtable.schema import ActivityLog, Reminders, Session, Site
+    from app.services.records import load_reminders, safe
+
+    former = f"{FORMER_FIRST} {FORMER_LAST}"
+    old_email = (target.email or "").strip()
+    # Longest first, so "Catalina Lopez" is replaced before a shorter form of it could be.
+    needles = sorted({n for n in (target.name, f"{target.first_name} {target.last_name}".strip(), old_email) if n and len(n) > 2}, key=len, reverse=True)
+
+    def scrub(text: str) -> str:
+        for needle in needles:
+            text = text.replace(needle, former)
+        return text
+
+    log_updates = []
+    for row in world.log:
+        fields = {}
+        for name, value in ((ActivityLog.TEXT, row.text), (ActivityLog.FROM, row.from_value), (ActivityLog.TO, row.to_value)):
+            if value and scrub(value) != value:
+                fields[name] = scrub(value)
+        if fields:
+            log_updates.append({"id": row.id, "fields": fields})
+    client.update_records(ActivityLog.TABLE, log_updates)
+
+    # Partner access, and partner contact fields that hold this person's email
+    session_updates = []
+    for project in world.projects.values():
+        if target.id in project.partner_ids:
+            session_updates.append(
+                {"id": project.id, "fields": {Session.PARTNERS: [p for p in project.partner_ids if p != target.id]}}
+            )
+    client.update_records(Session.TABLE, session_updates)
+    if old_email:
+        for table, cls in ((Session.TABLE, Session), (Site.TABLE, Site)):
+            contact_updates = [
+                {
+                    "id": r["id"],
+                    "fields": {cls.PARTNER_CONTACT_NAME: "", cls.PARTNER_CONTACT_EMAIL: "", cls.PARTNER_CONTACT_PHONE: ""},
+                }
+                for r in client.all_records(table)
+                if (r["fields"].get(cls.PARTNER_CONTACT_EMAIL) or "").strip().lower() == old_email.lower()
+            ]
+            client.update_records(table, contact_updates)
+
+    scheduled = [
+        r.id for r in safe(load_reminders) if r.recipient_id == target.id and r.status == reminders.SCHEDULED
+    ]
+    client.update_records(
+        Reminders.TABLE, [{"id": i, "fields": {Reminders.STATUS: reminders.CANCELLED}} for i in scheduled]
+    )
+
+    client.update_record(
+        Users.TABLE,
+        target.id,
+        {
+            Users.FIRST_NAME: FORMER_FIRST,
+            Users.LAST_NAME: FORMER_LAST,
+            # .invalid can never receive mail, and no Google account can sign in with it.
+            Users.EMAIL: f"removed-{target.id.lower()}@example.invalid",
+            Users.ROLES: [],
+        },
+        typecast=True,
+    )
+    history.log_event(None, None, user.id, "System", "removed a former team member's personal details")
+    return {"erased": True, "history_rows": len(log_updates)}

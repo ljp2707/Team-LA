@@ -145,6 +145,15 @@
 
 .season-bar .is-done {
   background: var(--color-primary);
+  transform-origin: left center;
+  animation: segment-fill 420ms var(--ease-out) both;
+  animation-delay: calc(700ms + var(--i, 0) * 70ms);
+}
+
+@keyframes segment-fill {
+  from {
+    transform: scaleX(0);
+  }
 }
 
 .dot-grid {
@@ -162,17 +171,32 @@
   background: var(--color-hover-tint);
 }
 
+.dot-grid span {
+  animation: dot-in 360ms var(--ease-spring) both;
+  animation-delay: calc(800ms + var(--i, 0) * 28ms);
+}
+
 .dot-grid .is-done {
   background: var(--color-primary);
 }
 
+@keyframes dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
 .dot-grid .is-pulsing {
   background: var(--water-mid);
-  animation: dot-pulse 2.4s ease-in-out infinite;
+  animation:
+    dot-in 360ms var(--ease-spring) both,
+    dot-pulse 2.4s ease-in-out infinite;
+  animation-delay: calc(800ms + var(--i, 0) * 28ms), 1.6s;
 }
 
 .dot-grid .is-pulsing:nth-child(2n) {
-  animation-delay: 0.8s;
+  animation-delay: calc(800ms + var(--i, 0) * 28ms), 2.4s;
 }
 
 @keyframes dot-pulse {
@@ -191,9 +215,25 @@
   width: clamp(150px, 12vw, 180px);
   aspect-ratio: 1;
   margin-left: -90px;
+  /* Drops in from above and settles with a little overshoot, like it was tossed */
+  animation: ring-drop 1100ms var(--ease-spring) 250ms both;
+}
+
+.life-ring-float {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   box-shadow: 0 16px 32px rgba(13, 36, 56, 0.2);
-  animation: ring-bob 5s ease-in-out infinite alternate;
+  cursor: pointer;
+  /* Bobs and sways a little, so it reads as floating rather than sliding */
+  animation: ring-bob 5s var(--ease-in-out) 1350ms infinite alternate;
+}
+
+.life-ring-float.is-dunked {
+  animation:
+    ring-dunk 900ms var(--ease-spring),
+    ring-bob 5s var(--ease-in-out) 900ms infinite alternate;
 }
 
 .life-ring svg {
@@ -203,12 +243,60 @@
   animation: ring-spin 48s linear infinite;
 }
 
+@keyframes ring-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-140px) rotate(-25deg);
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
 @keyframes ring-bob {
   from {
-    transform: translateY(-8px);
+    transform: translateY(-8px) rotate(-2deg);
   }
   to {
-    transform: translateY(16px);
+    transform: translateY(16px) rotate(2deg);
+  }
+}
+
+@keyframes ring-dunk {
+  0% {
+    transform: translateY(-8px) scale(1);
+  }
+  25% {
+    transform: translateY(26px) scale(0.96, 0.92);
+  }
+  100% {
+    transform: translateY(-8px) scale(1);
+  }
+}
+
+/* Bubbles let off by a tap on the ring */
+.splash {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: splash-rise 900ms var(--ease-out) both;
+}
+
+@keyframes splash-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), -90px) scale(1);
   }
 }
 
@@ -224,6 +312,13 @@
   inset: auto 0 0;
   height: 37%;
   pointer-events: none;
+  animation: water-in 1400ms var(--ease-out) both;
+}
+
+@keyframes water-in {
+  from {
+    transform: translateY(45%);
+  }
 }
 
 .wave {
@@ -277,15 +372,25 @@
 }
 
 @keyframes bubble-rise {
+  0% {
+    transform: translate(0, 0) scale(0.7);
+  }
   10% {
     opacity: 0.9;
   }
+  30% {
+    transform: translate(7px, -90px) scale(0.85);
+  }
+  55% {
+    transform: translate(-5px, -165px) scale(0.95);
+  }
   80% {
     opacity: 0.6;
+    transform: translate(9px, -240px) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(12px, -300px);
+    transform: translate(3px, -300px) scale(1.05);
   }
 }
 
@@ -452,4 +557,60 @@
   .hero-foot ul {
     flex-direction: column;
   }
+}
+
+/* ---------- First load: the headline rises line by line, then the rest follows ---------- */
+
+.hero-line {
+  display: block;
+  overflow: hidden;
+  /* Room for descenders, so the mask does not clip them */
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+
+.hero-line > span {
+  display: block;
+  animation: line-rise 900ms var(--ease-out) both;
+  animation-delay: calc(80ms + var(--i, 0) * 90ms);
+}
+
+@keyframes line-rise {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+.hero-rise {
+  animation: soft-rise 700ms var(--ease-out) both;
+  animation-delay: calc(80ms + var(--i, 0) * 90ms);
+}
+
+.hero-card {
+  animation: soft-rise 700ms var(--ease-out) both;
+  animation-delay: calc(420ms + var(--i, 0) * 110ms);
+}
+
+@keyframes soft-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* Footer links */
+.hero-foot-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.hero-foot-legal a {
+  color: #fff;
+  pointer-events: auto;
+  text-underline-offset: 3px;
+}
+
+.hero-foot {
+  pointer-events: none;
 }

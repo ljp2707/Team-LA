@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { Link } from "react-router-dom";
 import { Navigate } from "react-router-dom";
 import { seasonStats } from "../api/archive";
 import type { SeasonStats } from "../api/archive";
@@ -8,8 +10,9 @@ import { Card } from "../components/ui/Card";
 import { LogoMark } from "../components/ui/LogoMark";
 import "../styles/home.css";
 
-// One row per line of the dot grid: b = done, p = pulsing, - = empty.
-const DOT_ROWS = ["bbbbbbbpbb--", "bbbbbb-bbb--", "bbbbb-bb-bp-"];
+/** The dot grid on "Tasks done this week": one dot per task, up to this many. */
+const DOT_COLUMNS = 12;
+const DOT_COUNT = 36;
 
 const BUBBLES = [
   { left: "46%", size: 16, delay: "0s" },
@@ -20,6 +23,41 @@ const BUBBLES = [
 ];
 
 const PROGRAMS = ["Swim Safely", "Learn to Swim with YMCA", "Learn to Swim with City"];
+
+/** Passes a stagger index to CSS as --i. */
+const order = (i: number) => ({ "--i": i }) as CSSProperties;
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** Counts up from 0 to the value once, easing out, after a short wait. */
+function CountUp({ value, delay = 0 }: { value: number; delay?: number }) {
+  const [shown, setShown] = useState(() => (prefersReducedMotion() ? value : 0));
+  useEffect(() => {
+    if (prefersReducedMotion() || value === 0) {
+      setShown(value);
+      return;
+    }
+    const duration = Math.min(1200, 500 + value * 40);
+    let frame = 0;
+    let begin = 0;
+    const tick = (now: number) => {
+      if (!begin) begin = now + delay;
+      const t = Math.min(1, Math.max(0, (now - begin) / duration));
+      setShown(Math.round(value * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value, delay]);
+  return (
+    <span className="stat-number">
+      <span aria-hidden="true">{shown}</span>
+      <span className="visually-hidden">{value}</span>
+    </span>
+  );
+}
 
 /** Draws one wave. It repeats every 720 units, so scrolling by half loops cleanly. */
 function Wave({ layer, height, swell }: { layer: string; height: number; swell: number }) {
@@ -33,12 +71,27 @@ function Wave({ layer, height, swell }: { layer: string; height: number; swell: 
   );
 }
 
+/** Bubbles let off when someone taps the ring. */
+const SPLASH = [
+  { x: -34, size: 10, delay: 0 },
+  { x: -8, size: 14, delay: 60 },
+  { x: 18, size: 8, delay: 120 },
+  { x: 40, size: 12, delay: 30 },
+];
+
 function LifeRing() {
   const radius = 74;
   const stripe = (2 * Math.PI * radius) / 8; // Four coral stripes, four white gaps
+  // Each tap gets a new key, which restarts the dip and the splash from the start.
+  const [dunk, setDunk] = useState(0);
   return (
-    <div className="life-ring">
-      <svg viewBox="0 0 200 200" aria-hidden="true">
+    <div className="life-ring" aria-hidden="true">
+      <div
+        key={dunk}
+        className={`life-ring-float${dunk ? " is-dunked" : ""}`}
+        onPointerDown={() => setDunk((n) => n + 1)}
+      >
+        <svg viewBox="0 0 200 200">
         <circle cx="100" cy="100" r="52" fill="#BDD8EC" />
         <circle cx="100" cy="100" r={radius} fill="none" stroke="#fff" strokeWidth="46" />
         <circle
@@ -53,7 +106,16 @@ function LifeRing() {
         />
         <circle cx="100" cy="100" r="97" fill="none" stroke="#B9CBD9" strokeWidth="1.5" />
         <circle cx="100" cy="100" r="51" fill="none" stroke="#B9CBD9" strokeWidth="1.5" />
-      </svg>
+        </svg>
+        {dunk > 0 &&
+          SPLASH.map((b) => (
+            <span
+              key={b.x}
+              className="splash"
+              style={{ "--x": `${b.x}px`, width: b.size, height: b.size, animationDelay: `${b.delay}ms` } as CSSProperties}
+            />
+          ))}
+      </div>
     </div>
   );
 }
@@ -73,15 +135,15 @@ function SeasonCard({ stats }: { stats: SeasonStats }) {
   const toLaunch = stats.sites_to_launch;
   const launched = stats.sites_launched;
   return (
-    <Card className="stat-card">
+    <Card className="stat-card hero-card" style={order(0)}>
       <h2>{stats.year} season</h2>
       <div className="stat-row">
         <div>
-          <span className="stat-number">{toLaunch}</span>
+          <CountUp value={toLaunch} delay={450} />
           <span className="stat-label">sites to launch</span>
         </div>
         <div>
-          <span className="stat-number">{launched}</span>
+          <CountUp value={launched} delay={550} />
           <span className="stat-label">launched so far</span>
         </div>
       </div>
@@ -91,7 +153,7 @@ function SeasonCard({ stats }: { stats: SeasonStats }) {
         aria-label={`${launched} of ${toLaunch} sites launched`}
       >
         {Array.from({ length: toLaunch }, (_, index) => (
-          <span key={index} className={index < launched ? "is-done" : undefined} />
+          <span key={index} className={index < launched ? "is-done" : undefined} style={order(index)} />
         ))}
       </div>
     </Card>
@@ -99,19 +161,24 @@ function SeasonCard({ stats }: { stats: SeasonStats }) {
 }
 
 function TasksCard({ done }: { done: number }) {
-  const dotClass: Record<string, string | undefined> = { b: "is-done", p: "is-pulsing" };
+  // One filled dot per finished task, and a pulsing dot for the next one, so the picture matches the number.
+  const filled = Math.min(done, DOT_COUNT);
+  const dotClass = (index: number) => (index < filled ? "is-done" : index === filled ? "is-pulsing" : undefined);
   return (
-    <Card className="stat-card">
+    <Card className="stat-card hero-card" style={order(1)}>
       <h2>Tasks done this week</h2>
       <div className="stat-row">
-        <span className="stat-number">{done}</span>
+        <CountUp value={done} delay={650} />
       </div>
       <div className="dot-grid" aria-hidden="true">
-        {DOT_ROWS.join("")
-          .split("")
-          .map((dot, index) => (
-            <span key={index} className={dotClass[dot]} />
-          ))}
+        {Array.from({ length: DOT_COUNT }, (_, index) => (
+          // A diagonal wave: each dot waits for its column plus its row
+          <span
+            key={index}
+            className={dotClass(index)}
+            style={order((index % DOT_COLUMNS) + Math.floor(index / DOT_COLUMNS) * 2)}
+          />
+        ))}
       </div>
     </Card>
   );
@@ -146,17 +213,17 @@ export function Home() {
         <div className="hero-body">
           <div className="hero-copy">
             <h1>
-              Every site
-              <br />
-              launched
-              <br />
-              on time.
+              {["Every site", "launched", "on time."].map((line, i) => (
+                <span key={line} className="hero-line">
+                  <span style={order(i)}>{line}</span>
+                </span>
+              ))}
             </h1>
-            <p>
+            <p className="hero-rise" style={order(3)}>
               No More Under's shared home for opening new swim programs. Pick a template and
               a Day 1, and every task, owner and reminder is set up for you.
             </p>
-            <div className="hero-action">
+            <div className="hero-action hero-rise" style={order(4)}>
               <Button href="/auth/login" variant="dark">
                 Sign in with Google
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -204,7 +271,11 @@ export function Home() {
                 <li key={program}>{program}</li>
               ))}
             </ul>
-            <span>A No More Under tool</span>
+            <span className="hero-foot-legal">
+              A No More Under tool
+              <Link to="/privacy">Privacy</Link>
+              <Link to="/terms">Terms</Link>
+            </span>
           </footer>
         </div>
       </main>

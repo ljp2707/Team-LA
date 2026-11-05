@@ -18,6 +18,18 @@ MUTED = "#4e6175"
 BLUE = "#1767c9"
 FOOTER = "You get this because you have tasks in NMU Launches."
 
+
+def footer_lines() -> list[str]:
+    """Why this email came, how to stop it, and who sent it. Every email ends with these."""
+    settings = get_settings()
+    stop = (
+        f"To stop these emails, reply to this email or write to {settings.CONTACT_EMAIL}."
+        if settings.CONTACT_EMAIL
+        else "To stop these emails, reply to this email and ask to be removed."
+    )
+    org = settings.ORG_NAME + (f", {settings.ORG_ADDRESS}" if settings.ORG_ADDRESS else "")
+    return [FOOTER, stop, org]
+
 Email = tuple[str, str, str]
 
 LAYOUT = Template(
@@ -28,7 +40,7 @@ LAYOUT = Template(
 <h1 style="margin:0 0 16px;font-size:24px;line-height:1.2;color:$navy;">$heading</h1>
 $body
 <p style="margin:24px 0;"><a href="$url" style="display:inline-block;padding:12px 24px;border-radius:999px;background:$blue;color:#ffffff;text-decoration:none;font-weight:bold;">$button</a></p>
-<p style="margin:32px 0 0;font-size:13px;color:$muted;">$footer</p>
+<p style="margin:32px 0 0;font-size:13px;line-height:1.5;color:$muted;">$footer</p>
 </div></body></html>"""
 )
 
@@ -58,6 +70,13 @@ def _p(text: str) -> str:
     return f'<p style="margin:0 0 12px;">{escape(text)}</p>'
 
 
+def _footer_html() -> str:
+    lines = [escape(line) for line in footer_lines()]
+    privacy = escape(app_url("/privacy"), quote=True)
+    lines.append(f'<a href="{privacy}" style="color:{MUTED};">Privacy</a>')
+    return "<br>".join(lines)
+
+
 def _render(heading: str, paragraphs_html: str, paragraphs_text: str, url: str, button: str) -> tuple[str, str]:
     html = LAYOUT.substitute(
         navy=NAVY,
@@ -67,10 +86,11 @@ def _render(heading: str, paragraphs_html: str, paragraphs_text: str, url: str, 
         body=paragraphs_html,
         url=escape(url, quote=True),
         button=escape(button),
-        footer=escape(FOOTER),
+        footer=_footer_html(),
     )
     text = TEXT_LAYOUT.substitute(
-        heading=heading, body=paragraphs_text, button=button, url=url, footer=FOOTER
+        heading=heading, body=paragraphs_text, button=button, url=url, footer="\n".join(footer_lines())
+        + f"\nPrivacy: {app_url('/privacy')}"
     )
     return text, html
 

@@ -210,3 +210,9 @@ def test_dev_login_still_requires_an_active_airtable_user(client, settings):
 def test_dev_login_refuses_to_run_outside_localhost(values):
     with pytest.raises(ValueError):
         Settings(_env_file=None, DEV_LOGIN_EMAIL="a@example.org", **values)
+
+
+def test_every_response_has_security_headers(client):
+    response = client.get("/api/public/about")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"

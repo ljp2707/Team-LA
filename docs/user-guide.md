@@ -4,6 +4,8 @@ NMU Launches keeps track of everything that has to happen to open a swim program
 
 ## For everyone
 
+The **Privacy** and **Terms** links at the bottom of the menu, and on the home page, explain what the app keeps and the rules for using it.
+
 ### Signing in
 
 Go to the NMU Launches address and click **Sign in with Google**. Use the Google account your admin added. There is no password to set.
@@ -124,7 +126,8 @@ A template is the list of tasks for one kind of launch, with when each is due an
 - **Add a person** with their Google email, access level and roles. They get a welcome email and can sign in straight away.
 - **Edit** changes someone's name, access level and roles, or deactivates them so they can no longer sign in. You cannot remove your own admin access, and the last admin cannot be removed.
 - **Manage roles** adds, renames and deactivates roles. A role that tasks or teams use cannot be deleted, only made inactive.
-- **Hand off tasks** moves all of one person's open tasks to someone else, for example when they go on leave. Anyone else on those tasks stays on them. It shows the tasks first. Leave **Also put them on those launch teams** ticked so future reminders go to the new person too.
+- **Hand off tasks** moves all of one person's open tasks to someone else, for example when they go on leave. Anyone else on those tasks stays on them.
+- **Remove personal details** appears on a deactivated person. Use it when someone asks for their information to be deleted. Their name and email become "Former team member" everywhere, and it cannot be undone. The admin runbook has the full steps. It shows the tasks first. Leave **Also put them on those launch teams** ticked so future reminders go to the new person too.
 - **What each level can do** shows the permissions of Admin, Staff and Partner.
 - **System** shows whether Airtable, Google sign in and email are set up. **Send me a test email** checks that email works.
 

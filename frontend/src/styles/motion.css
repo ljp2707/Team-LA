@@ -1,0 +1,341 @@
+/*
+ * Motion and touch polish, loaded after the other styles.
+ *
+ * Rules this file follows:
+ * - Only transform and opacity move. Colors may fade.
+ * - Things that enter use a strong ease-out and stay under 300ms. Things that
+ *   leave are faster than things that arrive.
+ * - Popovers grow from the control that opened them. Modals stay centered.
+ * - Anything people do many times a day (hover, rows, status changes) gets
+ *   feedback, not choreography.
+ * - prefers-reduced-motion keeps fades and drops all movement (end of file).
+ */
+
+/* ---------- Typography details ---------- */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3 {
+  font-optical-sizing: auto;
+  text-wrap: balance;
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+/* Numbers that sit in columns or change in place should not jiggle */
+.stat-number,
+.stat-tile strong,
+.row-due,
+.nav-count,
+.badge,
+time,
+.progress-label {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Press feedback ---------- */
+
+button,
+.button,
+a,
+summary,
+input[type="checkbox"],
+input[type="radio"] {
+  touch-action: manipulation;
+}
+
+.button,
+.icon-button,
+.menu-button,
+.status-button,
+.chips button,
+.segmented button,
+.view-switch button,
+.hero-links button {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 160ms var(--ease-out);
+}
+
+.button:active:not(:disabled),
+.icon-button:active,
+.menu-button:active,
+.status-button:active,
+.chips button:active,
+.segmented button:active,
+.view-switch button:active {
+  transform: scale(0.97);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+}
+
+/* The done circle squeezes on press and springs back when released */
+.check {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 320ms var(--ease-spring);
+}
+
+.check:active:not(.check--static) {
+  transform: scale(0.86);
+  transition-duration: 150ms, 150ms, 150ms, 100ms;
+}
+
+/* The tick draws itself in when a task is marked done */
+.check svg path {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  transition: stroke-dashoffset 260ms var(--ease-out) 40ms;
+}
+
+.check:hover svg path,
+.check.is-checked svg path {
+  stroke-dashoffset: 0;
+}
+
+.check.is-checked svg path {
+  transition-delay: 60ms;
+}
+
+/* The sign in arrow nudges toward where it is going */
+.hero-action .button svg {
+  transition: transform 200ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hero-action .button:hover svg {
+    transform: translateX(3px);
+  }
+}
+
+/* ---------- Popovers: grow from their trigger ---------- */
+
+.status-popover {
+  transform-origin: top right;
+  transition:
+    opacity 150ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+
+@starting-style {
+  .status-popover {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+}
+
+.combo-list {
+  transform-origin: top center;
+  transition:
+    opacity 150ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+
+@starting-style {
+  .combo-list {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+/* ---------- Modals: rise into the center ---------- */
+
+.dialog[open],
+.home-dialog[open] {
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 240ms var(--ease-out);
+}
+
+.dialog[open]::backdrop,
+.home-dialog[open]::backdrop {
+  transition: opacity 200ms ease;
+}
+
+@starting-style {
+  .dialog[open],
+  .home-dialog[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+
+  .dialog[open]::backdrop,
+  .home-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+/* ---------- Toasts: up from the bottom edge, back down on the way out ---------- */
+
+.toast {
+  transition:
+    opacity 300ms ease,
+    transform 360ms var(--ease-drawer);
+}
+
+@starting-style {
+  .toast {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+.toast.is-leaving {
+  opacity: 0;
+  transform: translateY(40%);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+/* ---------- Banners and warnings arrive instead of popping in ---------- */
+
+.banner,
+.note-box {
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 260ms var(--ease-out);
+}
+
+@starting-style {
+  .banner,
+  .note-box {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ---------- Progress fills from empty the first time it is drawn ---------- */
+
+.progress span {
+  transition: width 700ms var(--ease-out);
+}
+
+@starting-style {
+  .progress span {
+    width: 0;
+  }
+}
+
+/* ---------- Mobile menu ---------- */
+
+@media (max-width: 860px) {
+  .sidebar.is-open .sidebar-menu {
+    transition:
+      opacity 180ms var(--ease-out),
+      transform 220ms var(--ease-out);
+  }
+
+  @starting-style {
+    .sidebar.is-open .sidebar-menu {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+
+  /* 16px stops iOS from zooming the page when an input is focused */
+  .input,
+  select.input,
+  textarea.input {
+    font-size: 16px;
+  }
+}
+
+/* ---------- Pages settle in ---------- */
+
+/* A short, small rise when a page first renders. Not on scroll, and only once. */
+.page,
+.legal-article {
+  animation: page-in 200ms var(--ease-out) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* ---------- Reduced motion: keep the fades, drop the movement ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-property: opacity, color, background-color, border-color !important;
+    transition-duration: 150ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Looping decoration on the home page stops completely */
+  .wave,
+  .life-ring,
+  .life-ring-float,
+  .life-ring svg,
+  .bubble,
+  .dot-grid span {
+    animation: none !important;
+  }
+
+  .bubble,
+  .splash {
+    display: none;
+  }
+}
+
+/* ---------- Layout details found while reviewing ---------- */
+
+/* Day 1 dates fit their card at any grid width ("Sun, Jan 17, 2027" stays on one line) */
+.project-card {
+  container-type: inline-size;
+}
+
+.project-card-date {
+  font-size: clamp(22px, 11cqi, 32px);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* Cards lift slightly on hover, on devices that can hover, and press down when clicked */
+.project-card {
+  transition:
+    background-color 150ms ease,
+    box-shadow 200ms ease,
+    transform 200ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .project-card:hover {
+    box-shadow: 0 6px 20px rgba(13, 36, 56, 0.08);
+    transform: translateY(-2px);
+  }
+}
+
+.project-card:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* On launch rows the status tag is at the left edge, so its menu opens to the right */
+.project-row .status-popover {
+  right: auto;
+  left: 0;
+  transform-origin: top left;
+}

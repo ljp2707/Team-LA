@@ -602,3 +602,24 @@ def test_public_season_stats_need_no_sign_in(client, project):
     body = client.get("/api/public/season-stats").json()
     assert set(body) == {"year", "sites_to_launch", "sites_launched", "tasks_done_this_week"}
     assert body["sites_to_launch"] == 1 and body["sites_launched"] == 0
+
+
+def test_erase_removes_a_former_persons_details(client, sign_in, project):
+    gone = fields(project, Users.TABLE, "recGone")
+    full = f"{gone[Users.FIRST_NAME]} {gone.get(Users.LAST_NAME, '')}".strip()
+    project.add(ActivityLog.TABLE, {ActivityLog.TYPE: "Reassignment", ActivityLog.TEXT: f"gave Flyer to {full}", ActivityLog.TO: full})
+    project.add(ActivityLog.TABLE, {ActivityLog.TYPE: "System", ActivityLog.TEXT: "wrote to gone@example.org"})
+    sign_in("admin@example.org")
+
+    assert client.post("/api/users/recStaff/erase").status_code == 409  # still active
+    response = client.post("/api/users/recGone/erase")
+    assert response.status_code == 200 and response.json()["history_rows"] == 2
+
+    row = fields(project, Users.TABLE, "recGone")
+    assert (row[Users.FIRST_NAME], row[Users.LAST_NAME]) == ("Former", "team member")
+    assert row[Users.EMAIL].endswith("@example.invalid")
+    texts = " ".join(
+        f"{r['fields'].get(ActivityLog.TEXT, '')} {r['fields'].get(ActivityLog.TO, '')}" for r in project.rows(ActivityLog.TABLE)
+    )
+    assert full not in texts and "gone@example.org" not in texts
+    assert "gave Flyer to Former team member" in texts

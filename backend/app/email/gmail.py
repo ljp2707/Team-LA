@@ -106,6 +106,10 @@ def build_message(to: str, subject: str, text: str, html: str) -> EmailMessage:
     message["From"] = formataddr((FROM_NAME, settings.GMAIL_SENDER))
     message["To"] = to
     message["Subject"] = subject
+    # Lets mail apps show their own "Unsubscribe" button. It opens an email to NMU.
+    contact = settings.CONTACT_EMAIL or settings.GMAIL_SENDER
+    if contact:
+        message["List-Unsubscribe"] = f"<mailto:{contact}?subject=Stop%20NMU%20Launches%20emails>"
     message.set_content(text)
     message.add_alternative(html, subtype="html")
     return message

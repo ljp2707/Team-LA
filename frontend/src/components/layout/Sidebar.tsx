@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { myTasks } from "../../api/tasks";
 import { useAuth } from "../../auth/AuthContext";
 import { Avatar } from "../ui/Bits";
@@ -113,6 +113,10 @@ export function Sidebar({ menuOpen, onToggleMenu }: { menuOpen: boolean; onToggl
           <a className="sign-out" href="/auth/logout">
             Sign out
           </a>
+          <nav className="sidebar-legal" aria-label="Policies">
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
+          </nav>
         </div>
       </div>
     </aside>

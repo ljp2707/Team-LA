@@ -5,6 +5,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { Archive } from "./pages/Archive";
 import { Dashboard } from "./pages/Dashboard";
 import { Home } from "./pages/Home";
+import { PrivacyPolicy, Terms } from "./pages/Legal";
 import { MyTasks } from "./pages/MyTasks";
 import { NewProject } from "./pages/NewProject";
 import { NotAuthorized } from "./pages/NotAuthorized";
@@ -20,6 +21,8 @@ export function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/not-authorized" element={<NotAuthorized />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<Terms />} />
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>

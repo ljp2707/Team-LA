@@ -102,7 +102,7 @@ To find the base ID, open the base in your browser. The address looks like `airt
 Google now calls this part of the console **Google Auth Platform**.
 
 1. Sign in to https://console.cloud.google.com with the Google account that will own the app (for now avanthi.arun@gmail.com, and an NMU-owned account at handoff). Create a project named **NMU Launches**.
-2. Open **Google Auth Platform**, then **Branding**. Set the app name to **NMU Launches** and choose a support email. Leave the logo empty, because a logo triggers brand verification.
+2. Open **Google Auth Platform**, then **Branding**. Set the app name to **NMU Launches** and choose a support email. Leave the logo empty, because a logo triggers brand verification. Once the app is deployed, also fill in **Application home page** (`https://YOUR-APP-DOMAIN/`), **Application privacy policy link** (`https://YOUR-APP-DOMAIN/privacy`) and **Application terms of service link** (`https://YOUR-APP-DOMAIN/terms`). Google expects these for an app that is In production.
 3. **Audience:** choose **External**.
 4. **Data Access:** add the `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile` scopes.
 5. **Clients**, then **Create client**, then **Web application**. Under **Authorized redirect URIs**, add these, matching exactly with no trailing slash except on the last one:
@@ -179,6 +179,7 @@ The live site needs real Google sign in, because the test login only works on yo
    - `DEV_ALLOW_VIEW_SWITCH=false`
    - `DEV_LOGIN_EMAIL`: leave this out or blank
    - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email
+   - `CONTACT_EMAIL` and `ORG_ADDRESS`: NMU's contact inbox and mailing address, shown on the Privacy page and in every email
 3. Under **Settings > Networking**, choose **Generate Domain**.
 4. Set both `APP_URL` and `FRONTEND_URL` to that domain, starting with `https://`.
 5. Add `https://YOUR-APP-DOMAIN/auth/callback` to the Google OAuth client's redirect URIs.

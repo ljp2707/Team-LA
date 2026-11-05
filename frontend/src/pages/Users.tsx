@@ -5,6 +5,7 @@ import {
   addRole,
   airtableHealth,
   authHealth,
+  erasePerson,
   handOff,
   listPeople,
   listRoles,
@@ -341,6 +342,24 @@ function PersonDialog({
     }
   }
 
+  async function erase() {
+    if (!person) return;
+    const ok = window.confirm(
+      `Remove ${person.name}'s personal details? Their name and email are replaced with "Former team member" everywhere, ` +
+        "including the history, and their reminders stop. Their finished work stays. This cannot be undone.",
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await erasePerson(person.id);
+      onSaved("Their personal details are removed.");
+    } catch (caught) {
+      setError(errorText(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const activeRoles = data.roles;
   const isSelf = person?.id === me?.user.id;
 
@@ -348,7 +367,11 @@ function PersonDialog({
     <Dialog
       open={open}
       title={person ? `Edit ${person.name}` : "Add a person"}
-      description={person ? person.email : "They can sign in with Google once you add them."}
+      description={
+        person
+          ? person.email
+          : "They can sign in with Google once you add them. They get one welcome email, and NMU Launches keeps their name and email so their team can see who does what."
+      }
       onClose={onClose}
       wide
       actions={
@@ -356,6 +379,11 @@ function PersonDialog({
           {person && !isSelf && (
             <Button variant={person.active ? "danger" : "outline"} className="push-left" disabled={busy} onClick={() => void setActive(!person.active)}>
               {person.active ? "Deactivate" : "Reactivate"}
+            </Button>
+          )}
+          {person && !isSelf && !person.active && person.first_name !== "Former" && (
+            <Button variant="danger" disabled={busy} onClick={() => void erase()}>
+              Remove personal details
             </Button>
           )}
           <Button variant="outline" onClick={onClose}>

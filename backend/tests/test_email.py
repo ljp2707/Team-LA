@@ -123,3 +123,24 @@ def test_test_email_endpoint_shows_the_error(client, sign_in, live, monkeypatch)
     assert body["sent"] is False and "authorize_gmail" in body["error"]
     sign_in("staff@example.org")
     assert client.post("/api/admin/test-email").status_code == 403
+
+
+def test_every_email_says_how_to_stop_it_and_who_sent_it(settings):
+    settings(CONTACT_EMAIL="launches@example.org", ORG_ADDRESS="1 Pool Way, Seattle WA")
+    _, text, html = templates.due_today(line())
+    for part in (text, html):
+        assert "To stop these emails" in part and "launches@example.org" in part
+        assert "No More Under, 1 Pool Way, Seattle WA" in part
+        assert "/privacy" in part
+
+
+def test_messages_carry_a_list_unsubscribe_header(settings):
+    settings(CONTACT_EMAIL="launches@example.org", GMAIL_SENDER="sender@example.org")
+    message = gmail.build_message("a@example.org", "Hi", "text", "<p>html</p>")
+    assert message["List-Unsubscribe"] == "<mailto:launches@example.org?subject=Stop%20NMU%20Launches%20emails>"
+
+
+def test_about_is_public(client, settings):
+    settings(CONTACT_EMAIL="launches@example.org")
+    body = client.get("/api/public/about").json()
+    assert body["org_name"] == "No More Under" and body["contact_email"] == "launches@example.org"

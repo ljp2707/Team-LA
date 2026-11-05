@@ -19,6 +19,10 @@ export const updatePerson = (
   body: Partial<Omit<PersonInput, "email">> & { status?: "Active" | "Inactive" },
 ) => send<Person>("PATCH", `/api/users/${id}`, body);
 
+/** For a deletion request. The person must be deactivated and have no open tasks. */
+export const erasePerson = (id: string) =>
+  send<{ erased: boolean; history_rows: number }>("POST", `/api/users/${id}/erase`);
+
 export const handOff = (body: {
   from_user: string;
   to_user: string;

@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -48,6 +48,22 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="NMU Launches", lifespan=lifespan)
+
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",  # Files are only ever read as the type they say
+    "X-Frame-Options": "DENY",  # No other site can show the app inside a frame
+    "Referrer-Policy": "strict-origin-when-cross-origin",  # Links out do not leak task URLs
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",  # The app never needs these
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for name, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    return response
+
 
 app.add_middleware(
     SessionMiddleware,

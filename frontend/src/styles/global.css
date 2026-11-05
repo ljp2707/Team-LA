@@ -358,11 +358,4 @@ a {
   color: var(--color-muted);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
+/* Reduced motion lives at the end of motion.css, which keeps fades and drops movement. */

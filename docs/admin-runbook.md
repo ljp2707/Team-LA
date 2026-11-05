@@ -37,6 +37,9 @@ On a laptop these live in the `.env` file in the top folder. On Railway they liv
 | `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` | Optional | Leave blank to use the Google sign in client |
 | `GMAIL_REFRESH_TOKEN` | Lets the app send as the sender | From `python -m jobs.authorize_gmail` |
 | `REMINDERS_DRY_RUN` | `true` logs emails without sending | `false` once the test email works |
+| `ORG_NAME` | Who runs the app | `No More Under`. Shown on the Privacy and Terms pages and in every email. |
+| `CONTACT_EMAIL` | Where privacy questions and data requests go | An NMU inbox someone reads. Shown on the Privacy page and in every email. |
+| `ORG_ADDRESS` | NMU's mailing address, one line | Shown on the Privacy page and in every email |
 
 ## Adding and removing people
 
@@ -98,6 +101,21 @@ The README's **Deploy on Railway** section covers the first setup. After that:
 - **Deploying:** merge to `main` on GitHub. Railway builds and deploys both services automatically, usually within a few minutes.
 - **Rolling back:** in Railway, open the service, then **Deployments**, find the last good deployment and choose **Redeploy**. Do the same for the cron service if it changed. Then fix the problem in GitHub, since the next push deploys again.
 - **After changing a variable**, click **Deploy** if Railway asks, so the services pick it up.
+
+## Privacy requests
+
+The Privacy page (`/privacy`) promises an answer within 30 days. Requests arrive at `CONTACT_EMAIL`, as replies to app emails, or through a mail app's Unsubscribe button (which emails `CONTACT_EMAIL` with the subject "Stop NMU Launches emails").
+
+- **"What do you have about me?"** Look at their row in **Users and roles**, and filter the Work table in Airtable by Assigned To to list their tasks. Send them what you find.
+- **"Stop emailing me."** If they still work with NMU, talk with them first, since reminders are how tasks get done. Otherwise, **Hand off tasks** to someone else, then **Edit > Deactivate**. Deactivated people get no email.
+- **"Delete my information."**
+  1. **Hand off tasks** to someone else.
+  2. **Edit > Deactivate**.
+  3. Open them again (tick **Show inactive people**) and click **Remove personal details**. This replaces their name and email with "Former team member" everywhere in the app, including the history text, removes them from partner access and from any partner contact fields that use their email, and cancels their reminders. Finished work stays, without their name.
+  4. Airtable keeps its own change history for a while. If the request needs that gone too, ask Airtable support, or delete and recreate the affected rows.
+  5. Reply to say it is done.
+
+Never put sensitive information (health details, anything about program participants) in notes. If someone does, delete the note in Airtable's Activity Log table.
 
 ## Changing the Airtable base
 

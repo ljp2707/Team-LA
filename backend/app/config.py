@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     GMAIL_REFRESH_TOKEN: str = ""
     REMINDERS_DRY_RUN: bool = True
 
+    # Shown on the Privacy and Terms pages and at the bottom of every email.
+    ORG_NAME: str = "No More Under"
+    CONTACT_EMAIL: str = ""  # Where privacy questions, data requests and "stop emailing me" go
+    ORG_ADDRESS: str = ""  # Mailing address, one line
+
     @property
     def is_production(self) -> bool:
         return self.ENV == "production"

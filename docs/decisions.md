@@ -52,6 +52,28 @@ Where the real Airtable base, the wireframes and the build plan disagreed, these
 
 **Season stats on the home page count closed launches.** "Launched so far" counts launches this year whose Day 1 has passed, including ones that are now Complete.
 
+## Privacy and legal
+
+Checked against a general list for web apps. NMU's own advisor or counsel should read the Privacy and Terms pages before launch; they were written to describe what the app actually does, not as legal advice.
+
+**Added:**
+
+- **Privacy Policy (`/privacy`) and Terms of Use (`/terms`).** Public pages, linked from the home page, the menu and every email. They include Google's required Limited Use statement for apps that use Google sign in and Gmail. The contact address and mailing address come from `CONTACT_EMAIL` and `ORG_ADDRESS`, so NMU can set them without a code change.
+- **Every email says why it came, how to stop it, and who sent it,** with a Privacy link and a `List-Unsubscribe` header so mail apps show their own Unsubscribe button. The emails are work notices, not marketing, so a one-click opt-out that silently drops someone's reminders would do more harm than good; stopping goes through a person at NMU instead.
+- **Data deletion.** Admins can **Remove personal details** from a deactivated person, which scrubs their name and email across the app. The runbook covers answering privacy requests within 30 days.
+- **Fonts are served by the app, not Google Fonts,** so visiting a page sends nobody's IP address to a third party. Both fonts are under the SIL Open Font License, which allows this; the license files are in `frontend/public/fonts/`.
+- **Notice on forms.** Adding a person says they get a welcome email and that their name and email are kept. The privacy page asks people not to put sensitive information in notes.
+- **Security headers** on every response, and an accessible-contrast border on the done circle (it was 1.9:1 against white, now 3.6:1).
+
+**Checked and not needed:**
+
+- **Cookie banner and cookie policy.** The app sets one cookie, the sign in session, which is strictly necessary. There are no analytics, ads or tracking pixels, so there is nothing to ask consent for. The privacy page has a Cookies section instead of a separate policy.
+- **Refund policy, hidden fees.** The app is free and takes no payments.
+- **Reviews and testimonials.** There are none.
+- **Third-party scripts.** The frontend loads nothing from other sites. Backend libraries are FastAPI, Authlib, httpx and pyairtable, none of which track anyone.
+- **Unsupported claims.** The home page numbers come from the live base. The "Tasks done this week" dots used to be a fixed pattern that did not match the number; they now show one dot per finished task. "Every site launched on time." is the wireframe's headline, a goal rather than a claim, and NMU may want to change it.
+- **Image alt text.** The app has no images. The logo, life ring and waves are decorative SVGs marked hidden from screen readers.
+
 ## Screens (following the wireframes)
 
 **"On track" is green on project cards.** The wireframe shows it green. Green is otherwise kept for Done.
