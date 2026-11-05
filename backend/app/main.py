@@ -75,6 +75,7 @@ for module in (
 ):
     app.include_router(module.router)
 app.include_router(users.roles_router)
+app.include_router(users.directory_router)
 
 
 @app.get("/{path:path}", include_in_schema=False)

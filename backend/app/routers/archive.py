@@ -1,6 +1,10 @@
 """Archive, /archive (admin): every closed launch, kept for good.
 
 Planned vs actual dates per task, with on time, late, skipped and added markers.
+
+Each launch also gets a schedule status, comparing the planned Day 1 (the Day 1
+before any Move Day 1) with the actual Day 1: Delayed if it started later,
+Completed Early if earlier, otherwise On Schedule.
 """
 
 import calendar
@@ -11,8 +15,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.auth.deps import require_admin
 from app.models.user import CurrentUser
 from app.services import history, logic
-from app.services.records import ProjectRec, TaskRec
+from app.services.records import LogRec, ProjectRec, TaskRec
 from app.services.views import World, history_dict
+
+SCHEDULE_STATUSES = ("On Schedule", "Delayed", "Completed Early")
 
 router = APIRouter(prefix="/api/archive", tags=["archive"], dependencies=[Depends(require_admin)])
 
@@ -53,6 +59,37 @@ def task_outcome(task: TaskRec) -> tuple[str, str]:
     return "On time", "done"
 
 
+def planned_day_one(p: ProjectRec, log: list[LogRec]) -> date | None:
+    """Day 1 as first planned: the "from" of the earliest Move Day 1, or Day 1 if never moved."""
+    moves = sorted(
+        (
+            r
+            for r in log
+            if r.session_id == p.id
+            and r.work_id is None
+            and r.type == "Date Change"
+            and r.text.startswith("moved Day 1")
+            and r.from_value
+        ),
+        key=lambda r: (r.created is None, r.created),
+    )
+    for r in moves:
+        try:
+            return date.fromisoformat(r.from_value[:10])
+        except ValueError:
+            continue
+    return p.start
+
+
+def schedule_of(planned: date | None, actual: date | None) -> dict:
+    """Compare the planned and actual Day 1, like the original app's archive."""
+    if planned is None or actual is None:
+        return {"status": "On Schedule", "days": 0, "planned_day_one": planned.isoformat() if planned else None}
+    days = (actual - planned).days
+    label = "Delayed" if days > 0 else "Completed Early" if days < 0 else "On Schedule"
+    return {"status": label, "days": abs(days), "planned_day_one": planned.isoformat()}
+
+
 def _summary(world: World, p: ProjectRec) -> dict:
     tasks = world.tasks_by_project.get(p.id, [])
     return {
@@ -63,6 +100,7 @@ def _summary(world: World, p: ProjectRec) -> dict:
         "day_one": p.start.isoformat() if p.start else None,
         "day_one_text": logic.fmt_date(p.start, date(1, 1, 1)) if p.start else "No Day 1",
         "on_time": on_time_percent(tasks),
+        "schedule": schedule_of(planned_day_one(p, world.log), p.start),
     }
 
 
@@ -71,20 +109,31 @@ def list_archive(
     site: str | None = Query(None, max_length=100),
     from_: str | None = Query(None, alias="from"),
     to: str | None = None,
+    q: str | None = Query(None, max_length=100),
+    schedule: str | None = Query(None, alias="status"),
+    year: int | None = None,
 ):
+    if schedule and schedule not in SCHEDULE_STATUSES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Status must be one of " + ", ".join(SCHEDULE_STATUSES))
     world = World()
     start, end = _parse_bound(from_, False), _parse_bound(to, True)
     rows = []
     for p in world.projects.values():
         if not p.closed:
             continue
-        if site and site.strip().lower() not in world.site_name(p).lower() and site.strip().lower() not in p.name.lower():
+        names = (world.site_name(p).lower(), p.name.lower())
+        if any(term and not any(term.strip().lower() in n for n in names) for term in (site, q)):
             continue
         if start and (p.start is None or p.start < start):
             continue
         if end and (p.start is None or p.start > end):
             continue
-        rows.append(_summary(world, p))
+        if year and (p.start is None or p.start.year != year):
+            continue
+        row = _summary(world, p)
+        if schedule and row["schedule"]["status"] != schedule:
+            continue
+        rows.append(row)
     rows.sort(key=lambda r: r["day_one"] or "", reverse=True)
     return {"launches": rows}
 

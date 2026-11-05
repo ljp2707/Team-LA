@@ -13,7 +13,7 @@ from app.airtable import client
 from app.airtable.schema import Links, Reminders, Work
 from app.auth.deps import current_user, require_admin, require_can_edit
 from app.email.templates import task_url
-from app.models.task import AssignIn, LinkIn, NoteIn, ReminderIn, TaskUpdateIn
+from app.models.task import AssignIn, LinkIn, NoteIn, ReassignIn, ReminderIn, TaskUpdateIn
 from app.models.user import CurrentUser
 from app.services import clock, history, logic, reminders
 from app.services.links import calendar_url, link_kind
@@ -315,6 +315,62 @@ def update_task(task_id: str, body: TaskUpdateIn, user: CurrentUser = Depends(re
             )
     fresh = World()
     return task_row(fresh, fresh.task(task.id), user)
+
+
+@router.post("/reassign")
+def reassign_tasks(body: ReassignIn, background: BackgroundTasks, user: CurrentUser = Depends(require_admin)):
+    """Admin only: move the chosen open tasks to one active person.
+
+    Every task must exist, be open and be on a launch that is not closed, or
+    nothing moves.
+    """
+    if not permissions.can_reassign_tasks(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin view required")
+    world = World()
+    taker = world.users.get(body.to_user)
+    if taker is None or not taker.active:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "The person taking over must be active")
+    giver = world.users.get(body.from_user) if body.from_user else None
+    if body.from_user and giver is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Person not found")
+    tasks = []
+    for task_id in dict.fromkeys(body.task_ids):
+        task = world.task(task_id)
+        project = world.projects.get(task.session_id or "")
+        if not logic.is_open(task.status) or project is None or project.closed:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Only open tasks can be reassigned")
+        if giver and not task.is_assigned(giver.id):
+            raise HTTPException(status.HTTP_409_CONFLICT, f"{task.name} is not assigned to {giver.short_name}")
+        tasks.append(task)
+
+    def new_people(t: TaskRec) -> list[str]:
+        if giver:
+            return list(dict.fromkeys(taker.id if a == giver.id else a for a in t.assignees))
+        return [taker.id]
+
+    changed = [t for t in tasks if new_people(t) != t.assignees]
+    if changed:
+        client.update_records(Work.TABLE, [{"id": t.id, "fields": {Work.ASSIGNED_TO: new_people(t)}} for t in changed])
+        names = lambda ids: logic.name_list([world.user_name(i) or "Someone" for i in ids], 3)  # noqa: E731
+        history.log_events(
+            [
+                history.Event(
+                    t.session_id,
+                    t.id,
+                    user.id,
+                    "Reassignment",
+                    f"gave {t.name} to {taker.name}",
+                    names(t.assignees) if t.assignees else "Nobody",
+                    names(new_people(t)),
+                )
+                for t in changed
+            ]
+        )
+        emailed = [t.id for t in changed if taker.id not in t.assignees]
+        if emailed and taker.id != user.id:
+            background.add_task(reminders.send_assignment_emails, {taker.id: emailed}, user.name)
+    fresh = World()
+    return {"moved": len(changed), "tasks": [task_row(fresh, fresh.task(t.id), user) for t in tasks]}
 
 
 @router.post("/{task_id}/assign")

@@ -3,6 +3,11 @@
 Nobody is ever deleted. Deactivating sets Status to Inactive. The server refuses
 any change that would leave no Active Admin, and admins cannot deactivate
 themselves or remove their own Admin level.
+
+DELETE /api/users/{id} ("remove access") also sets Status to Inactive, so history
+keeps the person's name, but is stricter than Deactivate: it is refused while
+the person still has open tasks. Reassign or hand them off first.
+GET /api/users/directory gives every signed-in NMU person teammates' names.
 """
 
 from collections import defaultdict
@@ -12,7 +17,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app import permissions
 from app.airtable import client
 from app.airtable.schema import ACTIVE, INACTIVE, Roles, SessionTeam, Users, Work
-from app.auth.deps import require_admin
+from app.auth.deps import current_user, require_admin
 from app.models.people import HandOffIn, RoleIn, RoleUpdateIn, UserIn, UserUpdateIn
 from app.models.user import CurrentUser
 from app.services import history, logic, reminders
@@ -21,6 +26,8 @@ from app.services.views import World
 
 router = APIRouter(prefix="/api/users", tags=["users"], dependencies=[Depends(require_admin)])
 roles_router = APIRouter(prefix="/api/roles", tags=["roles"], dependencies=[Depends(require_admin)])
+# Not admin only, so it lives on its own router.
+directory_router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 def _open_counts(world: World) -> dict[str, int]:
@@ -47,6 +54,8 @@ def _person(world: World, u: UserRec, counts: dict[str, int]) -> dict:
             {"id": r, "name": world.role_name(r)} for r in u.role_ids if world.role_name(r)
         ],
         "open_tasks": counts.get(u.id, 0),
+        "program_access": permissions.program_access(u.access_level),
+        "is_admin": permissions.is_admin_level(u.access_level),
     }
 
 
@@ -75,14 +84,26 @@ def check_admin_rules(users: list[UserRec], target: UserRec, body: UserUpdateIn,
         )
 
 
+@directory_router.get("/directory")
+def directory(user: CurrentUser = Depends(current_user)):
+    """Names of everyone, for assignee labels. Any signed-in NMU person, not partners."""
+    if not permissions.can_see_directory(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not available to partners")
+    world = World()
+    return [
+        {"id": u.id, "name": u.name, "access_level": u.access_level, "status": u.status, "active": u.active}
+        for u in sorted(world.users.values(), key=lambda u: u.name.lower())
+    ]
+
+
 @router.get("")
-def list_users(inactive: bool = False):
+def list_users(inactive: bool = False, access_level: str | None = None):
     world = World()
     counts = _open_counts(world)
     people = [
         _person(world, u, counts)
         for u in sorted(world.users.values(), key=lambda u: u.name.lower())
-        if inactive or u.active
+        if (inactive or u.active) and (not access_level or u.access_level == access_level)
     ]
     active_roles = [r for r in world.roles.values() if r.active]
     return {
@@ -157,6 +178,30 @@ def update_person(user_id: str, body: UserUpdateIn, user: CurrentUser = Depends(
         )
     world = World()
     return _person(world, world.users[user_id], _open_counts(world))
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_access(user_id: str, user: CurrentUser = Depends(require_admin)):
+    """Remove someone's access (Status Inactive). Refused while they have open tasks."""
+    world = World()
+    target = world.users.get(user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Person not found")
+    if target.id == user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You cannot remove your own access.")
+    if not target.active:
+        return None
+    open_count = _open_counts(world).get(target.id, 0)
+    if open_count:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{target.short_name} still has {logic.plural(open_count, 'open task')}. "
+            "Reassign them before removing access.",
+        )
+    check_admin_rules(list(world.users.values()), target, UserUpdateIn(status=INACTIVE), user.id)
+    client.update_record(Users.TABLE, user_id, {Users.STATUS: INACTIVE}, typecast=True)
+    history.log_event(None, None, user.id, "System", f"removed {target.name}'s access")
+    return None
 
 
 @router.post("/hand-off")
@@ -297,4 +342,4 @@ def update_role(role_id: str, body: RoleUpdateIn, user: CurrentUser = Depends(re
     return list_roles()
 
 
-__all__ = ["router", "roles_router", "INACTIVE"]
+__all__ = ["router", "roles_router", "directory_router", "INACTIVE"]

@@ -160,6 +160,8 @@ On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds d
 
 Admins add people on **Users and roles > Add a person**. The new person gets a welcome email and can then click **Sign in with Google**, with no password to set. **Edit > Deactivate** stops someone signing in. Before deactivating someone, use **Hand off tasks** to move their open tasks to someone else.
 
+The API also has a stricter **remove access** (`DELETE /api/users/{id}`), which sets Status to Inactive but is refused while the person still has open tasks, and `POST /api/tasks/reassign` to move chosen open tasks to one active person. These came from the user management prototype and have no buttons in the app yet.
+
 You can also do this straight in the Airtable **Users** table: a row with their Google email as Email Address, First Name, Last Name, Status **Active** and an Access Level lets them in, and Status **Inactive** keeps them out. Changes apply within about 30 seconds.
 
 ## Deploy on Railway

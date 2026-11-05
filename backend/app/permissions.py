@@ -196,3 +196,41 @@ def can_delete_note(actor: Actor, is_author: bool, minutes_old: float) -> bool:
 def can_set_reminder(actor: Actor) -> bool:
     """Set a reminder for yourself on any task you can see. Viewers cannot write."""
     return can_update_own_tasks(actor)
+
+
+# --- User management, reassignment and archive (merged from the user management
+# prototype in landerstuff/) ---------------------------------------------------
+
+# A plain-English summary of what each Access Level reaches, shown with each person.
+PROGRAM_ACCESS: dict[str, str] = {
+    "Admin": "All programs",
+    "Project Lead": "All programs",
+    "Staff": "Program Assistants, Operations, Marketing, Grants",
+    "Viewer": "Assigned program only",
+    "Partner": "Launches they are added to",
+}
+
+
+def program_access(access_level: str | None) -> str:
+    """What this Access Level can see (read only if unknown, like Viewer)."""
+    return PROGRAM_ACCESS.get(access_level or "", PROGRAM_ACCESS["Viewer"])
+
+
+def is_admin_level(access_level: str | None) -> bool:
+    """Does this Access Level start in admin view (Admin, and Project Lead for now)?"""
+    return base_view(access_level) == ADMIN
+
+
+def can_reassign_tasks(actor: Actor) -> bool:
+    """Move a batch of open tasks from one person to another."""
+    return actor.is_admin
+
+
+def can_remove_access(actor: Actor) -> bool:
+    """Remove someone's access. Blocked while they still have open tasks."""
+    return can_edit_setup(actor)
+
+
+def can_see_directory(actor: Actor) -> bool:
+    """See teammates' names for assignee labels. Partners are outside NMU, so no."""
+    return not actor.is_partner

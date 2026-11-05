@@ -65,3 +65,15 @@ class OneOffTaskIn(BaseModel):
     user_ids: list[str] = []  # More people besides user_id
     needs_first: list[str] = []
     comes_before: list[str] = []
+
+
+class ReassignIn(BaseModel):
+    """Move chosen open tasks to one person.
+
+    With from_user, only that person is swapped out and anyone else on the task
+    stays. Without it, the task is given to to_user alone.
+    """
+
+    task_ids: list[str] = Field(min_length=1, max_length=500)
+    to_user: str
+    from_user: str | None = None
