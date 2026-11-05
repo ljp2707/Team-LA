@@ -198,7 +198,7 @@ export function Home() {
         <header className="hero-top">
           <div className="logo">
             <LogoMark size={36} />
-            NMU Launches
+            No More Under
           </div>
           <nav className="hero-links" aria-label="About">
             <button type="button" onClick={() => howItWorks.current?.showModal()}>

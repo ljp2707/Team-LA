@@ -43,7 +43,7 @@ function LegalPage({ title, intro, children, info }: { title: string; intro: Rea
       <header className="legal-top">
         <Link to="/" className="logo">
           <LogoMark size={32} />
-          NMU Launches
+          No More Under
         </Link>
         <nav aria-label="Policies" className="legal-nav">
           <Link to="/privacy" aria-current={title === "Privacy Policy" ? "page" : undefined}>

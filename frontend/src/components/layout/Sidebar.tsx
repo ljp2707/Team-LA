@@ -63,9 +63,9 @@ export function Sidebar({ menuOpen, onToggleMenu }: { menuOpen: boolean; onToggl
         <NavLink to={me.home} className="logo">
           <LogoMark size={32} />
           <span>
-            NMU
+            No More
             <br />
-            Launches
+            Under
           </span>
         </NavLink>
         <button

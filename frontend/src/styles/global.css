@@ -60,6 +60,12 @@ a {
   flex: none;
 }
 
+/* The logo image has white corners, so crop it to its circle */
+.logo-mark {
+  flex: none;
+  border-radius: 50%;
+}
+
 /* Button */
 .button {
   display: inline-flex;

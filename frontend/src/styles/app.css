@@ -2015,3 +2015,50 @@ a.row-title:hover {
     font-size: 17px;
   }
 }
+
+/* Search box in the launches toolbar. It stretches to fill the row beside the
+   filters, so the toolbar lines up with the cards on wide and full screens. When
+   the filters don't fit beside it, the whole filter group moves to the next row
+   together, rather than one filter dropping down on its own. */
+.search-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.search-field svg {
+  position: absolute;
+  left: var(--space-3);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.search-field .input {
+  padding-left: 36px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--color-primary-hover);
+}
