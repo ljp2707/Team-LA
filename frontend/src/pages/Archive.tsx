@@ -35,7 +35,7 @@ export function Archive() {
 
   return (
     <div className="page">
-      <PageHeader title="Archive" description="Every finished launch, kept for good. Only admins can see this page." />
+      <PageHeader title="Archive" />
 
       <div className="filter-grid">
         <TextInput label="Site" type="search" placeholder="Search by site name" value={site} onChange={(e) => setSite(e.target.value)} maxLength={100} />

@@ -208,7 +208,6 @@ export function NewProject() {
       <PageHeader
         back={{ to: "/dashboard", label: "Back to dashboard" }}
         title="Start a launch"
-        description="One project is one program launch at one site."
       />
 
       <div className="two-col two-col--even">

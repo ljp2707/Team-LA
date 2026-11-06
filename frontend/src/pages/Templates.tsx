@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { listProjects } from "../api/projects";
 import {
+  deleteTemplate,
   discardDraft,
   duplicateTemplate,
   getTemplate,
@@ -131,6 +132,19 @@ export function Templates() {
     }
   }
 
+  async function remove() {
+    if (!t) return;
+    if (!window.confirm(`Delete the template ${t.name}? Its tasks and version history are deleted too. This cannot be undone.`)) return;
+    try {
+      await deleteTemplate(t.id);
+      await list.reload();
+      setParams({});
+      toast.show("Template deleted.");
+    } catch (caught) {
+      toast.error(errorText(caught));
+    }
+  }
+
   function addInsight(item: InsightItem) {
     const key = `new-${Date.now()}`;
     const next = [
@@ -148,7 +162,6 @@ export function Templates() {
     <div className="page">
       <PageHeader
         title="Templates"
-        description="One template per kind of launch. Changes only apply to new projects."
         action={
           <>
             <Button variant="outline" onClick={() => setOpen("from-project")}>
@@ -247,6 +260,9 @@ export function Templates() {
                     }
                   >
                     {t.active ? "Make inactive" : "Make active"}
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => void remove()}>
+                    Delete
                   </Button>
                   <Button size="sm" onClick={() => setSteps(t.steps.map(toInput))}>
                     Edit

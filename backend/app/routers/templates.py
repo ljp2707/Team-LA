@@ -148,6 +148,11 @@ def set_status(template_id: str, body: TemplateStatusIn, user: CurrentUser = Dep
     return get_template(template_id)
 
 
+@router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_template(template_id: str, user: CurrentUser = Depends(require_admin)):
+    svc.delete_template(template_id, user.id)
+
+
 @router.post("/{template_id}/duplicate", status_code=status.HTTP_201_CREATED)
 def duplicate(template_id: str, body: DuplicateIn, user: CurrentUser = Depends(require_admin)):
     return {"id": svc.duplicate(template_id, user.id, body.name)}

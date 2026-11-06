@@ -156,13 +156,29 @@ On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds d
 
 `docs/data-model.md` explains every table and field the app uses.
 
+## How the app reads Airtable
+
+Airtable answers at most 5 requests a second per base and sends 100 rows per request, so loading every table straight from Airtable takes several seconds. To keep pages quick, the server keeps a copy of each table in memory. All of this is in `backend/app/airtable/client.py`.
+
+- **On start,** the server fetches every table in the background, so the first sign in does not wait.
+- **A copy under 30 seconds old** is used as is.
+- **A copy between 30 seconds and 5 minutes old** is shown straight away, and a fresh one is fetched in the background for the next page. After 5 minutes with nobody using the app, the next page waits for Airtable (a few seconds).
+- **Only one download of a table runs at a time.** Other requests for it wait for that one.
+- **Every request to Airtable waits its turn,** at most 4 a second, so the base is never locked out for going over the limit.
+
+**Edits made in the app show right away.** After a write, the rows Airtable sends back go straight into that table's copy, and the tables that were changed are fetched again in the background a second later.
+
+**Edits made directly in Airtable** show within about 30 seconds. Sometimes the first page after that still shows the old copy, and the page after it shows the change.
+
+**Fields that come from another table.** Some fields are filled in by Airtable from a different table. For example, a task's due date follows its launch's Day 1, and a site's name includes its region. So when one table is edited, the app also throws away its copy of any table that takes fields from it. `DEPENDS_ON_WRITES_TO` in `client.py` lists these, for example "after editing Session, fetch Work again". If you make the app read a new formula, lookup or linked field that comes from another table, add that pair to the list. Otherwise that field can show its old value for about a second after an edit, until the background refresh catches up.
+
 ## Adding and removing people
 
 Admins add people on **Users and roles > Add a person**. The new person gets a welcome email and can then click **Sign in with Google**, with no password to set. **Edit > Deactivate** stops someone signing in. Before deactivating someone, use **Hand off tasks** to move their open tasks to someone else.
 
 The API also has a stricter **remove access** (`DELETE /api/users/{id}`), which sets Status to Inactive but is refused while the person still has open tasks, and `POST /api/tasks/reassign` to move chosen open tasks to one active person. These came from the user management prototype and have no buttons in the app yet.
 
-You can also do this straight in the Airtable **Users** table: a row with their Google email as Email Address, First Name, Last Name, Status **Active** and an Access Level lets them in, and Status **Inactive** keeps them out. Changes apply within about 30 seconds.
+You can also do this straight in the Airtable **Users** table: a row with their Google email as Email Address, First Name, Last Name, Status **Active** and an Access Level lets them in, and Status **Inactive** keeps them out. Changes apply within about 30 seconds (see **How the app reads Airtable**).
 
 ## Deploy on Railway
 
@@ -209,7 +225,7 @@ Each person's **Access Level** in the Airtable Users table sets what they can do
 
 Admins and Project Leads can use the switch in the sidebar to see the app exactly as staff do. While in staff view they have staff permissions, on the server as well as on screen.
 
-Changes to someone's Status or Access Level in Airtable apply within about 30 seconds, with no need to sign in again.
+Changes to someone's Status or Access Level in Airtable apply within about 30 seconds (see **How the app reads Airtable**), with no need to sign in again.
 
 **To change the Project Lead mapping,** edit the `"Project Lead"` line of `BASE_VIEW_BY_ACCESS_LEVEL` in `backend/app/permissions.py`, and update `test_project_lead_is_treated_as_admin_for_now` in `backend/tests/test_permissions.py` to match.
 
@@ -220,7 +236,7 @@ For demos, setting `DEV_ALLOW_VIEW_SWITCH=true` lets **anyone** signed in use ad
 | Folder | What is in it |
 |---|---|
 | `backend/app/` | The FastAPI app. `main.py` starts it, and `permissions.py` holds every role rule |
-| `backend/app/airtable/` | The Airtable connection, and `schema.py` with every table and field name |
+| `backend/app/airtable/` | The Airtable connection and its cache (`client.py`), and `schema.py` with every table and field name |
 | `backend/app/auth/` | Google sign in, sessions, and the checks that protect routes |
 | `backend/app/models/` | The shapes of users, projects, tasks and templates |
 | `backend/app/routers/` | The URLs the app answers |

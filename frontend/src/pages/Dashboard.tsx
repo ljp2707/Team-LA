@@ -7,7 +7,6 @@ export function Dashboard() {
     <div className="page">
       <PageHeader
         title="Active launches"
-        description="Every program launch in progress, one card each."
         action={<Button to="/projects/new">Start a launch</Button>}
       />
       <ProjectGrid showSummary emptyText="Start a launch to see it here." />

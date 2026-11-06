@@ -188,6 +188,91 @@ def test_airtable_reads_every_page_then_uses_the_cache(monkeypatch):
     airtable.clear_cache()
 
 
+class _CountingBase:
+    """Stands in for get_base: counts downloads, and can hold one open."""
+
+    def __init__(self):
+        import threading
+
+        self.calls = 0
+        self.release = threading.Event()
+        self.release.set()
+        self.value = "old"
+
+    def __call__(self):
+        return self
+
+    def table(self, name):
+        return self
+
+    def iterate(self, fields):
+        self.calls += 1
+        self.release.wait(5)
+        yield [{"id": "rec1", "fields": {"v": self.value}}]
+
+
+def test_airtable_cache_serves_stale_copy_and_refreshes_in_background(monkeypatch):
+    import time
+
+    base = _CountingBase()
+    airtable.clear_cache()
+    monkeypatch.setattr(airtable, "get_base", base)
+    assert REAL_ALL_RECORDS("Users")[0]["fields"]["v"] == "old"
+    base.value = "new"
+    # Make the copy look 60 seconds old: past fresh, inside stale.
+    key = ("Users", ())
+    at, records = airtable._cache[key]
+    airtable._cache[key] = (at - 60, records)
+    assert REAL_ALL_RECORDS("Users")[0]["fields"]["v"] == "old"  # Answered at once
+    for _ in range(100):
+        if not airtable._in_flight:
+            break
+        time.sleep(0.01)
+    assert REAL_ALL_RECORDS("Users")[0]["fields"]["v"] == "new"
+    assert base.calls == 2
+    airtable.clear_cache()
+
+
+def test_airtable_cache_downloads_a_table_once_for_many_readers(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    base = _CountingBase()
+    base.release.clear()
+    airtable.clear_cache()
+    monkeypatch.setattr(airtable, "get_base", base)
+    with ThreadPoolExecutor(5) as pool:
+        futures = [pool.submit(REAL_ALL_RECORDS, "Users") for _ in range(5)]
+        base.release.set()
+        results = [f.result() for f in futures]
+    assert all(len(r) == 1 for r in results)
+    assert base.calls == 1
+    airtable.clear_cache()
+
+
+def test_airtable_write_drops_copies_and_downloads_started_before_it(monkeypatch):
+    import threading
+
+    base = _CountingBase()
+    airtable.clear_cache()
+    monkeypatch.setattr(airtable, "get_base", base)
+    REAL_ALL_RECORDS("Users")
+    base.release.clear()
+    key = ("Users", ())
+    at, records = airtable._cache[key]
+    airtable._cache[key] = (at - 60, records)
+    REAL_ALL_RECORDS("Users")  # Starts a background refresh, held open
+    base.value = "after write"
+    airtable.clear_cache()  # A write lands while that refresh is still running
+    reader = threading.Thread(target=lambda: results.append(REAL_ALL_RECORDS("Users")))
+    results = []
+    reader.start()
+    base.release.set()
+    reader.join(5)
+    assert results[0][0]["fields"]["v"] == "after write"
+    assert airtable._cache[key][1][0]["fields"]["v"] == "after write"
+    airtable.clear_cache()
+
+
 def test_dev_login_signs_in_without_google(client, settings):
     settings(DEV_LOGIN_EMAIL="staff@example.org")
     assert client.get("/auth/login").headers["location"].endswith("/my-tasks")
@@ -216,3 +301,24 @@ def test_every_response_has_security_headers(client):
     response = client.get("/api/public/about")
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
+
+
+def test_airtable_write_patches_its_table_and_drops_tables_that_follow_it(monkeypatch):
+    base = _CountingBase()
+    airtable.clear_cache()
+    monkeypatch.setattr(airtable, "get_base", base)
+    for name in ("Session", "Work", "Steps"):
+        REAL_ALL_RECORDS(name)
+    airtable._cache[("Session", ())] = (airtable._cache[("Session", ())][0], [
+        {"id": "recA", "fields": {"v": "a"}},
+        {"id": "recB", "fields": {"v": "b"}},
+    ])
+    airtable._after_write("Session", changed=[{"id": "recB", "fields": {"v": "b2"}}, {"id": "recC", "fields": {"v": "c"}}])
+    assert [r["fields"]["v"] for r in REAL_ALL_RECORDS("Session")] == ["a", "b2", "c"]
+    assert ("Work", ()) not in airtable._cache  # Due dates follow the Session's Day 1
+    assert ("Steps", ()) in airtable._cache  # Not affected, kept
+    airtable._after_write("Session", deleted_ids=["recA"])
+    assert [r["id"] for r in REAL_ALL_RECORDS("Session")] == ["recB", "recC"]
+    airtable._after_write("Session")  # A write that failed part way
+    assert ("Session", ()) not in airtable._cache
+    airtable.clear_cache()

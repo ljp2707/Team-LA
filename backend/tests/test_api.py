@@ -554,6 +554,33 @@ def test_duplicate_and_save_project_as_template(client, sign_in, template):
     assert steps[0][Steps.DAYS_BEFORE_ANCHOR] == 30
 
 
+def test_template_used_by_a_launch_cannot_be_deleted(client, sign_in, template):
+    sign_in("admin@example.org")
+    response = client.delete("/api/templates/recTpl")
+    assert response.status_code == 409
+    assert "inactive" in response.json()["detail"]
+    assert template.writes_to(TemplateList.TABLE, "delete") == []
+    assert template.writes_to(Steps.TABLE, "delete") == []
+
+
+def test_unused_template_is_deleted_with_its_steps_and_versions(client, sign_in, template):
+    sign_in("admin@example.org")
+    copy_id = client.post("/api/templates/recTpl/duplicate", json={}).json()["id"]
+    copy_steps = {r["id"] for r in template.rows(Steps.TABLE) if r["fields"][Steps.TEMPLATE] == [copy_id]}
+    assert len(copy_steps) == 3
+    assert client.delete(f"/api/templates/{copy_id}").status_code == 204
+    assert copy_id not in {r["id"] for r in template.rows(TemplateList.TABLE)}
+    assert not copy_steps & {r["id"] for r in template.rows(Steps.TABLE)}
+    assert not [r for r in template.rows(TemplateVersions.TABLE) if r["fields"].get(TemplateVersions.TEMPLATE) == [copy_id]]
+    assert len([r for r in template.rows(Steps.TABLE) if r["fields"][Steps.TEMPLATE] == ["recTpl"]]) == 3
+    assert client.get(f"/api/templates/{copy_id}").status_code == 404
+
+
+def test_only_admins_can_delete_templates(client, sign_in, template):
+    sign_in("staff@example.org")
+    assert client.delete("/api/templates/recTpl").status_code == 403
+
+
 def test_insights_from_past_launches(fake):
     from app.services.templates import insights
 

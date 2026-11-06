@@ -44,7 +44,6 @@ export function Users() {
     <div className="page">
       <PageHeader
         title="Users and roles"
-        description="Tasks belong to roles, not names. One person can hold several roles."
         action={<Button onClick={() => setOpen("add")}>Add a person</Button>}
       />
 

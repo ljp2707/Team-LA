@@ -9,11 +9,6 @@ export function Projects() {
     <div className="page">
       <PageHeader
         title={partner ? "Your program" : "Projects"}
-        description={
-          partner
-            ? "The launches you are part of. Open one to see its tasks."
-            : "Every launch in progress. You can look at any of them, and update the tasks assigned to you."
-        }
       />
       <ProjectGrid
         showSummary={false}

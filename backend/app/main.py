@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.airtable.client import warn_about_schema_problems
+from app.airtable.client import warm_cache, warn_about_schema_problems
 from app.auth.google import callback_url
 from app.config import get_settings
 from app.routers import (
@@ -44,6 +44,7 @@ async def lifespan(_: FastAPI):
     )
     if not settings.is_production:
         warn_about_schema_problems()
+    warm_cache()  # In the background, so the first sign in does not wait on Airtable
     yield
 
 

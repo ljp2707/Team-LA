@@ -435,6 +435,31 @@ def from_project(project_id: str, name: str, actor_id: str) -> str:
     return create_template(name, steps, actor_id, f"Saved from the project {project.name}")
 
 
+def delete_template(template_id: str, actor_id: str) -> None:
+    """Delete a template with its steps and versions.
+
+    Only allowed while no launch, running or archived, was made from it: their tasks
+    still point at its steps for descriptions and insights. Those templates can be
+    made inactive instead.
+    """
+    template = get_template(template_id)
+    steps = [s for s in load_steps() if s.template_id == template_id]
+    step_ids = {s.id for s in steps}
+    in_use = any(p.template_id == template_id for p in load_projects()) or any(
+        t.step_id in step_ids for t in load_tasks(steps)
+    )
+    if in_use:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Launches were made from this template, so it cannot be deleted. Make it inactive instead.",
+        )
+    versions = [v.id for v in safe(load_versions) if v.template_id == template_id]
+    client.delete_records(Steps.TABLE, sorted(step_ids))
+    client.delete_records(TemplateVersions.TABLE, versions)
+    client.delete_records(TemplateList.TABLE, [template_id])
+    history.log_event(None, None, actor_id, "System", f"deleted the template {template.name}")
+
+
 def set_status(template_id: str, active: bool, actor_id: str) -> None:
     template = get_template(template_id)
     client.update_record(

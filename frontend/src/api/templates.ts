@@ -33,6 +33,8 @@ export const templateInsights = (id: string) => get<Insights>(`/api/templates/${
 export const setTemplateStatus = (id: string, status: "Active" | "Inactive") =>
   send<TemplateDetail>("PATCH", `/api/templates/${id}`, { status });
 
+export const deleteTemplate = (id: string) => send<void>("DELETE", `/api/templates/${id}`);
+
 export const duplicateTemplate = (id: string, name?: string) =>
   send<{ id: string }>("POST", `/api/templates/${id}/duplicate`, { name: name || null });
 

@@ -119,6 +119,7 @@ A template is the list of tasks for one kind of launch, with when each is due an
 - **Version history** shows every version, who published it and what changed.
 - **Duplicate** copies a template. **New template** starts a new one from a copy. **Save a project as a template** turns a launch, including tasks added to it, into a template.
 - **Make inactive** hides a template from Start a launch without deleting it.
+- **Delete** removes a template, with its tasks and version history, for good. It only works if no launch, running or archived, was ever made from it. Otherwise, make it inactive instead.
 - **From past launches** appears once a template has three finished launches. It shows tasks that are often late, often skipped, or often added by hand. **Add to this template** puts an often-added task into the draft.
 
 ### Users and roles
