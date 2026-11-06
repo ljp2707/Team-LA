@@ -39,6 +39,8 @@ export function Users() {
   const people = useApi(() => listPeople(showInactive), [showInactive]);
   const [open, setOpen] = useState<Open>(null);
   const close = () => setOpen(null);
+  // The permissions table and System checks are for developers only.
+  const devMode = useAuth().me?.dev_mode ?? false;
 
   return (
     <div className="page">
@@ -121,38 +123,40 @@ export function Users() {
         </div>
       )}
 
-      <Card className="table-card">
-        <h2>What each level can do</h2>
-        <div className="table-scroll">
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">Action</th>
-                <th scope="col">Admin</th>
-                <th scope="col">Staff</th>
-                <th scope="col">Partner</th>
-              </tr>
-            </thead>
-            <tbody>
-              {PERMISSION_TABLE.map((row) => (
-                <tr key={row.action}>
-                  <th scope="row">{row.action}</th>
-                  {[row.admin, row.staff, row.partner].map((cell, i) => (
-                    <td key={i} className={row.action !== "Who" && cell !== "No" && cell !== "Notes only" ? "is-yes" : undefined}>
-                      {cell}
-                    </td>
-                  ))}
+      {devMode && (
+        <Card className="table-card">
+          <h2>What each level can do</h2>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">Action</th>
+                  <th scope="col">Admin</th>
+                  <th scope="col">Staff</th>
+                  <th scope="col">Partner</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="muted small">
-          Viewers can see everything staff can, but cannot change anything. Project Leads work like staff.
-        </p>
-      </Card>
+              </thead>
+              <tbody>
+                {PERMISSION_TABLE.map((row) => (
+                  <tr key={row.action}>
+                    <th scope="row">{row.action}</th>
+                    {[row.admin, row.staff, row.partner].map((cell, i) => (
+                      <td key={i} className={row.action !== "Who" && cell !== "No" && cell !== "Notes only" ? "is-yes" : undefined}>
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="muted small">
+            Viewers can see everything staff can, but cannot change anything. Project Leads work like staff.
+          </p>
+        </Card>
+      )}
 
-      <SystemCard />
+      {devMode && <SystemCard />}
 
       {people.data && (
         <>

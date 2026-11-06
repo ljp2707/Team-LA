@@ -439,6 +439,41 @@ def test_add_person_refuses_duplicate_email(client, sign_in, fake):
     assert row[Users.EMAIL] == "mary@example.org" and row[Users.STATUS] == "Active"
 
 
+def test_adding_a_person_sends_them_a_welcome_email(client, sign_in, fake, settings, monkeypatch):
+    from app.airtable.schema import Reminders
+    from app.email import gmail
+
+    settings(REMINDERS_DRY_RUN=False)
+    sent = []
+    monkeypatch.setattr(gmail, "send_email", lambda to, subject, text, html: sent.append((to, subject)))
+    sign_in("admin@example.org")
+    new = {"first_name": "Mary", "email": "mary@example.org", "access_level": "Staff", "role_ids": ["recRole"]}
+    response = client.post("/api/users", json=new)
+    assert response.status_code == 201
+    assert sent == [("mary@example.org", "You've been added to NMU Launches")]
+    row = fake.find(Users.TABLE, response.json()["id"])["fields"]
+    assert row[Users.WELCOME_EMAIL_SENT]
+    logged = [r["fields"] for r in fake.rows(Reminders.TABLE)]
+    assert [(r[Reminders.KIND], r[Reminders.STATUS]) for r in logged] == [("Welcome", "Sent")]
+
+
+def test_a_failed_welcome_email_is_logged_as_failed(client, sign_in, fake, settings, monkeypatch):
+    from app.airtable.schema import Reminders
+    from app.email import gmail
+
+    settings(REMINDERS_DRY_RUN=False)
+
+    def fail(*args):
+        raise gmail.EmailError("Gmail refused the email: test")
+
+    monkeypatch.setattr(gmail, "send_email", fail)
+    sign_in("admin@example.org")
+    new = {"first_name": "Mary", "email": "mary@example.org", "access_level": "Staff"}
+    assert client.post("/api/users", json=new).status_code == 201
+    logged = [r["fields"] for r in fake.rows(Reminders.TABLE)]
+    assert [(r[Reminders.STATUS], r[Reminders.ERROR]) for r in logged] == [("Failed", "Gmail refused the email: test")]
+
+
 def test_last_admin_cannot_be_removed(client, sign_in, fake):
     sign_in("admin@example.org")
     # Ada cannot demote or deactivate herself.

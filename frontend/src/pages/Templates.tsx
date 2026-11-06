@@ -155,7 +155,6 @@ export function Templates() {
     void save(next);
   }
 
-  const nextVersion = (t?.live_version ?? 0) + 1;
   const runningOnLive = t?.projects_on_live ?? [];
 
   return (
@@ -192,7 +191,7 @@ export function Templates() {
             >
               <strong>{item.name}</strong>
               <span className="muted small">
-                {item.task_count} tasks · v{item.live_version} live
+                {item.task_count} tasks
                 {item.has_draft && " · draft"}
                 {!item.active && " · inactive"}
               </span>
@@ -209,9 +208,9 @@ export function Templates() {
             {editing ? (
               <div className="banner banner--inline" role="status">
                 <p>
-                  <strong>Editing a draft of v{nextVersion}.</strong>{" "}
+                  <strong>Editing a draft.</strong>{" "}
                   {runningOnLive.length
-                    ? `${runningOnLive.map((p) => p.site || p.name).join(" and ")} ${runningOnLive.length === 1 ? "stays" : "stay"} on v${t.live_version}, so nothing changes for launches already running.`
+                    ? `${runningOnLive.map((p) => p.site || p.name).join(" and ")} ${runningOnLive.length === 1 ? "keeps its" : "keep their"} current tasks, so nothing changes for launches already running.`
                     : "Launches already running are not changed."}
                   {dirty && " You have unsaved changes."}
                 </p>
@@ -225,7 +224,7 @@ export function Templates() {
                     </Button>
                   ) : (
                     <Button size="sm" onClick={() => setOpen("publish")} disabled={!t.draft}>
-                      Publish v{nextVersion}
+                      Publish
                     </Button>
                   )}
                   <button type="button" className="text-button" onClick={() => void discard()}>
@@ -238,7 +237,7 @@ export function Templates() {
                 <div>
                   <h2>{t.name}</h2>
                   <p className="muted small">
-                    v{t.live_version} live · {t.steps.length} tasks{" "}
+                    {t.steps.length} tasks{" "}
                     {!t.active && <Tag tone="idle">Inactive</Tag>}
                   </p>
                 </div>
@@ -394,13 +393,12 @@ export function Templates() {
           <PublishDialog
             open={open === "publish"}
             template={t}
-            version={nextVersion}
             onClose={close}
             onPublished={(saved) => {
               close();
               detail.setData(saved);
               void list.reload();
-              toast.show(`Published v${saved.live_version}. New launches use it from now on.`);
+              toast.show("Published. New launches use it from now on.");
             }}
           />
           <VersionsDialog open={open === "versions"} templateId={t.id} onClose={close} />
@@ -683,13 +681,11 @@ function StepDialog({
 function PublishDialog({
   open,
   template,
-  version,
   onClose,
   onPublished,
 }: {
   open: boolean;
   template: TemplateDetail;
-  version: number;
   onClose: () => void;
   onPublished: (saved: TemplateDetail) => void;
 }) {
@@ -714,8 +710,8 @@ function PublishDialog({
   return (
     <Dialog
       open={open}
-      title={`Publish v${version}`}
-      description={`New ${template.name} launches use v${version}. Launches already running keep their tasks.`}
+      title="Publish changes"
+      description={`New ${template.name} launches use these changes. Launches already running keep their tasks.`}
       onClose={onClose}
       actions={
         <>
@@ -723,7 +719,7 @@ function PublishDialog({
             Cancel
           </Button>
           <Button onClick={() => void publish()} disabled={busy}>
-            {busy ? "Publishing" : `Publish v${version}`}
+            {busy ? "Publishing" : "Publish"}
           </Button>
         </>
       }
@@ -847,7 +843,7 @@ function NameDialog({
   );
 }
 
-function NewTemplateDialog({
+export function NewTemplateDialog({
   open,
   templates,
   onClose,

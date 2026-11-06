@@ -80,7 +80,7 @@ Every launch in progress has a card with its Day 1, how much is complete, the ne
 Click **Start a launch**.
 
 1. **Start from** a template, or from a past launch to copy its tasks, owners and timing.
-2. Pick the **Site**. If the site has a profile, the partner contact, shipping address and Drive folder fill in for you. To add a site that is not on the list, type its name and choose **Add a new site**.
+2. Pick the **Site**. If the site has a profile, the partner contact, shipping address and Drive folder fill in for you. To add a site that is not on the list, type its name and choose **Add a new site**. To add a template, choose **+ Add a template** under the templates. It starts as a copy of one you have, and you can change its tasks later on Templates.
 3. Pick **Day 1**. Every due date is worked out from it.
 4. Check the program name, hours, location, lead instructors, partner contact and Drive folder. Tick **Partner access** for any partner who should see this launch.
 5. On the right, **Your task list** shows every task with its due date. Open **Owners by role** to choose who fills each role. To give one task to someone else, change the person on that task.
@@ -114,7 +114,7 @@ Once Day 1 has passed, **Close launch** (in Site and partner) moves the launch t
 A template is the list of tasks for one kind of launch, with when each is due and which role does it.
 
 - Click **Edit** to start a draft. Change a task's role from its menu, move tasks with the up and down arrows, click **Edit** on a task to change its name, timing, role or what it needs first, or **Add a task**. Click **Save draft** as you go.
-- **Publish** makes the draft the new live version. Launches already running keep the tasks they were made with. Only new launches use the new version.
+- **Publish** makes the draft live. Launches already running keep the tasks they were made with. Only new launches use the changes.
 - **Discard** throws the draft away.
 - **Version history** shows every version, who published it and what changed.
 - **Duplicate** copies a template. **New template** starts a new one from a copy. **Save a project as a template** turns a launch, including tasks added to it, into a template.
@@ -129,8 +129,7 @@ A template is the list of tasks for one kind of launch, with when each is due an
 - **Manage roles** adds, renames and deactivates roles. A role that tasks or teams use cannot be deleted, only made inactive.
 - **Hand off tasks** moves all of one person's open tasks to someone else, for example when they go on leave. Anyone else on those tasks stays on them.
 - **Remove personal details** appears on a deactivated person. Use it when someone asks for their information to be deleted. Their name and email become "Former team member" everywhere, and it cannot be undone. The admin runbook has the full steps. It shows the tasks first. Leave **Also put them on those launch teams** ticked so future reminders go to the new person too.
-- **What each level can do** shows the permissions of Admin, Staff and Partner.
-- **System** shows whether Airtable, Google sign in and email are set up. **Send me a test email** checks that email works.
+- In developer mode only, **What each level can do** shows the permissions of Admin, Staff and Partner, and **System** shows whether Airtable, Google sign in and email are set up. **Send me a test email** checks that email works. Neither shows in production.
 
 Access levels:
 

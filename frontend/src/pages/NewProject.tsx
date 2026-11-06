@@ -10,6 +10,7 @@ import {
 } from "../api/projects";
 import type { OneOffInput } from "../api/projects";
 import { listTemplates } from "../api/templates";
+import { NewTemplateDialog } from "./Templates";
 import type { ProjectPreview, Site } from "../api/types";
 import { listPeople, listRoles } from "../api/users";
 import { checkDetails, ProjectFields } from "../components/ProjectFields";
@@ -71,7 +72,7 @@ export function NewProject() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dialog, setDialog] = useState<null | "oneoff" | { site: string }>(null);
+  const [dialog, setDialog] = useState<null | "oneoff" | "template" | { site: string }>(null);
 
   const templates = useApi(listTemplates, []);
   const past = useApi(() => listProjects({ status: "closed" }), []);
@@ -234,7 +235,7 @@ export function NewProject() {
             {source === "template" ? (
               <fieldset className="radio-cards">
                 <legend className="section-label">Program type</legend>
-                {activeTemplates.length === 0 && <p className="muted">No active templates. Add one on Templates.</p>}
+                {activeTemplates.length === 0 && <p className="muted">No active templates yet.</p>}
                 {activeTemplates.map((t) => (
                   <label key={t.id} className={`radio-card${t.id === templateId ? " is-selected" : ""}`}>
                     <input
@@ -252,6 +253,11 @@ export function NewProject() {
                     </span>
                   </label>
                 ))}
+                {(templates.data?.templates.length ?? 0) > 0 && (
+                  <button type="button" className="text-button" onClick={() => setDialog("template")}>
+                    + Add a template
+                  </button>
+                )}
               </fieldset>
             ) : past.error ? (
               <p className="field-error">Past launches did not load. {past.error.message}</p>
@@ -454,6 +460,17 @@ export function NewProject() {
         onAdd={(item) => {
           setOneOffs([...oneOffs, item]);
           setDialog(null);
+        }}
+      />
+      <NewTemplateDialog
+        open={dialog === "template"}
+        templates={(templates.data?.templates ?? []).map((t) => ({ id: t.id, name: t.name }))}
+        onClose={() => setDialog(null)}
+        onCreated={async (id, name) => {
+          setDialog(null);
+          await templates.reload();
+          setTemplateId(id);
+          toast.show(`Made ${name}. Change its tasks any time on Templates.`);
         }}
       />
       <NewSiteDialog

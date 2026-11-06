@@ -51,23 +51,29 @@ Use **Users and roles** in the app:
 
 You can also edit the Airtable Users table directly. Changes apply within about 30 seconds.
 
+## Checking the setup
+
+The **System** box on **Users and roles** only shows in developer mode (`DEV_ALLOW_VIEW_SWITCH=true`), so it never appears in production. To use it, run the app on your own computer with that setting on. It runs against whatever values are in your `.env`, so to check production, put the production values there first.
+
+In production, an admin who is signed in can open `/api/health/airtable` on the app's address to see whether Airtable is connected. The server log also prints the Google sign in redirect URI on startup.
+
 ## Rotating the Airtable token
 
 Do this when the person who made the token leaves, or if the token may have leaked.
 
 1. Sign in to Airtable as the NMU-owned account. Go to https://airtable.com/create/tokens and create a new token with the four scopes above and access to the NMU base.
 2. Put it in `AIRTABLE_TOKEN` on both Railway services and redeploy.
-3. Open **Users and roles > System** and check that Airtable says **Connected**.
+3. Signed in as an admin, open `/api/health/airtable` on the app's address and check that `connected` is `true`.
 4. Delete the old token in Airtable.
 
 ## Re-authorizing Gmail
 
-Do this when the sender changes, or when the System card or the job logs say "The Gmail authorization has expired or been revoked".
+Do this when the sender changes, or when the System box (developer mode) or the job logs say "The Gmail authorization has expired or been revoked".
 
 1. On a laptop, with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, run `python -m jobs.authorize_gmail` from the `backend` folder.
 2. Sign in as the sending account. Click **Advanced**, then **Go to NMU Launches**. This warning is expected.
 3. Put the printed token in `GMAIL_REFRESH_TOKEN`, and the account's address in `GMAIL_SENDER`, on both Railway services.
-4. Click **Send me a test email** on the System card.
+4. With the same values in your `.env`, run the app in developer mode and click **Send me a test email** on the System box (see **Checking the setup**).
 
 The authorization breaks if the sender changes their Google password, removes the app's access in their Google account settings, or the Google Cloud app is moved back to Testing. Keep the app **In production** on the Audience page.
 
@@ -87,8 +93,8 @@ Every email it sends, fails or skips is written to the Airtable **Reminders** ta
 
 ## When emails stop
 
-1. Open **Users and roles > System**. If Email says **Not set up**, a Gmail variable is missing. If **Dry run is on**, set `REMINDERS_DRY_RUN=false`.
-2. Click **Send me a test email**. The message says what went wrong.
+1. Check the cron service's variables in Railway. Every Gmail variable must be set, and `REMINDERS_DRY_RUN` must be `false`.
+2. With the same values in your `.env`, run the app in developer mode, open **Users and roles > System** and click **Send me a test email** (see **Checking the setup**). The message says what went wrong.
 3. If it mentions an expired or revoked authorization, follow **Re-authorizing Gmail**.
 4. Check the cron service's latest run in Railway. If it did not run, check its schedule and that it has the same variables as the website.
 5. Look at the Reminders table for rows with Status **Failed** and read the Error column.

@@ -114,7 +114,7 @@ Google now calls this part of the console **Google Auth Platform**.
 7. **Audience**, then **Publish app**, to set the status to **In production**. Sign in only uses basic scopes, so no verification is needed. In Testing mode only listed test users can sign in. Publishing also stops the Gmail refresh token from expiring every 7 days.
 8. Leave `ALLOWED_EMAIL_DOMAIN` blank. Any Google account can try to sign in, and the Airtable Users table decides who gets in.
 
-When the backend starts, it prints the redirect URI it uses, for example `Google sign in redirect URI: http://localhost:8000/auth/callback`. That exact address must be on the client. Admins can also see it on **Users and roles > System**.
+When the backend starts, it prints the redirect URI it uses, for example `Google sign in redirect URI: http://localhost:8000/auth/callback`. That exact address must be on the client. In developer mode, admins can also see it on **Users and roles > System**.
 
 `BOOTSTRAP_ADMIN_EMAILS` makes sure the first admin can get in: if one of those emails has no row in the Users table, signing in creates an Active Admin row for it. An existing row is never changed.
 
@@ -134,7 +134,7 @@ All email (reminders, the weekly digest, assignment and welcome emails) goes thr
 2. Make sure `http://localhost:8765/` is on the OAuth client's redirect URIs, and that the app is **In production** (Audience page).
 3. On your computer, with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, run `python -m jobs.authorize_gmail` from `backend`. Sign in as the account that should send the emails (for now avanthi.arun@gmail.com, and later an NMU-owned account), then click through the unverified-app screen (**Advanced**, then **Go to NMU Launches**). This screen appears once, only for the sender, because `gmail.send` is a sensitive scope. Staff signing in never see it.
 4. Put the printed token in `GMAIL_REFRESH_TOKEN`, set `GMAIL_SENDER` to that same address, and set `REMINDERS_DRY_RUN=false`.
-5. In the app, go to **Users and roles**, then **System**, then **Send me a test email**.
+5. Run the app on your computer in developer mode (`DEV_ALLOW_VIEW_SWITCH=true`), go to **Users and roles**, then **System**, then **Send me a test email**. The System box only shows in developer mode, never in production.
 6. When the app is deployed later, set the same variables on **both** Railway services, the web service and the cron service.
 7. To change the sender later, run step 3 again with the new account and replace both variables.
 8. The refresh token stops working if the sender changes their Google password, revokes access, or does not use it for 6 months. The daily job uses it, so the last case should not happen.
@@ -229,7 +229,7 @@ Changes to someone's Status or Access Level in Airtable apply within about 30 se
 
 **To change the Project Lead mapping,** edit the `"Project Lead"` line of `BASE_VIEW_BY_ACCESS_LEVEL` in `backend/app/permissions.py`, and update `test_project_lead_is_treated_as_admin_for_now` in `backend/tests/test_permissions.py` to match.
 
-For demos, setting `DEV_ALLOW_VIEW_SWITCH=true` lets **anyone** signed in use admin view, with real admin permissions. Keep it `false` in production.
+For demos, setting `DEV_ALLOW_VIEW_SWITCH=true` lets **anyone** signed in use admin view, with real admin permissions. It also shows the **What each level can do** table and the **System** box on **Users and roles**, which are hidden otherwise. Keep it `false` in production.
 
 ## Project structure
 

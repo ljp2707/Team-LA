@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { myReminders, myTasks } from "../api/tasks";
 import type { MyTasks as MyTasksData, TaskRow, TaskStatus } from "../api/types";
-import { useAuth } from "../auth/AuthContext";
 import { changeStatus, MyTaskRow } from "../components/TaskRow";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -24,7 +23,6 @@ const GROUPS: { key: keyof MyTasksData["groups"]; label: string; tone?: "late" }
 ];
 
 export function MyTasks() {
-  const { me } = useAuth();
   const toast = useToast();
   const [filter, setFilter] = useState<Filter>("all");
   const [project, setProject] = useState("");
@@ -64,16 +62,6 @@ export function MyTasks() {
         <header className="page-header">
           <div>
             <h1>My Tasks</h1>
-            <p>
-              Only tasks assigned to you, across every {me?.view === "partner" ? "program you work on" : "project"}.{" "}
-              {data && (
-                <>
-                  {data.counts.overdue > 0 && <strong className="is-late">{data.counts.overdue} overdue</strong>}
-                  {data.counts.overdue > 0 && ", "}
-                  {data.counts.this_week} due this week.
-                </>
-              )}
-            </p>
           </div>
         </header>
 
