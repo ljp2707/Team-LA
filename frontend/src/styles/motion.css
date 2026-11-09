@@ -232,30 +232,6 @@ input[type="radio"] {
   }
 }
 
-/* ---------- Mobile menu ---------- */
-
-@media (max-width: 860px) {
-  .sidebar.is-open .sidebar-menu {
-    transition:
-      opacity 180ms var(--ease-out),
-      transform 220ms var(--ease-out);
-  }
-
-  @starting-style {
-    .sidebar.is-open .sidebar-menu {
-      opacity: 0;
-      transform: translateY(-8px);
-    }
-  }
-
-  /* 16px stops iOS from zooming the page when an input is focused */
-  .input,
-  select.input,
-  textarea.input {
-    font-size: 16px;
-  }
-}
-
 /* ---------- Pages settle in ---------- */
 
 /* A short, small rise when a page first renders. Not on scroll, and only once. */

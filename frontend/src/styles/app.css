@@ -354,7 +354,7 @@
 /* Toolbar: chips and filters */
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-3);
 }
@@ -362,7 +362,8 @@
 .chips,
 .segmented {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex: none;
+  flex-wrap: nowrap;
   padding: var(--space-1);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
@@ -377,6 +378,7 @@
   background: transparent;
   color: var(--color-ink);
   font: 600 14px/1.2 var(--font-body);
+  white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -413,7 +415,9 @@
 
 .inline-select {
   display: inline-flex;
+  flex: none;
   align-items: center;
+  white-space: nowrap;
   gap: var(--space-2);
   font-weight: 600;
   font-size: 14px;
@@ -954,7 +958,7 @@ a.row-title:hover {
 /* Stat tiles */
 .stat-strip {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-5) var(--space-7);
   padding: var(--space-5) var(--space-6);
 }
@@ -1015,11 +1019,12 @@ a.row-title:hover {
 /* Project cards */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-5);
 }
 
 .project-card {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -1656,195 +1661,9 @@ a.row-title:hover {
   font-weight: 800;
 }
 
-/* Below 860px: the sidebar becomes a top bar with a menu button, and columns stack */
-@media (max-width: 860px) {
-  .shell {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    width: 100%;
-    height: auto;
-    padding: var(--space-3) var(--space-4);
-    overflow: visible;
-    background: var(--color-page);
-  }
-
-  .menu-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: var(--control-height);
-    padding: 0 var(--space-4);
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: var(--color-surface);
-    color: var(--color-ink);
-    font: 700 15px/1 var(--font-body);
-    cursor: pointer;
-  }
-
-  .menu-button:hover {
-    background: var(--color-hover-tint);
-  }
-
-  .sidebar-menu {
-    display: none;
-  }
-
-  .sidebar.is-open .sidebar-menu {
-    display: flex;
-    max-height: calc(100vh - 80px);
-    overflow-y: auto;
-    padding-top: var(--space-4);
-  }
-
-  .main {
-    padding: var(--space-4);
-  }
-
-  .page-header {
-    flex-direction: column;
-  }
-
-  .page-header h1 {
-    font-size: 32px;
-  }
-
-  .page-actions {
-    justify-content: flex-start;
-  }
-
-  .page--aside,
-  .two-col,
-  .two-col--task,
-  .two-col--even,
-  .two-col--list {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sticky-card {
-    position: static;
-  }
-
-  .side-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-}
-
-/* Phone width */
-@media (max-width: 600px) {
-  .form-grid,
-  .form-grid--3,
-  .filter-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .card {
-    padding: var(--space-4);
-  }
-
-  .stat-strip {
-    gap: var(--space-4) var(--space-5);
-    padding: var(--space-4);
-  }
-
-  .stat-value {
-    font-size: 28px;
-  }
-
-  .task-row {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .task-row .row-due {
-    grid-column: 2;
-  }
-
-  .task-row .status-menu {
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .project-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .project-row-status {
-    grid-column: 1 / -1;
-  }
-
-  .project-row .row-who {
-    grid-column: 1;
-  }
-
-  .project-row .row-due {
-    grid-column: 2;
-    grid-row: 2;
-    align-self: start;
-  }
-
-  .people-list li {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .people-list li > .muted,
-  .people-list li > .tag {
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .people-list li > .button {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .step-head {
-    display: none;
-  }
-
-  .step-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
-
-  .segmented--status {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-radius: var(--radius-input);
-  }
-
-  .note-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .preview-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .select--pill {
-    max-width: 100%;
-  }
-
-  .first-card h2 {
-    font-size: 24px;
-  }
-
-  .project-card-date,
-  .archive-title {
-    font-size: 26px;
-  }
-
-  .table--archive th,
-  .table--archive td {
-    padding: var(--space-2) var(--space-1);
-  }
-}
+/* No width breakpoints. The app keeps its full screen layout at every window
+   size: below --layout-min-width the page scrolls sideways instead of stacking,
+   shrinking or overlapping. See .shell in global.css. */
 
 .table--archive tbody th .row-sub {
   font-weight: 500;
@@ -1892,6 +1711,7 @@ a.row-title:hover {
 
 /* Privacy Policy and Terms of Use */
 .legal {
+  min-width: 792px;
   min-height: 100vh;
   min-height: 100dvh;
   padding: var(--space-4);
@@ -1899,7 +1719,7 @@ a.row-title:hover {
 
 .legal-top {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
@@ -1939,7 +1759,7 @@ a.row-title:hover {
 }
 
 .legal-article h1 {
-  font-size: clamp(36px, 6vw, 52px);
+  font-size: 52px;
   line-height: 1;
   letter-spacing: -0.035em;
 }
@@ -1998,39 +1818,21 @@ a.row-title:hover {
   font-size: 0.9em;
 }
 
-@media (max-width: 600px) {
-  .legal {
-    padding: var(--space-2);
-  }
-
-  .legal-top {
-    padding: var(--space-3) var(--space-3);
-  }
-
-  .legal-article {
-    padding: var(--space-5) var(--space-4);
-  }
-
-  .legal-intro p {
-    font-size: 17px;
-  }
-}
-
 /* Search box in the launches toolbar. It stretches to fill the row beside the
-   filters, so the toolbar lines up with the cards on wide and full screens. When
-   the filters don't fit beside it, the whole filter group moves to the next row
-   together, rather than one filter dropping down on its own. */
+   filters, so the toolbar lines up with the cards. The search and filters always
+   stay on one row, the same as on a full screen. */
 .search-field {
   position: relative;
   display: inline-flex;
   align-items: center;
   flex: 1 1 240px;
-  min-width: 0;
+  min-width: 200px;
 }
 
 .toolbar-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex: none;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-3);
 }

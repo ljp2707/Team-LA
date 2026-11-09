@@ -79,4 +79,7 @@
   --sidebar-width: 232px;
   --control-height: 44px;
   --content-max: 1200px;
+  /* Narrowest the app gets: the sidebar, page padding and four 260px launch cards.
+     Smaller windows scroll sideways instead of rearranging. */
+  --layout-min-width: 1408px;
 }

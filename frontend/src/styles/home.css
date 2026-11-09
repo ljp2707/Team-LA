@@ -1,5 +1,11 @@
 /* Home page, matching page 01 of the wireframes. All motion is CSS keyframes. */
 .home {
+  /* The home page keeps its two column layout at any window size. Narrower
+     windows scroll sideways. 1200px keeps the life ring clear of the intro text.
+     Sizes below use cqi, the width of this box, so they stay put once the window
+     is narrower than the page. */
+  container-type: inline-size;
+  min-width: 1200px;
   height: 100vh;
   height: 100dvh;
   min-height: 680px;
@@ -61,7 +67,7 @@
 }
 
 .hero-copy h1 {
-  font-size: clamp(48px, min(6.7vw, 12vh), 96px);
+  font-size: clamp(48px, min(calc(6.7cqi + 2.144px), 12vh), 96px);
   font-weight: 800;
   line-height: 0.95;
   letter-spacing: -0.04em;
@@ -212,7 +218,7 @@
   z-index: 1;
   top: 27%;
   left: 54%;
-  width: clamp(150px, 12vw, 180px);
+  width: clamp(150px, calc(12cqi + 3.84px), 180px);
   aspect-ratio: 1;
   margin-left: -90px;
   /* Drops in from above and settles with a little overshoot, like it was tossed */
@@ -448,7 +454,7 @@
 }
 
 /* Short laptop screens: keep the words clear of the water */
-@media (max-height: 800px) and (min-width: 1000px) {
+@media (max-height: 800px) {
   .water {
     height: 30%;
   }
@@ -460,102 +466,6 @@
 
   .hero-action {
     margin-top: var(--space-4);
-  }
-}
-
-/* Narrow screens: one column that scrolls, with the water at the end */
-@media (max-width: 999px) {
-  .home {
-    height: auto;
-    min-height: 100dvh;
-  }
-
-  .hero {
-    min-height: calc(100dvh - 32px);
-  }
-
-  .hero-body {
-    grid-template-columns: minmax(0, 1fr);
-    padding-bottom: var(--space-4);
-  }
-
-  .hero-copy h1 {
-    font-size: clamp(52px, 13vw, 96px);
-  }
-
-  .life-ring {
-    position: relative;
-    top: auto;
-    left: auto;
-    align-self: center;
-    flex: none;
-    width: 140px;
-    margin: var(--space-3) 0 var(--space-5);
-  }
-
-  .hero-stats {
-    order: 2;
-  }
-
-  .water {
-    position: relative;
-    flex: 1 0 300px;
-    inset: auto;
-    height: 300px;
-    margin-top: -32px;
-  }
-
-  .wave--mid {
-    height: 86%;
-  }
-
-  .wave--deep {
-    height: 68%;
-  }
-}
-
-@media (max-width: 759px) {
-  .home {
-    padding: var(--space-2);
-  }
-
-  .hero {
-    min-height: calc(100dvh - 16px);
-  }
-
-  .hero-top,
-  .hero-body,
-  .hero-foot {
-    padding-left: var(--space-5);
-    padding-right: var(--space-5);
-  }
-
-  .hero-top .logo {
-    font-size: 18px;
-  }
-
-  .hero-links {
-    gap: var(--space-4);
-  }
-
-  .hero-links button {
-    font-size: 15px;
-  }
-
-  .hero-copy > p {
-    font-size: 17px;
-  }
-
-  .hero-action .button {
-    width: 100%;
-  }
-
-  .hero-foot {
-    flex-direction: column;
-  }
-
-  .hero-foot ul {
-    flex-direction: column;
   }
 }
 
