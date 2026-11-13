@@ -32,6 +32,10 @@ export interface TaskRow {
   can_edit: boolean;
   phase: string;
   completed: string | null;
+  /** True once the Airtable automation has put this task on the shared Google Calendar. */
+  on_calendar: boolean;
+  /** When the automation last wrote the event (ISO date-time), if ever. */
+  calendar_last_synced: string | null;
 }
 
 export interface MilestoneRef {

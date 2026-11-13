@@ -8,6 +8,31 @@ import { formatDate } from "../lib/dates";
 const isFinished = (status: TaskStatus) => status === "Done" || status === "Skipped";
 
 /**
+ * A small calendar mark after a task's name when the Airtable automation has put
+ * it on the shared NMU Google Calendar. The app never creates or edits the event.
+ */
+function CalendarMark({ task }: { task: Task }) {
+  if (!task.on_calendar) return null;
+  const synced = task.calendar_last_synced
+    ? new Date(task.calendar_last_synced).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        timeZone: "America/Los_Angeles",
+      })
+    : null;
+  const label = `On the NMU Google Calendar${synced ? `, last updated ${synced}` : ""}`;
+  return (
+    <span className="calendar-mark" title={label}>
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+        <rect x="1" y="2" width="10" height="9" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M1 5h10M4 1v2.2M8 1v2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+      <span className="visually-hidden">{label}</span>
+    </span>
+  );
+}
+
+/**
  * Change a task's status right away on screen, then save it.
  * If saving fails the old status comes back and the error is shown.
  */
@@ -72,9 +97,12 @@ export function MyTaskRow({
         <span className="check check--static" aria-hidden="true" />
       )}
       <div className="row-main">
-        <Link to={`/tasks/${task.id}`} className="row-title">
-          {task.name}
-        </Link>
+        <span>
+          <Link to={`/tasks/${task.id}`} className="row-title">
+            {task.name}
+          </Link>
+          <CalendarMark task={task} />
+        </span>
         {subtitle}
       </div>
       <span className={`row-due${task.overdue ? " is-late" : ""}`}>
@@ -131,9 +159,12 @@ export function ProjectTaskRow({
         )}
       </span>
       <div className="row-main">
-        <Link to={`/tasks/${task.id}`} className="row-title">
-          {task.name}
-        </Link>
+        <span>
+          <Link to={`/tasks/${task.id}`} className="row-title">
+            {task.name}
+          </Link>
+          <CalendarMark task={task} />
+        </span>
         {note && <span className={`row-sub${noteLate ? " is-late" : ""}`}>{note}</span>}
       </div>
       <span className="row-who">{who}</span>

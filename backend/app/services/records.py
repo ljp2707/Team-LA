@@ -442,6 +442,9 @@ class TaskRec:
     resource_link: str = ""
     has_override: bool = False
     assignees: list[str] = field(default_factory=list)  # Everyone on the task, in order
+    # Set by the Google Calendar automations, never by the app.
+    calendar_event_id: str = ""
+    calendar_last_synced: str | None = None
 
     def __post_init__(self) -> None:
         if not self.assignees and self.assigned_to:
@@ -486,6 +489,8 @@ def load_tasks(steps: list[StepRec] | None = None) -> list[TaskRec]:
                 description=step.description if step else "",
                 resource_link=f.get(Work.RESOURCE_LINK, "") or "",
                 has_override=override is not None,
+                calendar_event_id=f.get(Work.CALENDAR_EVENT_ID, "") or "",
+                calendar_last_synced=f.get(Work.CALENDAR_LAST_SYNCED) or None,
             )
         )
     return out

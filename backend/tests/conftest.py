@@ -95,11 +95,14 @@ class FakeAirtable:
         return record
 
     def create_records(self, name, rows, typecast=False):
+        # Same rule as the real client: the app never writes automation-owned fields.
+        airtable._refuse_automation_fields(name, rows)
         created = [self.add(name, dict(fields)) for fields in rows]
         self.writes += [("create", name, r["id"], dict(r["fields"])) for r in created]
         return created
 
     def update_records(self, name, updates, typecast=False):
+        airtable._refuse_automation_fields(name, [u["fields"] for u in updates])
         out = []
         for update in updates:
             record = self.find(name, update["id"])

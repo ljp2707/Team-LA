@@ -804,3 +804,69 @@ def test_deleting_a_launch_deletes_everything_on_it(client, sign_in, project):
     assert "recProj" not in {c["id"] for c in client.get("/api/projects").json()["projects"]}
     sign_in("staff@example.org")
     assert {t["id"] for g in client.get("/api/tasks/mine").json()["groups"].values() for t in g} == {"recOtherT"}
+
+
+# --- Google Calendar fields (written only by Airtable automations) -------------
+
+
+def _on_calendar(fake, task_id, event_id="evt123"):
+    fake.find(Work.TABLE, task_id)["fields"].update(
+        {
+            Work.CALENDAR_EVENT_ID: event_id,
+            Work.CALENDAR_SYNCED_KEY: "old key",
+            Work.CALENDAR_LAST_SYNCED: "2026-11-03T17:00:00.000Z",
+        }
+    )
+
+
+def test_the_app_refuses_to_write_calendar_fields():
+    from app.airtable import client as real
+
+    for fields in ({Work.CALENDAR_EVENT_ID: ""}, {Work.CALENDAR_SYNCED_KEY: "x"}, {Work.CALENDAR_LAST_SYNCED: None}):
+        with pytest.raises(ValueError):
+            real.create_records(Work.TABLE, [fields])
+        with pytest.raises(ValueError):
+            real.update_records(Work.TABLE, [{"id": "recT1", "fields": fields}])
+    real._refuse_automation_fields(Work.TABLE, [{Work.TASK_NAME: "fine"}])  # Other fields are allowed
+
+
+def test_task_rows_show_when_a_task_is_on_the_calendar(client, sign_in, project):
+    _on_calendar(project, "recT2")
+    sign_in("staff@example.org")
+    rows = {t["id"]: t for g in client.get("/api/tasks/mine").json()["groups"].values() for t in g}
+    assert rows["recT2"]["on_calendar"] is True
+    assert rows["recT2"]["calendar_last_synced"] == "2026-11-03T17:00:00.000Z"
+    assert rows["recT3"]["on_calendar"] is False and rows["recT3"]["calendar_last_synced"] is None
+
+
+def test_editing_a_task_keeps_its_calendar_event(client, sign_in, project):
+    _on_calendar(project, "recT2")
+    sign_in("admin@example.org")
+    assert client.patch("/api/tasks/recT2", json={"status": "In Progress"}).status_code == 200
+    assert client.patch("/api/tasks/recT2", json={"due_date": "2026-11-20"}).status_code == 200
+    assert client.patch("/api/tasks/recT2", json={"name": "Design the flyer"}).status_code == 200
+    assert client.post("/api/tasks/recT2/assign", json={"user_ids": ["recAdmin", "recStaff"]}).status_code == 200
+    assert client.post("/api/projects/recProj/move-day-one", json={"new_day_one": "2026-11-29"}).status_code == 200
+    saved = fields(project, Work.TABLE, "recT2")
+    assert saved[Work.CALENDAR_EVENT_ID] == "evt123"
+    assert saved[Work.CALENDAR_SYNCED_KEY] == "old key"
+    assert saved[Work.TASK_NAME] == "Design the flyer"  # The edits themselves did save
+    for _, table, _, written in project.writes_to(Work.TABLE):
+        assert not set(written) & {Work.CALENDAR_EVENT_ID, Work.CALENDAR_SYNCED_KEY, Work.CALENDAR_LAST_SYNCED}
+
+
+def test_a_launch_copied_from_another_does_not_copy_calendar_events(client, sign_in, project, monkeypatch):
+    from app.services import reminders
+
+    monkeypatch.setattr(reminders, "send_assignment_emails", lambda *a, **k: None)
+    for task_id in ("recT1", "recT2", "recT3", "recT4", "recT5"):
+        _on_calendar(project, task_id, f"evt-{task_id}")
+    sign_in("admin@example.org")
+    response = client.post(
+        "/api/projects",
+        json={"name": "Copy", "site_id": "recSite", "day_one": "2027-02-01", "from_project_id": "recProj"},
+    )
+    assert response.status_code == 201, response.text
+    new_tasks = [r for r in project.rows(Work.TABLE) if r["fields"][Work.SESSION] == [response.json()["id"]]]
+    assert new_tasks
+    assert all(Work.CALENDAR_EVENT_ID not in r["fields"] for r in new_tasks)

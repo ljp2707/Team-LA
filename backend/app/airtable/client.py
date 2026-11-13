@@ -32,6 +32,7 @@ from pyairtable import Api, retry_strategy
 
 from app.airtable.schema import (
     ALL_TABLES,
+    AUTOMATION_OWNED,
     Instructors,
     Region,
     Roles,
@@ -270,6 +271,18 @@ def _chunks(items: list, size: int = BATCH_SIZE):
         yield items[start : start + size]
 
 
+def _refuse_automation_fields(table_name: str, rows: list[dict[str, Any]]) -> None:
+    """Stop the app from writing fields that Airtable automations own.
+
+    The calendar automations keep the event ID on each task. If the app wrote it,
+    even as blank, the task would lose its event and get a duplicate.
+    """
+    owned = AUTOMATION_OWNED.get(table_name, set())
+    touched = sorted({name for fields in rows for name in fields} & owned)
+    if touched:
+        raise ValueError(f"The app must not write {', '.join(touched)} on {table_name}")
+
+
 def create_records(
     table_name: str, rows: list[dict[str, Any]], typecast: bool = False
 ) -> list[dict[str, Any]]:
@@ -277,6 +290,7 @@ def create_records(
     created: list[dict[str, Any]] = []
     if not rows:
         return created
+    _refuse_automation_fields(table_name, rows)
     table = get_base().table(table_name)
     try:
         for chunk in _chunks(rows):
@@ -301,6 +315,7 @@ def update_records(
     updated: list[dict[str, Any]] = []
     if not updates:
         return updated
+    _refuse_automation_fields(table_name, [u["fields"] for u in updates])
     table = get_base().table(table_name)
     try:
         for chunk in _chunks(updates):

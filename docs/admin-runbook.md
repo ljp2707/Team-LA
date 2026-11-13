@@ -100,6 +100,143 @@ Every email it sends, fails or skips is written to the Airtable **Reminders** ta
 5. Look at the Reminders table for rows with Status **Failed** and read the Error column.
 6. Rows with Status **Skipped** and "No one assigned" mean a task has nobody on it. Assign someone.
 
+## Google Calendar sync (Airtable automations)
+
+Each task can appear as an all-day event on a shared NMU Google Calendar, on its due date, with the people on the task invited as guests so it shows on their own calendars too. **Airtable does this, not the app.** Two Airtable automations create and update the events, and save each event's ID on the task so they can find it again.
+
+The app only reads what the automations write. A task that has an event shows a small calendar mark after its name. The app never creates, changes or clears an event or its ID, so editing a task in the app is always safe.
+
+Set this up in a **copy of the base first** (Airtable: base name menu > **Duplicate base**), try it with a few tasks, then repeat it in the real base. Some steps depend on Airtable features we could not confirm; they are listed at the end under **Check these before relying on it**.
+
+### Before you start
+
+- **A shared calendar.** In Google Calendar, create a calendar named "NMU Launches" (Other calendars > **+** > **Create new calendar**). Share it with the Google account that will run the automation, with **Make changes to events**. Use an NMU-owned account, not a person's: if that person leaves, the events stop updating.
+- **An Airtable plan with automations.** Every task that gets an event uses automation runs. A new launch creates all its tasks at once, which is one run per task plus one more each time a task changes. Check your plan's monthly run limit under the base's **Automations** tab.
+- **Look for an older reminder automation.** The Work table has older "Reminder Date" and "Reminder Sent" fields that mention "the daily Airtable reminder automation". The app sends its own reminder emails now. In the **Automations** tab, make sure any old reminder automation is turned off, so people do not get two emails.
+
+### Step 1: Add the fields to the Work table
+
+Open the **Work** table. For each field below, click **+** at the right end of the column headers, type the name exactly as shown (spelling and capital letters matter), pick the type, and save.
+
+**Two fields only the automations fill in.** Never type in these or clear them by hand. A developer can add both by running `python -m jobs.migrate_airtable --apply`.
+
+| Name | Type |
+|---|---|
+| Calendar Event ID | Single line text |
+| Calendar Synced Key | Long text |
+
+**One field Airtable keeps up to date.** The app shows it as "last updated" when you hover over the calendar mark.
+
+| Name | Type | Settings |
+|---|---|---|
+| Calendar Last Synced | Last modified time | Choose **Specific fields** and pick Calendar Event ID and Calendar Synced Key. Turn on **Include time**. |
+
+**Four formula fields** that work out what each event should say and whether it needs to change. For each one, choose the **Formula** type and paste the formula exactly.
+
+**Calendar Title**, the event's name. Finished tasks keep their event but get "Done:" or "Skipped:" in front.
+```
+IF(OR({Status} = "Done", {Status} = "Skipped"), {Status} & ": ", "") & {Task Name} & " · " & ARRAYJOIN({Session})
+```
+
+**Calendar Guests**, everyone on the task, as a comma-separated list of emails. Assignee Emails already looks these up from Assigned To.
+```
+ARRAYJOIN({Assignee Emails}, ",")
+```
+
+**Calendar Key**, a summary of everything the event shows. When it changes, the event needs updating.
+```
+{Task Name} & "|" & DATETIME_FORMAT({Due Date}, "YYYY-MM-DD") & "|" & {Calendar Guests} & "|" & {Status}
+```
+
+**Calendar Action** says **Create** when a task needs its first event, **Update** when its event is out of date, and stays blank otherwise. Both automations start from this field.
+```
+IF(
+  {Calendar Event ID} = "",
+  IF(AND({Due Date}, {Calendar Guests} != "", {Status} != "Done", {Status} != "Skipped"), "Create", ""),
+  IF({Calendar Key} != {Calendar Synced Key}, "Update", "")
+)
+```
+
+So a task gets an event once it has a due date and at least one person, unless it is already finished. After that, any change to its name, due date, people or status makes Calendar Action say Update.
+
+### Step 2: The "Create calendar event" automation
+
+1. Open the **Automations** tab and click **Create automation**. Name it "Calendar: create event".
+2. **Trigger:** choose **When a record matches conditions**. Table: **Work**. Condition: **Calendar Action** *is* `Create`.
+3. Click **Test trigger** to load a sample task. If none match, open a test task in Airtable, give it a due date and a person, and test again.
+4. **Action 1:** click **+ Add advanced logic or action**, choose **Google Calendar**, then **Create event**. Connect the NMU Google account and fill in:
+
+   | Event setting | Use |
+   |---|---|
+   | Calendar | NMU Launches |
+   | Title / Summary | **Calendar Title** (click **+** next to the box and pick it from the trigger record) |
+   | All day | Yes (see the note on all-day events below) |
+   | Start date | **Due Date** |
+   | End date | **Due Date** |
+   | Guests / Attendees | **Calendar Guests** |
+   | Description | Type the text below and insert the fields where shown |
+
+   Description:
+   ```
+   Launch: [Session]
+   Status: [Status]
+   Open in NMU Launches: https://YOUR-APP-ADDRESS/tasks/[Airtable record ID]
+   ```
+   Replace `YOUR-APP-ADDRESS` with the app's address (the `APP_URL` setting, without `https://`). The parts in brackets are inserted with **+**; "Airtable record ID" is listed under the trigger record.
+
+5. **Action 2:** add **Update record**. Table: **Work**. Record ID: the trigger record's **Airtable record ID**. Click **+ Choose field** twice and set:
+
+   | Field | Value |
+   |---|---|
+   | Calendar Event ID | The event's **ID** from Action 1 (click **+**, open Action 1's results) |
+   | Calendar Synced Key | **Calendar Key** from the trigger record |
+
+6. Test each action, check that the event appears on the NMU Launches calendar, then switch the automation **On**.
+
+### Step 3: The "Update calendar event" automation
+
+1. Create another automation named "Calendar: update event".
+2. **Trigger:** **When a record matches conditions**. Table: **Work**. Condition: **Calendar Action** *is* `Update`.
+3. **Action 1:** **Google Calendar > Update event**. Event ID: **Calendar Event ID** from the trigger record. Fill in Calendar, Title, All day, Start and End date, Guests and Description exactly as in Step 2.
+4. **Action 2:** **Update record** on the trigger record. Set only **Calendar Synced Key** to **Calendar Key**. Leave Calendar Event ID alone.
+5. Test it by renaming a test task in the app: Calendar Action should switch to Update, the event's title should change, and Calendar Action should go blank again. Then switch it **On**.
+
+### When a task is done or skipped
+
+Nothing extra is needed. Status is part of Calendar Key, so the update automation renames the event "Done: …" or "Skipped: …". The event stays on everyone's calendar as a record. Closing a launch with "Mark the open tasks as skipped" does this for every open task at once.
+
+If you would rather remove finished tasks from calendars and Airtable offers a **Delete event** action, see the last item under **Check these before relying on it**.
+
+### When a task or launch is deleted
+
+**Airtable cannot react to deleted records**, so a deleted task's event stays on the calendar. This happens when an admin uses **Delete launch** in the app, or someone deletes a Work row in Airtable.
+
+- Where possible, **close** a launch instead of deleting it. Its events then show as Done or Skipped instead of disappearing without a trace.
+- After deleting a launch, open the NMU Launches calendar, search for the launch's name (it is in every event title), and delete those events by hand.
+
+### When someone is removed from a task, or leaves
+
+Changing who is on a task updates the event's guest list. If **every** person is removed, the guest list is empty and Google may keep the old guests; check that event by hand.
+
+For a **"Delete my information"** privacy request, also remove the person as a guest from events on the NMU Launches calendar. Remove personal details in the app does not reach Google Calendar.
+
+### Turning it off
+
+Switch both automations **Off**. Existing events stay. Do **not** clear Calendar Event ID across many tasks unless you also delete their events: once the ID is blank, turning the automations back on would create duplicates.
+
+### Check these before relying on it
+
+We could not confirm these in Airtable's interface. Try each in the copy of the base.
+
+1. **Guests.** Does Airtable's Google Calendar **Create event** action have a guests or attendees setting, and does it take a comma-separated list? This is the most important one: without it, events only appear on the shared calendar, not on each person's own calendar. In that case each person can subscribe to the NMU Launches calendar instead, but they will see everyone's tasks.
+2. **Invitation emails.** If guests do work, Google may email an invitation for every event. A new launch creates dozens of tasks at once, so check whether the action has a "send notifications" option and turn it off if so.
+3. **All-day events.** Check that the action can make all-day events. If it asks for times instead, use the due date for both and see how it looks. In Google an all-day event's end is the next day; if the event shows one day short, set End date to a formula field `DATEADD({Due Date}, 1, 'days')`.
+4. **Event ID output.** Check that Create event lists an event **ID** among its results for Action 2 to use.
+5. **Update event.** Check that Google Calendar offers an **Update event** action that takes an event ID.
+6. **Matching conditions.** Check that **When a record matches conditions** fires again each time a record re-enters the condition (Calendar Action blank, then Update again). Also check whether tasks that *already* match when you switch an automation on get an event. If they do not, existing tasks only get events after their next change.
+7. **Formulas.** Check that `AND({Due Date}, ...)` treats a blank Due Date as false, and that Calendar Guests is blank (not a stray comma) for a task with nobody on it.
+8. **Delete event (optional).** If you want finished tasks removed from calendars, check whether Google Calendar offers a **Delete event** action. If so, add a third automation: trigger when **Status** is Done or Skipped *and* **Calendar Event ID** is not empty; action **Delete event** with Calendar Event ID. Do **not** clear Calendar Event ID afterwards. Calendar Action only says Create while the ID is blank, so clearing it would make a new event if the task were ever reopened.
+
 ## Deploying and rolling back on Railway
 
 The README's **Deploy on Railway** section covers the first setup. After that:
@@ -118,8 +255,9 @@ The Privacy page (`/privacy`) promises an answer within 30 days. Requests arrive
   1. **Hand off tasks** to someone else.
   2. **Edit > Deactivate**.
   3. Open them again (tick **Show inactive people**) and click **Remove personal details**. This replaces their name and email with "Former team member" everywhere in the app, including the history text, removes them from partner access and from any partner contact fields that use their email, and cancels their reminders. Finished work stays, without their name.
-  4. Airtable keeps its own change history for a while. If the request needs that gone too, ask Airtable support, or delete and recreate the affected rows.
-  5. Reply to say it is done.
+  4. If Google Calendar sync is on, remove them as a guest from events on the NMU Launches calendar (see **Google Calendar sync**).
+  5. Airtable keeps its own change history for a while. If the request needs that gone too, ask Airtable support, or delete and recreate the affected rows.
+  6. Reply to say it is done.
 
 Never put sensitive information (health details, anything about program participants) in notes. If someone does, delete the note in Airtable's Activity Log table.
 

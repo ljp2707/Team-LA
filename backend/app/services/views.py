@@ -226,6 +226,9 @@ def task_row(world: World, task: TaskRec, user: CurrentUser) -> dict:
         "can_edit": permissions.can_edit_task(user.actor, user.id, task.assignees),
         "phase": logic.phase_for(task.due, project.start if project else None, project.end if project else None),
         "completed": task.completed.isoformat() if task.completed else None,
+        # Read only: the Airtable automations put the task on the shared calendar.
+        "on_calendar": bool(task.calendar_event_id),
+        "calendar_last_synced": task.calendar_last_synced,
     }
 
 

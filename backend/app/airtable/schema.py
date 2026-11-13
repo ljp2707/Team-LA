@@ -192,6 +192,20 @@ class Work:
     ONE_OFF = "One-off"  # added by migrate_airtable
     SORT_ORDER = "Sort Order"  # added by migrate_airtable
     COMPLETED_BY = "Completed By"  # added by migrate_airtable
+    # Google Calendar sync. Airtable automations write these; the app only reads
+    # them and must never write them (see AUTOMATION_OWNED and the runbook).
+    CALENDAR_EVENT_ID = "Calendar Event ID"  # added by migrate_airtable
+    CALENDAR_SYNCED_KEY = "Calendar Synced Key"  # added by migrate_airtable
+    # A "Last modified time" field watching the two above. Made by hand, because
+    # the API cannot create it. See docs/admin-runbook.md.
+    CALENDAR_LAST_SYNCED = "Calendar Last Synced"
+
+
+# Fields only Airtable automations may write. The client refuses any app write
+# that includes one, so editing a task in the app can never clear or change them.
+AUTOMATION_OWNED: dict[str, set[str]] = {
+    Work.TABLE: {Work.CALENDAR_EVENT_ID, Work.CALENDAR_SYNCED_KEY, Work.CALENDAR_LAST_SYNCED},
+}
 
 
 NOT_STARTED = "Not Started"

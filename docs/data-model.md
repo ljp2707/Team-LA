@@ -193,6 +193,9 @@ Used by: My Tasks, Task page, Project page, reminders.
 | One-off *(added)* | Added to this launch only, not from the template. |
 | Sort Order *(added)* | Read and written by the app. |
 | Completed By *(added)* | Who marked it Done. |
+| Calendar Event ID *(added)* | The task's Google Calendar event. Written only by the Airtable calendar automations; the app reads it and never writes it. |
+| Calendar Synced Key *(added)* | What the calendar event showed when it was last written. Written only by the Airtable calendar automations. |
+| Calendar Last Synced | Last modified time of the two calendar fields, made by hand. Shown when hovering over a task's calendar mark. |
 
 ## Session Team
 
@@ -242,6 +245,7 @@ Used by: Task page, Project page.
 | Work | Link to the Work table. |
 | Session | Link to the Session table. |
 | Added By | Link to the Users table. |
+| File | Attachment. Only filled for Kind File, uploaded from someone's computer |
 
 ## Reminders
 

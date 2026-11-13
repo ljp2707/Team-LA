@@ -1896,3 +1896,11 @@ a.row-title:hover {
   margin-top: var(--space-3);
   padding: 0 var(--space-2);
 }
+
+/* Shown after a task's name when it is on the shared Google Calendar */
+.calendar-mark {
+  display: inline-flex;
+  margin-left: var(--space-2);
+  color: var(--color-muted);
+  vertical-align: -1px;
+}

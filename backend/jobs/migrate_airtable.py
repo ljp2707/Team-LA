@@ -115,6 +115,10 @@ NEW_FIELDS = {
         (Work.ANCHOR, text()),
         (Work.DAYS_BEFORE_ANCHOR, number()),
         (Work.DUE_DATE_OVERRIDE, date_field()),
+        # Written only by the Google Calendar automations. "Calendar Last Synced"
+        # is a Last modified time field, which the API cannot create: add it by hand.
+        (Work.CALENDAR_EVENT_ID, text()),
+        (Work.CALENDAR_SYNCED_KEY, long_text()),
     ],
     Steps.TABLE: [
         (Steps.SORT_ORDER, number(1)),

@@ -48,6 +48,8 @@ Where the real Airtable base, the wireframes and the build plan disagreed, these
 
 **Deleting a launch deletes everything on it.** Admins can delete a launch from its page. Its tasks, launch team, history and notes, links, and every reminder on its tasks are deleted with it, because the app hides any row whose launch is gone, so leftovers could never be seen or cleaned up and would keep people's names and notes in the base. To keep a launch for the record, close it instead; closed launches stay in the archive. One history row, not tied to any launch, records who deleted it. The launch itself is deleted last, so if Airtable fails part way, deleting it again finishes the job. This cannot be undone from the app.
 
+**Google Calendar sync runs in Airtable, not the app.** Airtable automations create and update an all-day event per task on a shared NMU calendar and keep the event ID on the task (Calendar Event ID and Calendar Synced Key). The app has no Google Calendar code. It only reads those fields to show a calendar mark on task rows, and the Airtable client refuses any app write that includes them (`AUTOMATION_OWNED` in `schema.py`), so editing a task can never clear an event ID and cause a duplicate event. Launches copied from a past launch get new tasks without event IDs, so they get their own events. Setup steps and open questions are in the admin runbook under **Google Calendar sync**.
+
 **Changing Day 1 only happens through Move Day 1.** Edit details does not offer Day 1, so the tasks and reminders always move with it.
 
 **New templates start from a copy.** "New template" copies an existing template under a new name, so the timing is already close. There is no blank template.
