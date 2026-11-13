@@ -21,7 +21,7 @@ export const PERMISSION_TABLE: PermissionRow[] = [
   },
   {
     // can_update_own_tasks, can_edit_task
-    action: "Update their own tasks, notes and links",
+    action: "Update their own tasks, notes, links, and files and photos uploaded from their computer",
     admin: "Yes",
     staff: "Yes",
     partner: "Yes",

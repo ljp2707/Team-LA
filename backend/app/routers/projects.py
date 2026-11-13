@@ -4,7 +4,7 @@ Dashboard (/dashboard, admin) and Projects (/projects, staff, read only) use
 GET /api/projects. Partners get only the projects they are listed on.
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from app import permissions
 from app.airtable import client
@@ -21,7 +21,7 @@ from app.models.project import (
 from app.models.task import LinkIn, OneOffTaskIn
 from app.models.user import CurrentUser
 from app.services import history, logic, projects, reminders, timeline
-from app.services.links import link_kind
+from app.services.links import FILE_KIND, link_kind, read_upload, save_upload
 from app.services.records import load_reminders, safe
 from app.services.views import (
     World,
@@ -336,3 +336,23 @@ def add_project_link(project_id: str, body: LinkIn, user: CurrentUser = Depends(
     )
     history.log_event(project.id, None, user.id, "Link", f"added the link {body.title.strip()}")
     return {"id": created["id"], "kind": kind}
+
+
+@router.post("/{project_id}/files", status_code=status.HTTP_201_CREATED)
+def add_project_file(
+    project_id: str,
+    file: UploadFile = File(...),
+    title: str = Form("", max_length=200),
+    user: CurrentUser = Depends(require_admin),
+):
+    """Upload a file or photo to a launch. Admins only, like launch links."""
+    world = World()
+    project = world.project(project_id)
+    try:
+        filename, content, content_type = read_upload(file)
+    except ValueError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+    name = title.strip() or filename
+    created = save_upload(name, filename, content, content_type, user.id, project.id)
+    history.log_event(project.id, None, user.id, "Link", f"uploaded the file {name}")
+    return {"id": created["id"], "kind": FILE_KIND}

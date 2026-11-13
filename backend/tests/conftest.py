@@ -112,6 +112,19 @@ class FakeAirtable:
             out.append(record)
         return out
 
+    def upload_attachment(self, name, record, field, filename, content, content_type):
+        stored = self.find(name, record["id"])
+        attachment = {
+            "id": f"att{next(self._ids)}",
+            "url": f"https://v5.airtableusercontent.com/{filename}",
+            "filename": filename,
+            "size": len(content),
+            "type": content_type,
+        }
+        stored["fields"][field] = [*stored["fields"].get(field, []), attachment]
+        self.writes.append(("upload", name, record["id"], {field: filename}))
+        return stored
+
     def delete_records(self, name, ids):
         self.tables[name] = [r for r in self.rows(name) if r["id"] not in ids]
         self.writes += [("delete", name, i, {}) for i in ids]
@@ -152,6 +165,7 @@ def fake_airtable(monkeypatch, fake):
     monkeypatch.setattr(airtable, "create_records", fake.create_records)
     monkeypatch.setattr(airtable, "update_records", fake.update_records)
     monkeypatch.setattr(airtable, "delete_records", fake.delete_records)
+    monkeypatch.setattr(airtable, "upload_attachment", fake.upload_attachment)
     public.clear()
     return fake
 

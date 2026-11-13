@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   addOneOff,
+  addProjectFile,
   addProjectLink,
   closeProject,
   getProject,
@@ -30,12 +31,13 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
 import { Tag } from "../components/ui/Tag";
 import { useToast } from "../components/ui/Toast";
+import { FileDialog, fileSize } from "../components/FileDialog";
 import { LinkDialog } from "../components/LinkDialog";
 import { PeoplePicker } from "../components/PeoplePicker";
 import { useApi } from "../hooks/useApi";
 import { formatDate, todayIso } from "../lib/dates";
 
-type Open = null | "move" | "oneoff" | "edit" | "close" | "history" | "link" | "template";
+type Open = null | "move" | "oneoff" | "edit" | "close" | "history" | "link" | "file" | "template";
 
 function errorText(caught: unknown) {
   return caught instanceof Error ? caught.message : "That did not work. Please try again.";
@@ -261,16 +263,16 @@ export function ProjectDetail() {
           )}
 
           <Card>
-            <h2>Links</h2>
+            <h2>Links and files</h2>
             {p.links.length === 0 ? (
-              <p className="muted">No links yet.</p>
+              <p className="muted">No links or files yet.</p>
             ) : (
               <ul className="link-list">
                 {p.links.map((link) => (
                   <li key={link.id ?? link.url}>
                     <a href={link.url} target="_blank" rel="noreferrer">
                       <strong>{link.title}</strong>
-                      <span className="muted">{link.kind}</span>
+                      <span className="muted">{link.is_file ? ["File", fileSize(link.file_size)].filter(Boolean).join(" · ") : link.kind}</span>
                     </a>
                     {link.can_remove && link.id && (
                       <button
@@ -291,9 +293,14 @@ export function ProjectDetail() {
               </ul>
             )}
             {p.can_manage && (
-              <Button variant="outline" size="sm" onClick={() => setOpen("link")}>
-                Add a link
-              </Button>
+              <div className="inline-actions">
+                <Button variant="outline" size="sm" onClick={() => setOpen("link")}>
+                  Add a link
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setOpen("file")}>
+                  Upload a file
+                </Button>
+              </div>
             )}
           </Card>
 
@@ -365,6 +372,16 @@ export function ProjectDetail() {
             onSave={async (title, url) => {
               await addProjectLink(p.id, title, url);
               close();
+              await project.reload();
+            }}
+          />
+          <FileDialog
+            open={open === "file"}
+            onClose={close}
+            onSave={async (file, title) => {
+              await addProjectFile(p.id, file, title);
+              close();
+              toast.show("File uploaded.");
               await project.reload();
             }}
           />

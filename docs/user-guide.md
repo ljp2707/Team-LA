@@ -42,6 +42,7 @@ A task says **Blocked** and "Waiting on …" when it needs another task finished
 - **Status:** the same four choices, in one row.
 - **Notes:** write anything the team should know and click **Post note**. You can delete your own note for 15 minutes after posting it.
 - **Links:** click **Attach a Drive or Canva link** and paste a link that starts with `https://`. The app labels it Google Drive, Canva or Other.
+- **Files and photos:** click **Upload a file or photo** and choose one from your computer. Photos, PDFs, Word, Excel, PowerPoint, text and CSV files work, up to 5 MB each. For anything bigger, put it in Google Drive and attach the link. Anyone who can see the task can open the file.
 - **Due, Timing, Role and Assigned to:** when it is due, how that relates to Day 1, and who is responsible. Only admins can change these. **Add to Google Calendar** puts the due date on your calendar.
 - **Order of work:** **Needs first** lists the tasks that must be done before this one. **Waiting on this** lists the tasks that cannot start until you finish.
 - **Reminders:** which automatic emails have gone out, and any reminders you set. Click **Set a reminder**, pick a date and add a note if you like, and the app emails you that morning. If you finish the task first, the reminder is cancelled.
@@ -65,7 +66,7 @@ Emails are never sent for tasks that are done or skipped. Every email has a butt
 
 ### Partners
 
-Partners (for example YMCA staff and swim team leads) see **Your program** instead of Projects. It only shows the launches they have been added to. They can update their own tasks, add notes and links, and set reminders. They see notes the team has shared with partners, and never internal notes or the history.
+Partners (for example YMCA staff and swim team leads) see **Your program** instead of Projects. It only shows the launches they have been added to. They can update their own tasks, add notes, links and files, and set reminders. They see notes the team has shared with partners, and never internal notes or the history.
 
 ## For admins
 
