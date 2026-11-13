@@ -141,6 +141,7 @@ def test_viewers_cannot_write_anything(client, sign_in, project):
         ("delete", "/api/notes/recN", None),
     ]:
         assert client.request(method, path, json=body).status_code == 403, path
+    assert _upload(client, "/api/tasks/recT2/files").status_code == 403
 
 
 def test_admin_reassigns_and_due_date_change_is_logged(client, sign_in, project):
@@ -348,6 +349,62 @@ def test_notes_and_links_on_own_task(client, sign_in, project):
     assert client.post("/api/tasks/recT2/links", json={"title": "x", "url": "http://insecure.org"}).status_code == 422
     assert client.delete(f"/api/links/{link.json()['id']}").status_code == 200
     assert not any(r["id"] == link.json()["id"] for r in project.rows(Links.TABLE))
+
+
+def _upload(client, path, name="flyer.png", content=b"png bytes", title=""):
+    return client.post(path, files={"file": (name, content, "image/png")}, data={"title": title})
+
+
+def test_files_on_own_task(client, sign_in, project):
+    sign_in("staff@example.org")
+    made = _upload(client, "/api/tasks/recT2/files", title="Pool photo")
+    assert made.status_code == 201 and made.json()["kind"] == "File"
+    row = fields(project, Links.TABLE, made.json()["id"])
+    assert row[Links.KIND] == "File" and row[Links.TITLE] == "Pool photo"
+    assert row[Links.WORK] == ["recT2"] and row[Links.ADDED_BY] == ["recStaff"]
+    assert row[Links.FILE][0]["filename"] == "flyer.png"
+
+    shown = client.get("/api/tasks/recT2").json()["links"]
+    item = next(l for l in shown if l["id"] == made.json()["id"])
+    assert item["is_file"] and item["url"] == f"/api/links/{made.json()['id']}/file"
+    assert item["file_name"] == "flyer.png" and item["file_size"] == len(b"png bytes")
+
+    opened = client.get(item["url"], follow_redirects=False)
+    assert opened.status_code == 302
+    assert opened.headers["location"] == "https://v5.airtableusercontent.com/flyer.png"
+
+    # The title falls back to the file's name, without any folders.
+    named = _upload(client, "/api/tasks/recT2/files", name="../../Budget.pdf")
+    assert fields(project, Links.TABLE, named.json()["id"])[Links.TITLE] == "Budget.pdf"
+
+    assert _upload(client, "/api/tasks/recT5/files").status_code == 403  # Not their task
+    assert client.delete(f"/api/links/{made.json()['id']}").status_code == 200
+    assert client.get(item["url"]).status_code == 404
+
+
+def test_file_uploads_refuse_bad_files(client, sign_in, project):
+    sign_in("staff@example.org")
+    before = len(project.rows(Links.TABLE))
+    assert _upload(client, "/api/tasks/recT2/files", name="page.html").status_code == 422
+    assert _upload(client, "/api/tasks/recT2/files", name="run.exe").status_code == 422
+    assert _upload(client, "/api/tasks/recT2/files", name="noext").status_code == 422
+    assert _upload(client, "/api/tasks/recT2/files", content=b"").status_code == 422
+    too_big = _upload(client, "/api/tasks/recT2/files", content=b"x" * (5 * 1024 * 1024 + 1))
+    assert too_big.status_code == 422 and "5 MB" in too_big.json()["detail"]
+    assert len(project.rows(Links.TABLE)) == before
+
+
+def test_project_files_are_admin_only_and_hidden_from_other_partners(client, sign_in, project):
+    sign_in("staff@example.org")
+    assert _upload(client, "/api/projects/recProj/files").status_code == 403
+    sign_in("admin@example.org")
+    made = _upload(client, "/api/projects/recProj/files", name="map.jpg")
+    assert made.status_code == 201
+    links = client.get("/api/projects/recProj").json()["links"]
+    assert any(l["id"] == made.json()["id"] and l["is_file"] for l in links)
+
+    sign_in("partner@example.org")  # Not listed on this launch
+    assert client.get(f"/api/links/{made.json()['id']}/file", follow_redirects=False).status_code == 404
 
 
 def test_note_delete_window_through_the_api(client, sign_in, project, advance):

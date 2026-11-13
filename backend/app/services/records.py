@@ -558,22 +558,34 @@ class LinkRec:
     session_id: str | None = None
     added_by: str | None = None
     created: datetime | None = None
+    # Only for Kind File. file_url is Airtable's, and stops working after a few hours.
+    file_name: str = ""
+    file_url: str = ""
+    file_size: int | None = None
 
 
 def load_links() -> list[LinkRec]:
-    return [
-        LinkRec(
-            id=r["id"],
-            title=r["fields"].get(Links.TITLE, "") or "",
-            url=r["fields"].get(Links.URL, "") or "",
-            kind=r["fields"].get(Links.KIND) or "Other",
-            work_id=_first(r["fields"].get(Links.WORK)),
-            session_id=_first(r["fields"].get(Links.SESSION)),
-            added_by=_first(r["fields"].get(Links.ADDED_BY)),
-            created=_created(r),
+    out = []
+    for r in client.all_records(Links.TABLE):
+        f = r["fields"]
+        files = f.get(Links.FILE) or []
+        attachment = files[0] if files else {}
+        out.append(
+            LinkRec(
+                id=r["id"],
+                title=f.get(Links.TITLE, "") or "",
+                url=f.get(Links.URL, "") or "",
+                kind=f.get(Links.KIND) or "Other",
+                work_id=_first(f.get(Links.WORK)),
+                session_id=_first(f.get(Links.SESSION)),
+                added_by=_first(f.get(Links.ADDED_BY)),
+                created=_created(r),
+                file_name=attachment.get("filename", "") or "",
+                file_url=attachment.get("url", "") or "",
+                file_size=_int(attachment.get("size")),
+            )
         )
-        for r in client.all_records(Links.TABLE)
-    ]
+    return out
 
 
 @dataclass

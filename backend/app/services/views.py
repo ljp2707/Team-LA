@@ -17,6 +17,7 @@ from fastapi import HTTPException, status
 from app import permissions
 from app.models.user import CurrentUser
 from app.services import clock, logic
+from app.services.links import FILE_KIND
 from app.services.records import (
     InstructorRec,
     LinkRec,
@@ -251,11 +252,16 @@ def note_dict(world: World, row: LogRec, user: CurrentUser) -> dict:
 
 
 def link_dict(world: World, link: LinkRec, can_remove: bool) -> dict:
+    is_file = link.kind == FILE_KIND
     return {
         "id": link.id,
         "title": link.title,
-        "url": link.url,
+        # Files open through the app, which checks access and gets a fresh Airtable URL.
+        "url": f"/api/links/{link.id}/file" if is_file else link.url,
         "kind": link.kind,
+        "is_file": is_file,
+        "file_name": link.file_name if is_file else None,
+        "file_size": link.file_size if is_file else None,
         "added_by": world.user_short(link.added_by),
         "can_remove": can_remove,
     }

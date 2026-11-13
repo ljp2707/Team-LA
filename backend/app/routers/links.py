@@ -1,17 +1,43 @@
-"""Removing links, and deleting or sharing notes: /api/links/{id} and /api/notes/{id}."""
+"""Opening uploaded files, removing links and files, and deleting or sharing notes.
+
+Routes: /api/links/{id}, /api/links/{id}/file and /api/notes/{id}.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 
 from app import permissions
 from app.airtable import client
 from app.airtable.schema import ActivityLog, Links
-from app.auth.deps import require_can_edit
+from app.auth.deps import current_user, require_can_edit
 from app.models.task import NoteVisibilityIn
 from app.models.user import CurrentUser
 from app.services import clock, history
+from app.services.links import FILE_KIND
 from app.services.views import World, check_project_access, note_dict
 
 router = APIRouter(prefix="/api", tags=["links and notes"])
+
+
+@router.get("/links/{link_id}/file")
+def open_file(link_id: str, user: CurrentUser = Depends(current_user)):
+    """Send the browser to the uploaded file, for anyone who can see its task or launch.
+
+    Airtable's file URLs stop working after a few hours, so pages link here and this
+    looks up the current one each time.
+    """
+    world = World()
+    link = next((l for l in world.links if l.id == link_id), None)
+    if link is None or not link.file_url:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+    session_id = link.session_id
+    if link.work_id:
+        session_id = world.task(link.work_id).session_id
+    project = world.projects.get(session_id or "")
+    if project is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
+    check_project_access(user, project)
+    return RedirectResponse(link.file_url, status_code=status.HTTP_302_FOUND)
 
 
 @router.delete("/links/{link_id}")
@@ -21,17 +47,18 @@ def remove_link(link_id: str, user: CurrentUser = Depends(require_can_edit)):
     if link is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Link not found")
     session_id = link.session_id
+    noun = "file" if link.kind == FILE_KIND else "link"
     if link.work_id:
         task = world.task(link.work_id)
         check_project_access(user, world.project(task.session_id or ""))
         if not permissions.can_edit_task(user.actor, user.id, task.assignees):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only change tasks assigned to you")
         session_id = task.session_id
-        what = f"removed the link {link.title} from {task.name}"
+        what = f"removed the {noun} {link.title} from {task.name}"
     else:
         if not permissions.can_manage_projects(user.actor):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can change project links")
-        what = f"removed the link {link.title}"
+        what = f"removed the {noun} {link.title}"
     client.delete_records(Links.TABLE, [link.id])
     history.log_event(session_id, link.work_id, user.id, "Link", what)
     return {"removed": True}

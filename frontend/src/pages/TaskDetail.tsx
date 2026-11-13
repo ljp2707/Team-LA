@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import {
   addNote,
   addReminder,
+  addTaskFile,
   addTaskLink,
   assignTask,
   cancelReminder,
@@ -25,6 +26,7 @@ import { StatusTag } from "../components/ui/StatusTag";
 import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { addDays, formatDate } from "../lib/dates";
+import { FileDialog, fileSize } from "../components/FileDialog";
 import { LinkDialog } from "../components/LinkDialog";
 import { PeoplePicker } from "../components/PeoplePicker";
 
@@ -39,7 +41,7 @@ function errorText(caught: unknown) {
   return caught instanceof Error ? caught.message : "That did not work. Please try again.";
 }
 
-type Open = null | "link" | "reminder" | "assign" | "due" | "rename";
+type Open = null | "link" | "file" | "reminder" | "assign" | "due" | "rename";
 
 export function TaskDetail() {
   const { id = "" } = useParams();
@@ -233,14 +235,14 @@ export function TaskDetail() {
           </Card>
 
           <Card>
-            <h2>Links</h2>
+            <h2>Links and files</h2>
             {t.links.length > 0 && (
               <ul className="link-list link-list--boxed">
                 {t.links.map((link) => (
                   <li key={link.id ?? link.url}>
                     <a href={link.url} target="_blank" rel="noreferrer">
                       <strong>{link.title}</strong>
-                      <span className="muted">{link.kind}</span>
+                      <span className="muted">{link.is_file ? ["File", fileSize(link.file_size)].filter(Boolean).join(" · ") : link.kind}</span>
                     </a>
                     {link.can_remove && link.id && (
                       <button
@@ -260,11 +262,16 @@ export function TaskDetail() {
                 ))}
               </ul>
             )}
-            {t.links.length === 0 && <p className="muted">No links yet.</p>}
+            {t.links.length === 0 && <p className="muted">No links or files yet.</p>}
             {t.can_edit && (
-              <Button variant="outline" onClick={() => setOpen("link")}>
-                Attach a Drive or Canva link
-              </Button>
+              <div className="inline-actions">
+                <Button variant="outline" onClick={() => setOpen("link")}>
+                  Attach a Drive or Canva link
+                </Button>
+                <Button variant="outline" onClick={() => setOpen("file")}>
+                  Upload a file or photo
+                </Button>
+              </div>
             )}
           </Card>
         </div>
@@ -403,6 +410,16 @@ export function TaskDetail() {
         onSave={async (title, url) => {
           await addTaskLink(t.id, title, url);
           close();
+          await task.reload();
+        }}
+      />
+      <FileDialog
+        open={open === "file"}
+        onClose={close}
+        onSave={async (file, title) => {
+          await addTaskFile(t.id, file, title);
+          close();
+          toast.show("File uploaded.");
           await task.reload();
         }}
       />

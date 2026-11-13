@@ -231,15 +231,16 @@ class ActivityLog:
 
 
 class Links:
-    """Drive and Canva links on tasks and projects. Table added by migrate_airtable."""
+    """Drive and Canva links, and uploaded files, on tasks and projects. Table added by migrate_airtable."""
 
     TABLE = "Links"
     TITLE = "Title"  # Primary field
     URL = "URL"
-    KIND = "Kind"  # Google Drive, Canva, Other
+    KIND = "Kind"  # Google Drive, Canva, Other, File
     WORK = "Work"
     SESSION = "Session"
     ADDED_BY = "Added By"
+    FILE = "File"  # Attachment. Only filled for Kind File, uploaded from someone's computer
 
 
 class Reminders:

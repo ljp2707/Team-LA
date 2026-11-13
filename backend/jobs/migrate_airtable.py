@@ -139,10 +139,11 @@ NEW_TABLES = {
     Links.TABLE: [
         (Links.TITLE, text()),
         (Links.URL, ("url", None)),
-        (Links.KIND, select("Google Drive", "Canva", "Other")),
+        (Links.KIND, select("Google Drive", "Canva", "Other", "File")),
         (Links.WORK, link(Work.TABLE)),
         (Links.SESSION, link(Session.TABLE)),
         (Links.ADDED_BY, link(Users.TABLE)),
+        (Links.FILE, ("multipleAttachments", None)),
     ],
     Reminders.TABLE: [
         (Reminders.NAME, text()),

@@ -6,7 +6,7 @@ projects they are listed on. Viewers change nothing.
 
 from datetime import timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from app import permissions
 from app.airtable import client
@@ -16,7 +16,7 @@ from app.email.templates import task_url
 from app.models.task import AssignIn, LinkIn, NoteIn, ReassignIn, ReminderIn, TaskUpdateIn
 from app.models.user import CurrentUser
 from app.services import clock, history, logic, reminders
-from app.services.links import calendar_url, link_kind
+from app.services.links import FILE_KIND, calendar_url, link_kind, read_upload, save_upload
 from app.services.records import TaskRec, load_reminders, safe
 from app.services.timeline import find_cycle
 from app.services.views import World, check_project_access, link_dict, note_dict, task_row
@@ -172,6 +172,9 @@ def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
                 "title": "Resource from the template",
                 "url": task.resource_link,
                 "kind": link_kind(task.resource_link),
+                "is_file": False,
+                "file_name": None,
+                "file_size": None,
                 "added_by": None,
                 "can_remove": False,
             },
@@ -458,6 +461,34 @@ def add_task_link(task_id: str, body: LinkIn, user: CurrentUser = Depends(requir
         visibility=permissions.default_note_visibility(user.actor),
     )
     return {"id": created["id"], "kind": kind}
+
+
+@router.post("/{task_id}/files", status_code=status.HTTP_201_CREATED)
+def add_task_file(
+    task_id: str,
+    file: UploadFile = File(...),
+    title: str = Form("", max_length=200),
+    user: CurrentUser = Depends(require_can_edit),
+):
+    """Upload a file or photo from someone's computer. Same rules as adding a link."""
+    world = World()
+    task = _visible_task(world, task_id, user)
+    _require_edit(task, user)
+    try:
+        filename, content, content_type = read_upload(file)
+    except ValueError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(error)) from error
+    name = title.strip() or filename
+    created = save_upload(name, filename, content, content_type, user.id, task.session_id, task.id)
+    history.log_event(
+        task.session_id,
+        task.id,
+        user.id,
+        "Link",
+        f"uploaded the file {name} to {task.name}",
+        visibility=permissions.default_note_visibility(user.actor),
+    )
+    return {"id": created["id"], "kind": FILE_KIND}
 
 
 @router.post("/{task_id}/reminders", status_code=status.HTTP_201_CREATED)

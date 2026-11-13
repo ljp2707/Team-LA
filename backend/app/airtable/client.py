@@ -338,6 +338,32 @@ def delete_records(table_name: str, record_ids: list[str]) -> None:
     _after_write(table_name, deleted_ids=record_ids)
 
 
+def upload_attachment(
+    table_name: str,
+    record: dict[str, Any],
+    field: str,
+    filename: str,
+    content: bytes,
+    content_type: str,
+) -> dict[str, Any]:
+    """Add a file to an attachment field of a record the app just created.
+
+    Airtable takes files up to 5 MB this way. It answers with only the attachment
+    field, so that is put into `record` before the cache is patched. Returns the
+    record with every field.
+    """
+    try:
+        result = get_base().table(table_name).upload_attachment(
+            record["id"], field, filename, content, content_type
+        )
+    except BaseException:
+        _after_write(table_name)
+        raise
+    merged = {**record, "fields": {**record["fields"], field: result["fields"].get(field, [])}}
+    _after_write(table_name, changed=[merged])
+    return merged
+
+
 def table_counts() -> list[dict[str, Any]]:
     """Return the record count for each table, or an error for that table."""
     results = []

@@ -1,4 +1,4 @@
-import { get, query, send } from "./client";
+import { get, query, send, upload } from "./client";
 import type { MyReminder, MyTasks, Note, ReminderPanel, TaskDetail, TaskRow, TaskStatus } from "./types";
 
 export const myTasks = (params: { filter?: string; project?: string } = {}) =>
@@ -28,6 +28,9 @@ export const shareNote = (id: string, visibility: "Internal" | "Shared") =>
 
 export const addTaskLink = (id: string, title: string, url: string) =>
   send<{ id: string; kind: string }>("POST", `/api/tasks/${id}/links`, { title, url });
+
+export const addTaskFile = (id: string, file: File, title: string) =>
+  upload<{ id: string; kind: string }>(`/api/tasks/${id}/files`, file, { title });
 
 export const addReminder = (id: string, sendOn: string, note: string) =>
   send<ReminderPanel>("POST", `/api/tasks/${id}/reminders`, { send_on: sendOn, note });

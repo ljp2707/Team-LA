@@ -1,4 +1,4 @@
-import { get, query, send } from "./client";
+import { get, query, send, upload } from "./client";
 import type {
   DayOneResult,
   HistoryEntry,
@@ -79,6 +79,9 @@ export const projectHistory = (id: string, page: number) =>
 
 export const addProjectLink = (id: string, title: string, url: string) =>
   send<{ id: string }>("POST", `/api/projects/${id}/links`, { title, url });
+
+export const addProjectFile = (id: string, file: File, title: string) =>
+  upload<{ id: string; kind: string }>(`/api/projects/${id}/files`, file, { title });
 
 export const removeLink = (id: string) => send<{ removed: boolean }>("DELETE", `/api/links/${id}`);
 

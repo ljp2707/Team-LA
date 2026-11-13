@@ -29,11 +29,13 @@ function detailMessage(body: unknown, status: number): string {
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
+  // A FormData body (a file upload) sets its own Content-Type with the boundary.
+  const json = !(options.body instanceof FormData);
   try {
     response = await fetch(path, {
       ...options,
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...options.headers },
+      headers: { ...(json ? { "Content-Type": "application/json" } : {}), ...options.headers },
     });
   } catch {
     throw new ApiError(0, "Could not reach NMU Launches. Check your connection.");
@@ -61,6 +63,14 @@ export const get = <T>(path: string) => api<T>(path);
 
 export const send = <T>(method: "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown) =>
   api<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+
+/** Send a file from the person's computer as a form, with any extra text fields. */
+export function upload<T>(path: string, file: File, fields: Record<string, string> = {}) {
+  const form = new FormData();
+  form.append("file", file);
+  for (const [name, value] of Object.entries(fields)) form.append(name, value);
+  return api<T>(path, { method: "POST", body: form });
+}
 
 /** Build a query string, leaving out empty values. */
 export function query(params: Record<string, string | null | undefined>): string {

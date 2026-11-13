@@ -83,6 +83,10 @@ export interface LinkItem {
   title: string;
   url: string;
   kind: string;
+  /** Uploaded from someone's computer. url then opens it through the app. */
+  is_file: boolean;
+  file_name: string | null;
+  file_size: number | null;
   added_by: string | null;
   can_remove: boolean;
 }
