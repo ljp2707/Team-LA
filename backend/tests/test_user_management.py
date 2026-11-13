@@ -145,3 +145,47 @@ def test_archive_schedule_compares_planned_and_actual_day_one(client, sign_in, f
     assert [r["id"] for r in client.get("/api/archive?q=kent").json()["launches"]] == ["recEarly"]
     assert client.get("/api/archive?status=Bogus").status_code == 422
     assert client.get("/api/archive/recLate").json()["schedule"]["status"] == "Delayed"
+
+
+# --- One person's launches and tasks --------------------------------------------
+
+
+def test_only_admin_view_can_see_a_persons_work(client, sign_in, project):
+    assert p.can_view_user_work(Actor("Admin", "admin"))
+    assert not p.can_view_user_work(Actor("Admin", "staff"))
+    for email in ("staff@example.org", "viewer@example.org", "partner@example.org"):
+        sign_in(email)
+        assert client.get("/api/users/recStaff/work").status_code == 403
+    sign_in("admin@example.org")
+    client.post("/api/me/view", json={"view": "staff"})
+    assert client.get("/api/users/recStaff/work").status_code == 403
+
+
+def test_a_persons_work_shows_active_launches_and_open_tasks(client, sign_in, project):
+    from tests.builders import add_team
+
+    # A closed launch is left out, even with an open task on it.
+    add_project(project, "recClosed", name="Old", status="Complete", start=date(2026, 6, 1))
+    add_task(project, "recClosedT", "Leftover", date(2026, 6, 1), project="recClosed", assigned="recStaff")
+    # On a team with nothing assigned: still listed, with no tasks.
+    add_project(project, "recTeamOnly", name="Kent", start=date(2027, 1, 10))
+    add_team(project, "recTeamOnly", "recRoleOps", "recStaff")
+
+    sign_in("admin@example.org")
+    body = client.get("/api/users/recStaff/work").json()
+    assert body["person"]["id"] == "recStaff"
+    assert body["person"]["access_level"] == "Staff"
+    launches = body["launches"]
+    assert [launch["id"] for launch in launches] == ["recProj", "recTeamOnly"]  # By Day 1
+    first = launches[0]
+    assert [t["id"] for t in first["tasks"]] == ["recT2", "recT4", "recT3"]  # Open only, by due date
+    assert all(t["status"] and t["due"] for t in first["tasks"])
+    assert first["done"] == 0
+    assert launches[1]["tasks"] == [] and launches[1]["roles"] == ["Operations"]
+
+    admin = client.get("/api/users/recAdmin/work").json()["launches"]
+    assert [t["id"] for t in admin[0]["tasks"]] == ["recT5"]
+    assert admin[0]["done"] == 1  # Confirm head coach is done, so it is only counted
+
+    assert client.get("/api/users/recPartner/work").json()["launches"] == []
+    assert client.get("/api/users/recNobody/work").status_code == 404

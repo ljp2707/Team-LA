@@ -131,6 +131,7 @@ export interface ProjectDetail extends ProjectCard {
   partners: { id: string; name: string | null }[];
   open_tasks: number;
   can_manage: boolean;
+  can_delete: boolean;
   can_close: boolean;
   edit: ProjectEdit | null;
 }
@@ -329,6 +330,25 @@ export interface Person {
   active: boolean;
   roles: { id: string; name: string | null }[];
   open_tasks: number;
+}
+
+/** One active launch on a person's page, with their open tasks on it. */
+export interface PersonLaunch {
+  id: string;
+  name: string;
+  site: string;
+  program_type: string;
+  day_one: string | null;
+  /** Their roles on the launch team, if any. */
+  roles: string[];
+  tasks: TaskRow[];
+  /** How many of their tasks on this launch are already done or skipped. */
+  done: number;
+}
+
+export interface PersonWork {
+  person: Person;
+  launches: PersonLaunch[];
 }
 
 export interface PeopleList {

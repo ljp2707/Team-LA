@@ -133,6 +133,16 @@ def can_manage_projects(actor: Actor) -> bool:
     return actor.is_admin
 
 
+def can_delete_projects(actor: Actor) -> bool:
+    """Delete a launch with its tasks, team, history, links and reminders."""
+    return actor.is_admin
+
+
+def can_view_user_work(actor: Actor) -> bool:
+    """See another person's launches and the tasks they have on each."""
+    return actor.is_admin
+
+
 def can_assign_tasks(actor: Actor) -> bool:
     """Assign or change anyone's task."""
     return actor.is_admin

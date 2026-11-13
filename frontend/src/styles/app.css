@@ -754,7 +754,15 @@ input.select {
 }
 
 .project-row {
-  grid-template-columns: 120px minmax(0, 1fr) minmax(0, 180px) 64px;
+  /* The due column fits the longest short date with a year ("Sep 30, 2027").
+     The rows are separate grids, so a fixed width keeps every column lined up. */
+  grid-template-columns: 120px minmax(0, 1fr) minmax(0, 180px) 96px;
+}
+
+/* If the date still does not fit (a larger font or zoom), the year wraps onto
+   its own line instead of running past the edge of the row. */
+.project-row .row-due {
+  white-space: normal;
 }
 
 .task-row:hover,
@@ -1863,4 +1871,28 @@ a.row-title:hover {
 
 .link-button:hover {
   color: var(--color-primary-hover);
+}
+
+/* One person's launches and tasks (Users, then a person's name) */
+.person-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.person-launch-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+}
+
+.person-launch-head .row-title {
+  font: inherit;
+}
+
+.person-launch-empty {
+  margin-top: var(--space-3);
+  padding: 0 var(--space-2);
 }

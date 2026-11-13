@@ -321,7 +321,11 @@ def update_record(
 
 
 def delete_records(table_name: str, record_ids: list[str]) -> None:
-    """Delete rows the app owns (links, notes, drafts, unused templates). Never projects or tasks."""
+    """Delete rows the app owns (links, notes, drafts, unused templates).
+
+    Projects and tasks are only deleted by projects.delete, when an admin deletes
+    a whole launch. Nothing else deletes them.
+    """
     if not record_ids:
         return
     table = get_base().table(table_name)

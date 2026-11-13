@@ -4,6 +4,7 @@ import {
   addOneOff,
   addProjectLink,
   closeProject,
+  deleteProject,
   getProject,
   listInstructors,
   listSites,
@@ -35,7 +36,7 @@ import { PeoplePicker } from "../components/PeoplePicker";
 import { useApi } from "../hooks/useApi";
 import { formatDate, todayIso } from "../lib/dates";
 
-type Open = null | "move" | "oneoff" | "edit" | "close" | "history" | "link" | "template";
+type Open = null | "move" | "oneoff" | "edit" | "close" | "delete" | "history" | "link" | "template";
 
 function errorText(caught: unknown) {
   return caught instanceof Error ? caught.message : "That did not work. Please try again.";
@@ -45,6 +46,7 @@ export function ProjectDetail() {
   const { id = "" } = useParams();
   const { me } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
   const project = useApi(() => getProject(id), [id]);
   const [open, setOpen] = useState<Open>(null);
   const [moved, setMoved] = useState<DayOneResult | null>(null);
@@ -242,6 +244,11 @@ export function ProjectDetail() {
                     Reopen
                   </Button>
                 )}
+                {p.can_delete && (
+                  <Button variant="danger" size="sm" onClick={() => setOpen("delete")}>
+                    Delete launch
+                  </Button>
+                )}
               </div>
             )}
           </Card>
@@ -370,6 +377,18 @@ export function ProjectDetail() {
           />
           <TemplateDialog open={open === "template"} project={p} onClose={close} />
         </>
+      )}
+      {p.can_delete && (
+        <DeleteDialog
+          open={open === "delete"}
+          project={p}
+          onClose={close}
+          onDeleted={(name) => {
+            close();
+            toast.show(`Deleted ${name}.`);
+            navigate(back.to, { replace: true });
+          }}
+        />
       )}
       {p.can_see_history && <HistoryDialog open={open === "history"} projectId={p.id} onClose={close} />}
     </div>
@@ -787,6 +806,73 @@ function CloseDialog({
       )}
       {project.open_tasks > 0 && !skip && (
         <p className="muted small">Left unticked, the open tasks stay as they are and show as unfinished in the archive.</p>
+      )}
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+    </Dialog>
+  );
+}
+
+function DeleteDialog({
+  open,
+  project,
+  onClose,
+  onDeleted,
+}: {
+  open: boolean;
+  project: Project;
+  onClose: () => void;
+  onDeleted: (name: string) => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const name = project.site || project.name;
+  const taskCount = project.groups.reduce((sum, g) => sum + g.tasks.length, 0);
+  const label = project.day_one ? `${name} (Day 1 ${formatDate(project.day_one)})` : name;
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteProject(project.id);
+      onDeleted(name);
+    } catch (caught) {
+      setError(errorText(caught));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      title={`Delete ${name}?`}
+      onClose={() => {
+        setError(null);
+        onClose();
+      }}
+      actions={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={() => void confirm()} disabled={busy}>
+            {busy ? "Deleting" : "Delete launch"}
+          </Button>
+        </>
+      }
+    >
+      <p>
+        This permanently deletes <strong>{label}</strong> with its{" "}
+        {taskCount === 1 ? "1 task" : `${taskCount} tasks`}, its team, notes, history, links and reminders.{" "}
+        <strong>This cannot be undone.</strong>
+      </p>
+      {!project.closed && (
+        <p className="muted small">
+          To keep a record of it instead, close the launch. Closed launches stay in the archive.
+        </p>
       )}
       {error && (
         <p className="field-error" role="alert">

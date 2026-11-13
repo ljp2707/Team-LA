@@ -141,6 +141,7 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
         ],
         "open_tasks": sum(1 for t in tasks if logic.is_open(t.status)),
         "can_manage": is_admin,
+        "can_delete": permissions.can_delete_projects(user.actor),
         "can_close": is_admin
         and not project.closed
         and project.start is not None
@@ -178,6 +179,15 @@ def update_project(
     world = World()
     projects.update_details(world, world.project(project_id), body, user)
     return _project_detail(World(), project_id, user)
+
+
+@router.delete("/{project_id}")
+def delete_project(project_id: str, user: CurrentUser = Depends(require_admin)):
+    """Delete a launch and everything that belongs to it. Admins only. Cannot be undone."""
+    if not permissions.can_delete_projects(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can delete launches")
+    world = World()
+    return projects.delete(world, world.project(project_id), user)
 
 
 @router.post("/{project_id}/move-day-one")

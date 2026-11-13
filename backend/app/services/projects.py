@@ -13,6 +13,8 @@ from app.airtable.schema import (
     SESSION_IN_PROGRESS,
     SESSION_NOT_STARTED,
     SITE_TYPES,
+    ActivityLog,
+    Links,
     Reminders,
     Session,
     SessionTeam,
@@ -349,6 +351,47 @@ def reopen(project: ProjectRec, user: CurrentUser) -> None:
         typecast=True,
     )
     history.log_event(project.id, None, user.id, "Project Closed", "reopened this launch", "Complete", "In progress")
+
+
+def delete(world: World, project: ProjectRec, user: CurrentUser) -> dict:
+    """Delete a launch and every row that only exists for it.
+
+    That is its tasks, its team, its history and notes, its links, and every
+    reminder on its tasks. Nothing is left pointing at a launch that is gone,
+    because the app hides such rows everywhere, so they could never be seen or
+    cleaned up from here. To keep a launch for the record, close it instead.
+
+    The launch itself goes last. If Airtable fails part way, the launch is still
+    there with some of its rows, and deleting it again finishes the job.
+    """
+    task_ids = {t.id for t in world.tasks_by_project.get(project.id, [])}
+    reminder_ids = [r.id for r in safe(load_reminders) if r.work_id in task_ids]
+    link_ids = [
+        link.id for link in world.links if link.session_id == project.id or link.work_id in task_ids
+    ]
+    log_ids = [
+        row.id for row in world.log if row.session_id == project.id or row.work_id in task_ids
+    ]
+    team_ids = [t.id for t in world.team_for(project.id)]
+
+    client.delete_records(Reminders.TABLE, reminder_ids)
+    client.delete_records(Links.TABLE, link_ids)
+    client.delete_records(ActivityLog.TABLE, log_ids)
+    client.delete_records(SessionTeam.TABLE, team_ids)
+    client.delete_records(Work.TABLE, sorted(task_ids))
+    client.delete_records(Session.TABLE, [project.id])
+
+    name = world.site_name(project)
+    if project.start:
+        name = f"{name} (Day 1 {logic.fmt_date(project.start, world.today)})"
+    history.log_event(
+        None,
+        None,
+        user.id,
+        "System",
+        f"deleted the launch {name} and its {logic.plural(len(task_ids), 'task')}",
+    )
+    return {"deleted": True, "tasks": len(task_ids)}
 
 
 def season_stats(world: World) -> dict:

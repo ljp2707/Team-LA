@@ -1,5 +1,5 @@
 import { get, query, send } from "./client";
-import type { HandOffPreview, PeopleList, Person, RoleRow } from "./types";
+import type { HandOffPreview, PeopleList, Person, PersonWork, RoleRow } from "./types";
 
 export interface PersonInput {
   first_name: string;
@@ -11,6 +11,9 @@ export interface PersonInput {
 
 export const listPeople = (inactive: boolean) =>
   get<PeopleList>(`/api/users${query({ inactive: inactive ? "true" : null })}`);
+
+/** Admins only: one person's active launches and their open tasks on each. */
+export const personWork = (id: string) => get<PersonWork>(`/api/users/${id}/work`);
 
 export const addPerson = (body: PersonInput) => send<Person>("POST", "/api/users", body);
 

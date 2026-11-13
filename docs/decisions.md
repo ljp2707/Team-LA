@@ -46,6 +46,8 @@ Where the real Airtable base, the wireframes and the build plan disagreed, these
 
 **Closing a launch with open tasks.** A launch can be closed once Day 1 has passed. If tasks are still open, the admin can tick "Mark the open tasks as skipped", or leave them as they are so the archive shows them unfinished. Either way the history records it, and custom reminders on skipped tasks are cancelled.
 
+**Deleting a launch deletes everything on it.** Admins can delete a launch from its page. Its tasks, launch team, history and notes, links, and every reminder on its tasks are deleted with it, because the app hides any row whose launch is gone, so leftovers could never be seen or cleaned up and would keep people's names and notes in the base. To keep a launch for the record, close it instead; closed launches stay in the archive. One history row, not tied to any launch, records who deleted it. The launch itself is deleted last, so if Airtable fails part way, deleting it again finishes the job. This cannot be undone from the app.
+
 **Changing Day 1 only happens through Move Day 1.** Edit details does not offer Day 1, so the tasks and reminders always move with it.
 
 **New templates start from a copy.** "New template" copies an existing template under a new name, so the timing is already close. There is no blank template.

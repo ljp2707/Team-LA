@@ -22,7 +22,7 @@ from app.models.people import HandOffIn, RoleIn, RoleUpdateIn, UserIn, UserUpdat
 from app.models.user import CurrentUser
 from app.services import history, logic, reminders
 from app.services.records import UserRec
-from app.services.views import World
+from app.services.views import World, task_row
 
 router = APIRouter(prefix="/api/users", tags=["users"], dependencies=[Depends(require_admin)])
 roles_router = APIRouter(prefix="/api/roles", tags=["roles"], dependencies=[Depends(require_admin)])
@@ -115,6 +115,55 @@ def list_users(inactive: bool = False, access_level: str | None = None):
         "roles": sorted(({"id": r.id, "name": r.name} for r in active_roles), key=lambda r: r["name"]),
         "access_levels": permissions.ACCESS_LEVELS,
     }
+
+
+@router.get("/{user_id}/work")
+def person_work(user_id: str, user: CurrentUser = Depends(require_admin)):
+    """One person's active launches, with their open tasks on each. Admins only.
+
+    A launch counts as theirs if they are on its team or have any task on it.
+    Closed launches are left out, as on My Tasks. Finished tasks are only counted.
+    """
+    if not permissions.can_view_user_work(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin view required")
+    world = World()
+    target = world.users.get(user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Person not found")
+    roles_by_project: dict[str, list[str]] = defaultdict(list)
+    for t in world.team:
+        if t.user_id == target.id and t.session_id and world.role_name(t.role_id):
+            roles_by_project[t.session_id].append(world.role_name(t.role_id) or "")
+    tasks_by_project: dict[str, list] = defaultdict(list)
+    for t in world.tasks:
+        if t.session_id and t.is_assigned(target.id):
+            tasks_by_project[t.session_id].append(t)
+    active = [
+        p
+        for p in world.projects.values()
+        if not p.closed and (p.id in roles_by_project or p.id in tasks_by_project)
+    ]
+    active.sort(key=lambda p: (p.start is None, p.start, world.site_name(p).lower()))
+    launches = []
+    for p in active:
+        mine = tasks_by_project.get(p.id, [])
+        open_tasks = sorted(
+            (t for t in mine if logic.is_open(t.status)),
+            key=lambda t: (t.due is None, t.due, t.sort_order or 0, t.name),
+        )
+        launches.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "site": world.site_name(p),
+                "program_type": world.template_name(p),
+                "day_one": p.start.isoformat() if p.start else None,
+                "roles": sorted(set(roles_by_project.get(p.id, []))),
+                "tasks": [task_row(world, t, user) for t in open_tasks],
+                "done": len(mine) - len(open_tasks),
+            }
+        )
+    return {"person": _person(world, target, _open_counts(world)), "launches": launches}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

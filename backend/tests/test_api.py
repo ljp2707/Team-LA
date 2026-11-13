@@ -685,3 +685,65 @@ def test_erase_removes_a_former_persons_details(client, sign_in, project):
     )
     assert full not in texts and "gone@example.org" not in texts
     assert "gave Flyer to Former team member" in texts
+
+
+# --- Deleting a launch ----------------------------------------------------------
+
+
+def test_only_admin_view_can_delete_a_launch(client, sign_in, project):
+    assert p.can_delete_projects(Actor("Admin", "admin"))
+    assert not p.can_delete_projects(Actor("Admin", "staff"))
+    assert not p.can_delete_projects(Actor("Staff", "staff"))
+    for email in ("staff@example.org", "viewer@example.org", "partner@example.org"):
+        sign_in(email)
+        assert client.delete("/api/projects/recProj").status_code == 403
+    sign_in("admin@example.org")
+    client.post("/api/me/view", json={"view": "staff"})
+    assert client.get("/api/projects/recProj").json()["can_delete"] is False
+    assert client.delete("/api/projects/recProj").status_code == 403
+    assert project.writes_to(Session.TABLE, "delete") == []
+    assert project.writes_to(Work.TABLE, "delete") == []
+
+
+def test_deleting_a_launch_deletes_everything_on_it(client, sign_in, project):
+    from tests.builders import add_reminder
+
+    add_team(project, "recProj", "recRole", "recStaff")
+    add_note(project, "recN1", "recT2", "recStaff")
+    add_reminder(project, "recR1", "recT2", "recStaff", date(2026, 11, 20))
+    project.add(Links.TABLE, {Links.TITLE: "Flyer", Links.URL: "https://canva.com/x", Links.SESSION: ["recProj"]}, "recL1")
+    # Another launch's rows must be left alone.
+    add_project(project, "recOther", name="Kent")
+    add_task(project, "recOtherT", "Other task", date(2026, 12, 1), project="recOther", assigned="recStaff")
+    add_team(project, "recOther", "recRole", "recStaff")
+    add_note(project, "recN2", "recOtherT", "recStaff", project="recOther")
+    add_reminder(project, "recR2", "recOtherT", "recStaff", date(2026, 11, 25))
+
+    sign_in("admin@example.org")
+    assert client.get("/api/projects/recProj").json()["can_delete"] is True
+    response = client.delete("/api/projects/recProj")
+    assert response.status_code == 200
+    assert response.json() == {"deleted": True, "tasks": 6}
+
+    assert [r["id"] for r in project.rows(Session.TABLE)] == ["recOther"]
+    assert [r["id"] for r in project.rows(Work.TABLE)] == ["recOtherT"]
+    assert [r["fields"][SessionTeam.SESSION] for r in project.rows(SessionTeam.TABLE)] == [["recOther"]]
+    assert project.rows(Links.TABLE) == []
+    from app.airtable.schema import Reminders
+    assert [r["id"] for r in project.rows(Reminders.TABLE)] == ["recR2"]
+    log = project.rows(ActivityLog.TABLE)
+    assert "recN1" not in {r["id"] for r in log} and "recN2" in {r["id"] for r in log}
+    # The launch goes last, so a failure part way never leaves rows without a launch.
+    assert [w[1] for w in project.writes if w[0] == "delete"][-1] == Session.TABLE
+    # One history row, not tied to any launch, records who deleted it.
+    deleted = [r for r in log if "deleted the launch" in r["fields"].get(ActivityLog.TEXT, "")]
+    assert len(deleted) == 1
+    assert ActivityLog.SESSION not in deleted[0]["fields"]
+    assert deleted[0]["fields"][ActivityLog.AUTHOR] == ["recAdmin"]
+    assert "Rainier Beach" in deleted[0]["fields"][ActivityLog.TEXT]
+
+    assert client.get("/api/projects/recProj").status_code == 404
+    assert client.delete("/api/projects/recProj").status_code == 404
+    assert "recProj" not in {c["id"] for c in client.get("/api/projects").json()["projects"]}
+    sign_in("staff@example.org")
+    assert {t["id"] for g in client.get("/api/tasks/mine").json()["groups"].values() for t in g} == {"recOtherT"}

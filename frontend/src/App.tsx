@@ -10,6 +10,7 @@ import { MyTasks } from "./pages/MyTasks";
 import { NewProject } from "./pages/NewProject";
 import { NotAuthorized } from "./pages/NotAuthorized";
 import { NotFound } from "./pages/NotFound";
+import { PersonDetail } from "./pages/PersonDetail";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import { Projects } from "./pages/Projects";
 import { TaskDetail } from "./pages/TaskDetail";
@@ -35,6 +36,7 @@ export function App() {
             <Route path="/projects/new" element={<NewProject />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/users" element={<Users />} />
+            <Route path="/users/:id" element={<PersonDetail />} />
             <Route path="/archive" element={<Archive />} />
           </Route>
 

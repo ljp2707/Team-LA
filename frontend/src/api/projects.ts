@@ -66,6 +66,10 @@ export const addOneOff = (id: string, body: OneOffInput) =>
 export const closeProject = (id: string, skipOpen: boolean) =>
   send<{ closed: boolean }>("POST", `/api/projects/${id}/close`, { skip_open: skipOpen });
 
+/** Admins only. Deletes the launch with its tasks, team, history, links and reminders. */
+export const deleteProject = (id: string) =>
+  send<{ deleted: boolean; tasks: number }>("DELETE", `/api/projects/${id}`);
+
 export const reopenProject = (id: string) => send<{ reopened: boolean }>("POST", `/api/projects/${id}/reopen`);
 
 export const projectHistory = (id: string, page: number) =>

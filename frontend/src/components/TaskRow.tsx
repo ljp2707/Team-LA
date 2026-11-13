@@ -28,18 +28,32 @@ export async function changeStatus(
   }
 }
 
-/** A row on My Tasks: a done circle, the task, its due date and a status menu. */
-export function MyTaskRow({ task, onStatus }: { task: Task; onStatus: (task: Task, status: TaskStatus) => void }) {
+/**
+ * A row on My Tasks: a done circle, the task, its due date and a status menu.
+ * Under a launch heading (a person's page), pass showProject={false} to show the
+ * task's role instead of repeating the launch name.
+ */
+export function MyTaskRow({
+  task,
+  onStatus,
+  showProject = true,
+}: {
+  task: Task;
+  onStatus: (task: Task, status: TaskStatus) => void;
+  showProject?: boolean;
+}) {
   const done = isFinished(task.status);
+  const context = showProject ? [task.site || task.project_name, task.program_type] : [task.role];
+  const details = [
+    ...context,
+    task.shared_with.length > 0 ? `shared with ${task.shared_with.join(", ")}` : null,
+    task.one_off ? "added to this launch" : null,
+  ].filter(Boolean);
   const subtitle = task.waiting_text ? (
     <span className="row-sub is-late">{task.waiting_text}</span>
-  ) : (
-    <span className="row-sub">
-      {[task.site || task.project_name, task.program_type].filter(Boolean).join(" · ")}
-      {task.shared_with.length > 0 && ` · shared with ${task.shared_with.join(", ")}`}
-      {task.one_off && " · added to this launch"}
-    </span>
-  );
+  ) : details.length > 0 ? (
+    <span className="row-sub">{details.join(" · ")}</span>
+  ) : null;
   return (
     <li className={`task-row${done ? " is-done" : ""}`}>
       {task.can_edit ? (

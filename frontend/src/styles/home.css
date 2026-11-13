@@ -95,12 +95,6 @@
   font-size: 16px;
 }
 
-.hero-action span {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-hero-text);
-}
-
 /* Stat cards */
 .hero-stats {
   display: flex;

@@ -220,8 +220,7 @@ export function Home() {
               ))}
             </h1>
             <p className="hero-rise" style={order(3)}>
-              No More Under's shared home for opening new swim programs. Pick a template and
-              a Day 1, and every task, owner and reminder is set up for you.
+              No More Under's shared home for opening new swim programs.
             </p>
             <div className="hero-action hero-rise" style={order(4)}>
               <Button href="/auth/login" variant="dark">
@@ -236,7 +235,6 @@ export function Home() {
                   />
                 </svg>
               </Button>
-              <span>Use the Google account your admin added</span>
             </div>
           </div>
           {stats && (

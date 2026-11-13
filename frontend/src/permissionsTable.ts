@@ -41,6 +41,20 @@ export const PERMISSION_TABLE: PermissionRow[] = [
     partner: "No",
   },
   {
+    // can_delete_projects
+    action: "Delete a launch",
+    admin: "Yes",
+    staff: "No",
+    partner: "No",
+  },
+  {
+    // can_view_user_work
+    action: "See anyone's launches and tasks",
+    admin: "Yes",
+    staff: "No",
+    partner: "No",
+  },
+  {
     // can_assign_tasks
     action: "Assign or change anyone's task",
     admin: "Yes",
