@@ -4,7 +4,7 @@ Dashboard (/dashboard, admin) and Projects (/projects, staff, read only) use
 GET /api/projects. Partners get only the projects they are listed on.
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 
 from app import permissions
 from app.airtable import client
@@ -20,7 +20,7 @@ from app.models.project import (
 )
 from app.models.task import LinkIn, OneOffTaskIn
 from app.models.user import CurrentUser
-from app.services import history, logic, projects, reminders, timeline
+from app.services import export, history, logic, projects, reminders, timeline
 from app.services.links import FILE_KIND, link_kind, read_upload, save_upload
 from app.services.records import load_reminders, safe
 from app.services.views import (
@@ -142,6 +142,7 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
         "open_tasks": sum(1 for t in tasks if logic.is_open(t.status)),
         "can_manage": is_admin,
         "can_delete": permissions.can_delete_projects(user.actor),
+        "can_export": permissions.can_export_projects(user.actor),
         "can_close": is_admin
         and not project.closed
         and project.start is not None
@@ -170,6 +171,23 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
 @router.get("/{project_id}")
 def get_project(project_id: str, user: CurrentUser = Depends(current_user)):
     return _project_detail(World(), project_id, user)
+
+
+@router.get("/{project_id}/export.csv")
+def export_project(project_id: str, user: CurrentUser = Depends(require_admin)):
+    """The launch's tasks as a CSV download, for Google Sheets or Excel. Admins only."""
+    if not permissions.can_export_projects(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can export launches")
+    world = World()
+    project = world.project(project_id)
+    return Response(
+        content=export.project_csv(world, project),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{export.filename(project, world)}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.patch("/{project_id}")

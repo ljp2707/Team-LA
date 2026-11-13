@@ -6,6 +6,7 @@ import {
   addProjectLink,
   closeProject,
   deleteProject,
+  exportProject,
   getProject,
   listInstructors,
   listSites,
@@ -53,6 +54,7 @@ export function ProjectDetail() {
   const [open, setOpen] = useState<Open>(null);
   const [moved, setMoved] = useState<DayOneResult | null>(null);
   const [undoing, setUndoing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   if (project.error) return <ErrorState error={project.error} onRetry={project.reload} />;
   if (!project.data) return <LoadingState label="Loading the launch" />;
@@ -92,6 +94,24 @@ export function ProjectDetail() {
     }
   }
 
+  async function exportTasks() {
+    setExporting(true);
+    try {
+      const name = await exportProject(p.id);
+      toast.show(`Downloaded ${name}.`);
+    } catch (caught) {
+      toast.error(errorText(caught));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const exportButton = p.can_export ? (
+    <Button variant="outline" onClick={() => void exportTasks()} disabled={exporting}>
+      {exporting ? "Exporting" : "Export"}
+    </Button>
+  ) : null;
+
   const back = me?.view === "admin" ? { to: p.closed ? "/archive" : "/dashboard", label: p.closed ? "Archive" : "Dashboard" } : { to: "/projects", label: me?.view === "partner" ? "Your program" : "Projects" };
   const subtitle = [p.program_type, p.site_type, p.template_version ? `Template v${p.template_version}` : null]
     .filter(Boolean)
@@ -118,6 +138,7 @@ export function ProjectDetail() {
         action={
           p.can_manage && !p.closed ? (
             <>
+              {exportButton}
               <Button variant="outline" onClick={() => setOpen("move")}>
                 Move Day 1
               </Button>
@@ -125,6 +146,7 @@ export function ProjectDetail() {
             </>
           ) : p.can_manage && p.closed ? (
             <>
+              {exportButton}
               <Button variant="outline" onClick={() => setOpen("template")}>
                 Save as a template
               </Button>
@@ -133,7 +155,9 @@ export function ProjectDetail() {
               </Button>
               <Button to={`/projects/new?from=${p.id}`}>Start a new launch from this</Button>
             </>
-          ) : undefined
+          ) : (
+            exportButton ?? undefined
+          )
         }
       />
 

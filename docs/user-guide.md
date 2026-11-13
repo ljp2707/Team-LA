@@ -106,6 +106,21 @@ On a launch's page:
 
 Once Day 1 has passed, **Close launch** (in Site and partner) moves the launch to the Archive and stops its reminders. If tasks are still open, you can mark them all skipped at the same time. **Reopen** brings a closed launch back. You can still **Add task** on a closed launch, for example to record follow-up work. It gets no reminders or emails.
 
+### Exporting a launch to a spreadsheet
+
+On a launch's page, click **Export** at the top. Your browser downloads a CSV file named after the launch and today's date, for example `Bellevue-Launch-tasks-2026-11-12.csv`. Only admins see the button. It works on running and closed launches.
+
+The file has one row per task, soonest due date first, with these columns: Launch, Task, Assigned to, Status, Due date, Completed date, Phase, Role, Program type and Site type. Tasks with nobody on them say **Unassigned**. Tasks without a due date are at the bottom. A launch with no tasks gives a file with just the column names.
+
+To open it in Google Sheets, either:
+
+- **Import it into a sheet.** Open Google Sheets, start a blank spreadsheet, then **File > Import > Upload** and pick the file. Choose **Replace current sheet** and leave the separator on **Detect automatically**.
+- **Or upload it to Drive.** In Google Drive, **New > File upload** and pick the file, then right-click it and choose **Open with > Google Sheets**.
+
+Dates come through as real dates, so you can sort and filter by them. The export is a copy: changes made in the spreadsheet do not go back into NMU Launches. Do not share it outside NMU, since it lists who is doing each task.
+
+A task name that starts with `=`, `+`, `-` or `@` is saved with an apostrophe in front, for example `'=Order caps`, so the spreadsheet shows it as text instead of running it as a formula. Some spreadsheet apps show the apostrophe; that is expected.
+
 ### The archive
 
 **Archive** lists every closed launch with how many tasks were finished on time. Search by site name or pick a date range. Click a launch to see its numbers and each task's planned and actual dates. **Start a new launch from this** opens Start a launch with that launch's tasks.

@@ -870,3 +870,84 @@ def test_a_launch_copied_from_another_does_not_copy_calendar_events(client, sign
     new_tasks = [r for r in project.rows(Work.TABLE) if r["fields"][Work.SESSION] == [response.json()["id"]]]
     assert new_tasks
     assert all(Work.CALENDAR_EVENT_ID not in r["fields"] for r in new_tasks)
+
+
+# --- Exporting a launch to CSV ----------------------------------------------------
+
+
+def _csv_rows(response):
+    import csv
+    import io
+
+    return list(csv.reader(io.StringIO(response.text)))
+
+
+def test_only_admin_view_can_export_a_launch(client, sign_in, project):
+    assert p.can_export_projects(Actor("Admin", "admin"))
+    assert not p.can_export_projects(Actor("Admin", "staff"))
+    for email in ("staff@example.org", "viewer@example.org", "partner@example.org"):
+        sign_in(email)
+        assert client.get("/api/projects/recProj/export.csv").status_code == 403
+    sign_in("admin@example.org")
+    client.post("/api/me/view", json={"view": "staff"})
+    assert client.get("/api/projects/recProj").json()["can_export"] is False
+    assert client.get("/api/projects/recProj/export.csv").status_code == 403
+    client.post("/api/me/view", json={"view": "admin"})
+    assert client.get("/api/projects/recProj").json()["can_export"] is True
+    assert client.get("/api/projects/recNope/export.csv").status_code == 404
+
+
+def test_export_is_one_row_per_task_sorted_by_due_date(client, sign_in, project):
+    sign_in("admin@example.org")
+    response = client.get("/api/projects/recProj/export.csv")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="Rainier-Beach-Swim-Safely-2026-tasks-2026-11-04.csv"'
+    )
+    header, *rows = _csv_rows(response)
+    assert header[:5] == ["Launch", "Task", "Assigned to", "Status", "Due date"]
+    by_task = {r[1]: dict(zip(header, r)) for r in rows}
+    assert [r[1] for r in rows] == [
+        "Confirm head coach",
+        "Design flyer",
+        "Ship equipment to site",
+        "Community outreach",
+        "Day 1 check-in",
+        "Send participant survey",
+    ]
+    flyer = by_task["Design flyer"]
+    assert flyer["Launch"] == "Rainier Beach Swim Safely 2026"
+    assert flyer["Assigned to"] == "Sam"  # A name, never a record ID
+    assert flyer["Due date"] == "2026-10-30"  # YYYY-MM-DD, so Sheets reads a date
+    assert by_task["Confirm head coach"]["Completed date"] == "2026-10-10"
+    assert by_task["Community outreach"]["Status"] == "Blocked"  # As the launch page shows it
+    assert by_task["Send participant survey"]["Assigned to"] == "Unassigned"
+    assert by_task["Ship equipment to site"]["Role"] == "Operations"
+    assert "rec" not in response.text
+
+
+def test_export_escapes_commas_quotes_line_breaks_and_formulas(client, sign_in, project):
+    tricky = 'Order caps, goggles & "kick boards"\nfor the deep end'
+    add_task(project, "recX1", tricky, date(2026, 12, 20), assigned="recStaff")
+    add_task(project, "recX2", "=HYPERLINK(\"http://evil\")", date(2026, 12, 21))
+    add_task(project, "recX3", "No date yet", None)
+    project.find(Work.TABLE, "recX1")["fields"][Work.ASSIGNED_TO] = ["recStaff", "recAdmin"]
+    sign_in("admin@example.org")
+    header, *rows = _csv_rows(client.get("/api/projects/recProj/export.csv"))
+    assert all(len(r) == len(header) for r in rows)  # No cell spilled into another column
+    tasks = [r[1] for r in rows]
+    assert tricky in tasks  # Comes back exactly, line break and quotes included
+    assert "'=HYPERLINK(\"http://evil\")" in tasks  # Shown as text, never run as a formula
+    assert tasks[-1] == "No date yet"  # Tasks with no due date go last
+    assert rows[-1][4] == ""
+    assert dict(zip(header, rows[tasks.index(tricky)]))["Assigned to"] == "Sam, Ada"
+
+
+def test_export_of_a_launch_with_no_tasks_is_just_the_header(client, sign_in, project):
+    add_project(project, "recEmpty", name='Bellevue / Launch: "Fall"?')
+    sign_in("admin@example.org")
+    response = client.get("/api/projects/recEmpty/export.csv")
+    assert response.status_code == 200
+    assert len(_csv_rows(response)) == 1
+    assert 'filename="Bellevue-Launch-Fall-tasks-2026-11-04.csv"' in response.headers["content-disposition"]

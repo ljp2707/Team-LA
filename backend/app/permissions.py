@@ -138,6 +138,11 @@ def can_delete_projects(actor: Actor) -> bool:
     return actor.is_admin
 
 
+def can_export_projects(actor: Actor) -> bool:
+    """Download a launch's tasks as a CSV file."""
+    return actor.is_admin
+
+
 def can_view_user_work(actor: Actor) -> bool:
     """See another person's launches and the tasks they have on each."""
     return actor.is_admin

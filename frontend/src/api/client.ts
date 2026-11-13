@@ -27,7 +27,8 @@ function detailMessage(body: unknown, status: number): string {
   return "That did not work. Please try again.";
 }
 
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+/** Fetch from our backend and turn any error answer into an ApiError with one plain sentence. */
+async function request(path: string, options: RequestInit = {}): Promise<Response> {
   let response: Response;
   // A FormData body (a file upload) sets its own Content-Type with the boundary.
   const json = !(options.body instanceof FormData);
@@ -55,8 +56,34 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     }
     throw new ApiError(response.status, detailMessage(body, response.status));
   }
+  return response;
+}
+
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await request(path, options);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+/**
+ * Download a file the backend makes (such as a CSV export) and save it with the
+ * name the server gives in Content-Disposition. Errors arrive as ApiError, so the
+ * page can show them as a toast instead of opening a raw error page.
+ */
+export async function download(path: string, fallbackName: string): Promise<string> {
+  const response = await request(path);
+  const header = response.headers.get("Content-Disposition") ?? "";
+  const name = /filename="?([^";]+)"?/.exec(header)?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Give the browser a moment to start the download before freeing the file.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return name;
 }
 
 export const get = <T>(path: string) => api<T>(path);

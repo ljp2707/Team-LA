@@ -1,4 +1,4 @@
-import { get, query, send, upload } from "./client";
+import { download, get, query, send, upload } from "./client";
 import type {
   DayOneResult,
   HistoryEntry,
@@ -69,6 +69,9 @@ export const closeProject = (id: string, skipOpen: boolean) =>
 /** Admins only. Deletes the launch with its tasks, team, history, links and reminders. */
 export const deleteProject = (id: string) =>
   send<{ deleted: boolean; tasks: number }>("DELETE", `/api/projects/${id}`);
+
+/** Admins only. Saves the launch's tasks as a CSV file for Google Sheets or Excel. */
+export const exportProject = (id: string) => download(`/api/projects/${id}/export.csv`, "launch-tasks.csv");
 
 export const reopenProject = (id: string) => send<{ reopened: boolean }>("POST", `/api/projects/${id}/reopen`);
 

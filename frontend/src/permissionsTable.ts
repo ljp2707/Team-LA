@@ -48,6 +48,13 @@ export const PERMISSION_TABLE: PermissionRow[] = [
     partner: "No",
   },
   {
+    // can_export_projects
+    action: "Export a launch to a spreadsheet",
+    admin: "Yes",
+    staff: "No",
+    partner: "No",
+  },
+  {
     // can_view_user_work
     action: "See anyone's launches and tasks",
     admin: "Yes",

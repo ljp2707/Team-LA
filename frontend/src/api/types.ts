@@ -140,6 +140,7 @@ export interface ProjectDetail extends ProjectCard {
   open_tasks: number;
   can_manage: boolean;
   can_delete: boolean;
+  can_export: boolean;
   can_close: boolean;
   edit: ProjectEdit | null;
 }
