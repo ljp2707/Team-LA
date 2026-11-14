@@ -15,7 +15,7 @@ from app.auth.deps import current_user, require_admin, require_can_edit
 from app.email.templates import task_url
 from app.models.task import AssignIn, LinkIn, NoteIn, ReassignIn, ReminderIn, TaskUpdateIn
 from app.models.user import CurrentUser
-from app.services import clock, history, logic, reminders
+from app.services import calendar_feed, clock, history, logic, reminders
 from app.services.links import FILE_KIND, calendar_url, link_kind, read_upload, save_upload
 from app.services.records import TaskRec, load_reminders, safe
 from app.services.timeline import find_cycle
@@ -127,6 +127,13 @@ def my_tasks(
     }
 
 
+def _in_calendar_feed(world: World, task: TaskRec, user: CurrentUser) -> bool:
+    me = world.users.get(user.id)
+    return bool(me and me.calendar_token) and task.id in {
+        t.id for t in calendar_feed.feed_tasks(world, me)
+    }
+
+
 @router.get("/{task_id}")
 def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
     world = World()
@@ -214,6 +221,9 @@ def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
         "calendar_url": calendar_url(
             f"{task.name} ({world.site_name(project)})", row["due"], task_url(task.id)
         ),
+        # True when their calendar feed is on and already includes this task, so the
+        # page can say so next to Add to Google Calendar.
+        "in_calendar_feed": _in_calendar_feed(world, task, user),
         "can_edit": can_edit,
         "can_admin": is_admin,
         "can_set_reminder": permissions.can_set_reminder(user.actor),

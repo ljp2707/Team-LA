@@ -1904,3 +1904,22 @@ a.row-title:hover {
   color: var(--color-muted);
   vertical-align: -1px;
 }
+
+/* My Tasks: the calendar sync card */
+.calendar-feed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.calendar-feed .inline-form {
+  align-self: stretch;
+  flex-wrap: nowrap;
+}
+
+.calendar-feed .input {
+  min-width: 0;
+  font-size: 13px;
+}

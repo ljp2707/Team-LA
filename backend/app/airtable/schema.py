@@ -24,6 +24,8 @@ class Users:
     SESSION_TEAM = "Session Team"
     ACTIVITY_LOG = "Activity Log"
     WELCOME_EMAIL_SENT = "Welcome Email Sent"  # added by migrate_airtable
+    # The secret in this person's calendar feed link. Blank means the feed is off.
+    CALENDAR_FEED_TOKEN = "Calendar Feed Token"  # added by migrate_airtable
 
 
 ACTIVE = "Active"

@@ -211,6 +211,8 @@ def update_person(user_id: str, body: UserUpdateIn, user: CurrentUser = Depends(
         fields[Users.ROLES] = [r for r in body.role_ids if r in world.roles]
     if "status" in sent and body.status:
         fields[Users.STATUS] = body.status
+        if body.status != ACTIVE:
+            fields[Users.CALENDAR_FEED_TOKEN] = None  # Their calendar feed link stops working
     if fields:
         client.update_record(Users.TABLE, user_id, fields, typecast=True)
         what = []
@@ -248,7 +250,9 @@ def remove_access(user_id: str, user: CurrentUser = Depends(require_admin)):
             "Reassign them before removing access.",
         )
     check_admin_rules(list(world.users.values()), target, UserUpdateIn(status=INACTIVE), user.id)
-    client.update_record(Users.TABLE, user_id, {Users.STATUS: INACTIVE}, typecast=True)
+    client.update_record(
+        Users.TABLE, user_id, {Users.STATUS: INACTIVE, Users.CALENDAR_FEED_TOKEN: None}, typecast=True
+    )
     history.log_event(None, None, user.id, "System", f"removed {target.name}'s access")
     return None
 
@@ -484,6 +488,7 @@ def erase_person(user_id: str, user: CurrentUser = Depends(require_admin)):
             # .invalid can never receive mail, and no Google account can sign in with it.
             Users.EMAIL: f"removed-{target.id.lower()}@example.invalid",
             Users.ROLES: [],
+            Users.CALENDAR_FEED_TOKEN: None,
         },
         typecast=True,
     )

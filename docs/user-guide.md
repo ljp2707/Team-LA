@@ -60,6 +60,21 @@ A task says **Blocked** and "Waiting on …" when it needs another task finished
 
 Emails are never sent for tasks that are done or skipped. Every email has a button that opens the task or My Tasks.
 
+### Putting your tasks on Google Calendar
+
+There are two ways. You can use either or both.
+
+- **One task at a time.** On a task's page, click **Add to Google Calendar** and save the event. It is a one-off copy: if the task's date or name changes later, change the event yourself.
+- **All your tasks, kept up to date.** On **My Tasks**, in the **Calendar** box, tick **Sync all my tasks to Google Calendar**, then click **Add to Google Calendar** and confirm. Your open tasks with a due date appear as all-day events titled "[Launch] Task". When a task's date or name changes, or it is done, skipped or given to someone else, your calendar follows on its own. Google checks for changes a few times a day, so new tasks and changes can take several hours to appear.
+
+With sync on, a task's page says **Already on your calendar via sync**, so you do not add it twice.
+
+**If the Add to Google Calendar button does not work,** copy the link with **Copy**. In Google Calendar on a computer, next to **Other calendars** click **+**, then **From URL**, paste the link and click **Add calendar**. The same link works in Apple Calendar and Outlook.
+
+**Keep the link private.** Anyone with it can see your task list. If you shared it by mistake, click **Reset link**: the old link stops working at once, and you add the new one to Google Calendar again (and remove the old "NMU Launches tasks" calendar there).
+
+**To stop,** click **Turn off**. The link stops working, and Google removes the events the next time it checks. You can also remove the calendar in Google Calendar under **Other calendars**.
+
 ### Projects
 
 **Projects** in the menu shows every launch in progress. You can open any of them to see their tasks and history, and you can update the tasks assigned to you. Only admins can change anything else.

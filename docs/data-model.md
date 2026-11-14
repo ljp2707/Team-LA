@@ -22,6 +22,7 @@ Used by: Sign in, Users and roles, every assignment.
 | Session Team | Link to the Session Team table. |
 | Activity Log | Link to the Activity Log table. |
 | Welcome Email Sent *(added)* | Set when the welcome email goes out, so it is sent once. |
+| Calendar Feed Token *(added)* | The secret in this person's calendar feed link. Blank means their feed is off. Treat it like a password. |
 
 ## Template List
 

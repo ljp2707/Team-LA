@@ -100,6 +100,20 @@ Every email it sends, fails or skips is written to the Airtable **Reminders** ta
 5. Look at the Reminders table for rows with Status **Failed** and read the Error column.
 6. Rows with Status **Skipped** and "No one assigned" mean a task has nobody on it. Assign someone.
 
+## Calendar sync for each person (calendar feed)
+
+Anyone except Viewers can turn on **Sync all my tasks to Google Calendar** on My Tasks. The app then gives them a private link (an iCalendar feed) that Google Calendar subscribes to. The app builds the feed itself whenever Google asks for it; there is nothing to set up in Airtable or Google beyond one field.
+
+**The field to add.** In the **Users** table, add **Calendar Feed Token** as a **Single line text** field (or run `python -m jobs.migrate_airtable --apply`). It holds the secret part of each person's link. Blank means their sync is off.
+
+- **Treat it like a password.** Anyone who has it can read that person's task list. Do not copy it into other tables, exports or messages.
+- To **switch off someone's feed** (for example if their link leaked), clear their Calendar Feed Token. Their link stops working at once. They can turn sync on again from My Tasks to get a new link.
+- **Deactivate**, **Remove access** and **Remove personal details** all clear it automatically.
+
+**It only works on the live site.** Google fetches the feed from its own servers, so a link that points at `localhost` (a laptop) never loads in Google Calendar. `APP_URL` must be the public https address.
+
+**Do not use it together with the shared calendar below for the same people.** The Airtable automations invite each person as a guest on the shared NMU calendar, so someone with both would see every task twice. The feed is the simpler and more reliable choice: finished and deleted tasks drop off on their own, and nothing depends on Airtable features we could not confirm.
+
 ## Google Calendar sync (Airtable automations)
 
 Each task can appear as an all-day event on a shared NMU Google Calendar, on its due date, with the people on the task invited as guests so it shows on their own calendars too. **Airtable does this, not the app.** Two Airtable automations create and update the events, and save each event's ID on the task so they can find it again.
@@ -255,7 +269,7 @@ The Privacy page (`/privacy`) promises an answer within 30 days. Requests arrive
   1. **Hand off tasks** to someone else.
   2. **Edit > Deactivate**.
   3. Open them again (tick **Show inactive people**) and click **Remove personal details**. This replaces their name and email with "Former team member" everywhere in the app, including the history text, removes them from partner access and from any partner contact fields that use their email, and cancels their reminders. Finished work stays, without their name.
-  4. If Google Calendar sync is on, remove them as a guest from events on the NMU Launches calendar (see **Google Calendar sync**).
+  4. If Google Calendar sync is on, remove them as a guest from events on the NMU Launches calendar (see **Google Calendar sync**). Their own calendar feed link is cleared automatically.
   5. Airtable keeps its own change history for a while. If the request needs that gone too, ask Airtable support, or delete and recreate the affected rows.
   6. Reply to say it is done.
 

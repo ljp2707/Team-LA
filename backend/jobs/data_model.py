@@ -67,6 +67,7 @@ FIELDS: dict[tuple[str, str], str] = {
     ("Work", "STATUS"): "Not Started, In Progress, Blocked, Done or Skipped.",
     ("Work", "COMPLETED_DATE"): "Set when the task is marked Done.",
     ("Work", "COMPLETED_BY"): "Who marked it Done.",
+    ("Users", "CALENDAR_FEED_TOKEN"): "The secret in this person's calendar feed link. Blank means their feed is off. Treat it like a password.",
     ("Work", "CALENDAR_EVENT_ID"): "The task's Google Calendar event. Written only by the Airtable calendar automations; the app reads it and never writes it.",
     ("Work", "CALENDAR_SYNCED_KEY"): "What the calendar event showed when it was last written. Written only by the Airtable calendar automations.",
     ("Work", "CALENDAR_LAST_SYNCED"): "Last modified time of the two calendar fields, made by hand. Shown when hovering over a task's calendar mark.",

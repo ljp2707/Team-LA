@@ -135,6 +135,7 @@ NEW_FIELDS = {
     ],
     Users.TABLE: [
         (Users.WELCOME_EMAIL_SENT, date_time()),
+        (Users.CALENDAR_FEED_TOKEN, text()),
     ],
 }
 

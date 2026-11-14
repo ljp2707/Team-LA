@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { myReminders, myTasks } from "../api/tasks";
 import type { MyTasks as MyTasksData, TaskRow, TaskStatus } from "../api/types";
+import { CalendarFeedCard } from "../components/CalendarFeedCard";
 import { changeStatus, MyTaskRow } from "../components/TaskRow";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -160,6 +161,7 @@ export function MyTasks() {
             </ul>
           )}
         </Card>
+        <CalendarFeedCard />
       </aside>
     </div>
   );

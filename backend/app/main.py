@@ -15,6 +15,7 @@ from app.routers import (
     admin,
     archive,
     auth,
+    calendar,
     health,
     links,
     me,
@@ -89,6 +90,7 @@ for module in (
     archive,
     sites,
     admin,
+    calendar,
 ):
     app.include_router(module.router)
 app.include_router(users.roles_router)

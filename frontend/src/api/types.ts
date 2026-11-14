@@ -183,6 +183,8 @@ export interface TaskDetail extends TaskRow {
   links: LinkItem[];
   reminders: ReminderPanel;
   calendar_url: string | null;
+  /** Their calendar sync is on and already includes this task. */
+  in_calendar_feed: boolean;
   can_admin: boolean;
   can_set_reminder: boolean;
   can_share_notes: boolean;

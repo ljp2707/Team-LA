@@ -316,6 +316,9 @@ export function TaskDetail() {
                 Add to Google Calendar
               </a>
             )}
+            {t.calendar_url && !done && t.in_calendar_feed && (
+              <p className="muted small">Already on your calendar via sync, so you do not need to add it.</p>
+            )}
           </Card>
 
           <Card>
