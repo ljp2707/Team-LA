@@ -83,6 +83,14 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",  # No other site can show the app inside a frame
     "Referrer-Policy": "strict-origin-when-cross-origin",  # Links out do not leak task URLs
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",  # The app never needs these
+    # F27: a page from another site that opens ours in a new window cannot reach into it
+    # (and the reverse). Sign-in uses full-page redirects, not popups, so nothing breaks.
+    "Cross-Origin-Opener-Policy": "same-origin",
+    # F27: other sites cannot load our responses (API answers, files, images) into their
+    # pages. Google Calendar reads the feed from its servers, which this does not affect.
+    "Cross-Origin-Resource-Policy": "same-origin",
+    # F27: old Flash and PDF readers may not load cross-site policy files from this host.
+    "X-Permitted-Cross-Domain-Policies": "none",
 }
 
 # Browsers only ever use https for this site once they have seen it (production only:

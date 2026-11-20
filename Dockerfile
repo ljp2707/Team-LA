@@ -21,4 +21,5 @@ USER appuser
 # Railway's edge is the only way in, so trust its X-Forwarded-For and -Proto headers:
 # the app then sees each visitor's real address and https (findings F14).
 # FORWARDED_ALLOW_IPS narrows which proxies are believed; "*" when it is not set.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\""]
+# --no-server-header: do not tell visitors which web server and version runs the app (F27).
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\" --no-server-header"]

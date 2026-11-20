@@ -527,6 +527,31 @@ directive, 2 of these fail.
 
 **Commit.** "Pin the CSP to the minimum and upgrade requests in production (F26)".
 
+### F27. No cross-origin isolation headers, and the Server header names uvicorn — Low (Fixed)
+
+**Problem.** Answers did not send `Cross-Origin-Opener-Policy` or
+`Cross-Origin-Resource-Policy`, so another site could keep a handle on an app window it
+opened, or load the app's responses into its own pages (the basis of some side-channel
+attacks such as Spectre-style reads). Uvicorn also sent `server: uvicorn`, telling visitors
+what software to look up vulnerabilities for.
+
+**Fix.** `SECURITY_HEADERS` in `security.py` adds `Cross-Origin-Opener-Policy: same-origin`,
+`Cross-Origin-Resource-Policy: same-origin` and `X-Permitted-Cross-Domain-Policies: none` to
+every answer, errors included. Sign-in uses full-page redirects, not popups, so the opener
+policy breaks nothing; Google Calendar reads the feed from its own servers, which the
+resource policy does not affect. The Dockerfile now runs uvicorn with `--no-server-header`.
+`Cross-Origin-Embedder-Policy` is not added: the app needs nothing it would unlock, and it
+would make every cross-origin resource opt in. Railway's proxy may add its own
+`server: railway-edge`, which reveals nothing about the app.
+
+**Tests** (`test_cross_origin_headers.py`): the three headers are on API answers, 401s,
+404s, the frontend, a refused cross-site request and a 413; no embedder policy; the
+Dockerfile's single `CMD` has `--no-server-header`; the real app under uvicorn sends no
+`server` header with that setting and does send `server: uvicorn` without it, which shows
+the check works. The browser test (F28) runs every page with these headers on.
+
+**Commit.** "Add cross-origin isolation headers and drop the Server header (F27)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one
