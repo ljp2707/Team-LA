@@ -23,7 +23,7 @@ it.
 | F6 | Upload bodies have no size limit and are parsed before sign-in is checked | Medium | Fixed in `39baf62` |
 | F7 | URLs typed directly into Airtable are rendered as links without a scheme check | Medium | Fixed in `39baf62` |
 | F8 | `GET /auth/logout` can be triggered from any website | Low | Fixed in `7d83c4c` |
-| F9 | CSRF protection relies on SameSite=Lax alone; no Origin check | Low | Closed: not an issue |
+| F9 | CSRF protection relies on SameSite=Lax alone; no Origin check | Low | Closed; Origin check added anyway in `66af153` |
 | F10 | Uploaded file content is not checked against its extension | Low | Fixed in `7d83c4c` |
 | F11 | Staff on a task can share another person's Internal note with partners | Low | Fixed in `7d83c4c` |
 | F12 | `ENV` defaults to `development`, so production protections fail open if it is missing | Low | Fixed in `3ae3248` |
@@ -169,7 +169,7 @@ it.
 
 ### F9. CSRF relies on SameSite=Lax alone — Low
 
-**Status: Closed, not an issue.** Confirmed by the project owner that `up.railway.app` is on the Public Suffix List, so other Railway apps are cross-site and the Lax cookie is never sent with their requests. Kept below for the record.
+**Status: Closed, not an issue. An Origin check was added anyway in commit `66af153` as defence in depth (`OriginCheck` in `backend/app/security.py`, tests in `backend/tests/test_security_requests.py`).** Confirmed by the project owner that `up.railway.app` is on the Public Suffix List, so other Railway apps are cross-site and the Lax cookie is never sent with their requests. Kept below for the record.
 
 - **Where:** `backend/app/main.py:70-77` (session cookie). No Origin or Referer check on writes.
 - **Exploit:** Today a cross-site attacker cannot send the cookie on a POST, PATCH or DELETE,
