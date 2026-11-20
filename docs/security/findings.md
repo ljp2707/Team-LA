@@ -336,15 +336,115 @@ it.
 
 ## New routes since the review (sponsor changes, 2026-11-20)
 
-Added after F1 to F19 were fixed, for the next security pass to review. Each one has a
-row in `backend/tests/test_access_matrix.py`, its rule in `app/permissions.py`, and sits
-behind the Origin check and the per-person write limit.
+Added after F1 to F19 were fixed. Each one has a row in
+`backend/tests/test_access_matrix.py` and its rule in `app/permissions.py`, and sits behind
+the Origin check. The Delete route counts toward the per-person write limit (60 a minute);
+Nudge has its own rule instead (20 an hour per admin), because the rate limiter applies the
+first rule that matches. Reviewed in Phase 0 below (F20 to F24).
 
 | Route | Who | What it can change | Notes |
 |---|---|---|---|
 | `POST /api/tasks/{id}/nudge` | Admin view (`can_nudge`) | Sends one email to each Active assignee; writes a Reminders row (Kind Nudge) per email and one History row (Type Nudge) | Body `message` up to 500 characters, HTML-escaped in the email, never stored or logged. Once per person per task per 24 hours (read from Reminders, so it survives restarts; answers 429). 20 per admin per hour (`rate_limit.py`, in memory). Respects `REMINDERS_DRY_RUN`. Refused on finished tasks and closed programs. Gmail errors are returned to the admin as the safe `EmailError` text |
 | `GET /api/tasks/mine` (changed) | Anyone signed in | Nothing (read only) | New query parameters `state`, `city`, `program_type` (length-capped) and `sort` (`due`, `program` or `location` only). They only narrow the caller's own task list, filtered in Python. Filter choices are built from the caller's own tasks, so they never reveal other people's sites |
 | `DELETE /api/tasks/{id}` | Admin view (`can_delete_tasks`) | Deletes one Work row. Writes a History row first, removes it from other tasks' Depends On, cancels its Scheduled custom reminders, moves its Links rows to the program | Refused (409) on closed programs. Cannot be undone; no Airtable-side recovery other than Airtable's own trash. The task's Google Calendar event (shared-calendar sync) is not removed |
+
+## Phase 0 review of the sponsor features (2026-11-20)
+
+Reviewed: Nudge, Delete task, the My Tasks filters and sort, the Overdue section on a
+program's page, and the Launches to Programs wording. Status for each finding is **Open**
+until it is fixed and its commit and tests are listed here.
+
+### F20. Nudge has no limit per person across tasks — Medium (Open)
+
+**Problem.** The once-a-day limit is per person *per task*, and the 20-an-hour cap is per
+*admin*. Nothing limits how many nudges one person receives in total. One admin can nudge
+the same person about 20 different tasks in an hour, and every other admin can do the same,
+so a staff member or partner can be flooded with email by a careless or compromised admin
+account. It also risks the Gmail sender being marked as spam.
+
+**Proposed fix.** A limit per recipient across all tasks and all admins (proposed: 3 nudges
+per person per 24 hours), counted from the Reminders table like the per-task limit, so it
+survives a restart. People already at the limit are skipped with a clear message, and the
+route answers 429 if everyone is. The logic goes in `services/reminders.py` next to
+`recent_nudges`.
+
+**Tests.** Nudging one person about a 4th task within a day is refused; a different person
+on the same task is still nudged; the limit counts nudges from every admin; it resets after
+24 hours.
+
+### F21. Two nudges at the same moment can both send — Low (Open)
+
+**Problem.** The route reads Reminders, decides who may be nudged, sends, and only then
+writes the Reminders row. Two requests at the same moment (a double click, or two admins)
+both pass the check before either writes, so the person gets the email twice. FastAPI runs
+these routes on a thread pool, so this can really happen.
+
+**Proposed fix.** A lock held from the check through the write, one per task, in
+`services/reminders.py`. This works because the app runs as one Railway instance; the code
+comment and README will say a shared lock is needed if it is ever scaled to several.
+
+**Tests.** Two nudges started together on separate threads send one email and get one 200
+and one 429.
+
+### F22. A failed Delete task can leave a half-done delete — Low (Open)
+
+**Problem.** Delete writes the history entry, clears dependencies, cancels reminders, moves
+links, and deletes the row last. If Airtable fails part way (an outage, or its rate limit),
+the history says the task was deleted while the task still exists, possibly with its
+dependencies already cleared and its reminders cancelled. The admin sees a generic 500.
+
+**Proposed fix.** Keep the order (history first, as required). If a later step fails, write
+a second history entry saying the delete did not finish, and answer 502 with "The task was
+not fully deleted. Please try again." Every step can safely run again, so a retry finishes
+the job.
+
+**Tests.** With the final Airtable delete made to fail: the response is 502 with that
+message, both history entries exist, and a retry succeeds and leaves no dependencies or
+scheduled reminders pointing at the task.
+
+### F23. `project` filter on My Tasks has no format or length limit — Info (Open)
+
+**Problem.** The new filters are length-capped, but the older `project` parameter is not.
+It is only compared with the caller's own tasks, so it cannot reveal anything, but it is
+the one unvalidated input on the route.
+
+**Proposed fix.** Require the shape of an Airtable record ID (`rec` and 14 letters or
+digits); anything else gets 422. No route checks this shape yet, so this adds one shared
+pattern that later routes can reuse.
+
+**Tests.** A malformed or very long `project` value gets 422; a valid one still filters.
+
+### F24. Checks that passed (Phase 0) — Info
+
+- **Admin checks.** Nudge and Delete use `require_admin` and then `permissions.can_nudge` or
+  `can_delete_tasks`. Staff, viewers, partners and an admin in staff view get 403; signed
+  out gets 401 (tests in `test_nudge.py`, `test_delete_task.py`, access matrix).
+- **Object access.** Both load the task through `_visible_task`. Unknown IDs get 404.
+- **Origin check.** Covers every POST, PUT, PATCH and DELETE under `/api/` and `/auth/`,
+  so both new routes are covered.
+- **Access matrix.** Rows exist for `POST /api/tasks/{task_id}/nudge` and
+  `DELETE /api/tasks/{task_id}`; the matrix's every-route check passes.
+- **Nudge recipients.** Only the task's own assignees whose Users row is Active. There is no
+  way to pass an address or user ID in the request. The body is only `message`.
+- **Nudge message.** Capped at 500 characters (422 above that), HTML-escaped by `_p` in the
+  email (`<script>` test), and never stored in Airtable or written to logs (tests).
+- **Nudge refusals.** Done and Skipped tasks, closed (archived) programs, and tasks with
+  nobody Active get 409. Dry run sends nothing and writes nothing (test).
+- **Delete task.** Refused on closed programs (archived programs are closed programs, status
+  Complete). The history entry is written before the delete (test checks the order).
+  Dependencies are cleared, Scheduled custom reminders are cancelled, and links move to the
+  program (tests). Automatic reminders are worked out from existing tasks, so a deleted
+  task gets none.
+- **My Tasks filters.** The task list is the caller's own assigned tasks on programs they
+  can see before any filter runs; filters only remove tasks. Filter choices come from that
+  same list. `sort` accepts only three values; bad values get 422 (tests in
+  `test_my_tasks_filters.py`, including other people's tasks never appearing).
+- **Overdue section.** Built from the same task list the page already returned, so it shows
+  nothing new to anyone.
+- **Programs wording.** Text only. No routes, permissions or data changed.
+
+Known and documented, not a finding: a deleted task's event on the shared Google Calendar
+is not removed by the app (admin runbook says to remove it by hand).
 
 ## Manual steps outside the code
 

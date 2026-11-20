@@ -87,7 +87,7 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | Method | Path | Role | Changes data | Notes |
 |---|---|---|---|---|
 | GET | `/api/projects` | current_user | No | Partners: only their launches. `status=closed` needs Admin |
-| GET | `/api/projects/{id}` | current_user | No | `check_project_access` (partners get 404 for other launches). History hidden from partners; edit block admin only |
+| GET | `/api/projects/{id}` | current_user | No | `check_project_access` (partners get 404 for other programs). History hidden from partners; edit block admin only. Changed 2026-11-20: overdue tasks move into `overdue_tasks`, the same task list split differently, so nothing new is shown |
 | GET | `/api/projects/{id}/history` | require_internal | No | |
 | POST | `/api/projects/preview` | Admin | No | |
 | POST | `/api/projects` | Admin | Yes; sends assignment emails | |
@@ -106,10 +106,10 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 
 | Method | Path | Role | Changes data | Notes |
 |---|---|---|---|---|
-| GET | `/api/tasks/mine` | current_user | No | Own tasks on launches the caller can see |
-| GET | `/api/tasks/{id}` | current_user | No | `_visible_task` (partner launch check). Notes filtered by visibility. People list only for admins |
+| GET | `/api/tasks/mine` | current_user | No | Own tasks on programs the caller can see. Changed 2026-11-20: optional `state` (max 50), `city` (max 100), `program_type` (max 200) and `sort` (`due`, `program` or `location` only) only narrow that list; filter choices come from the caller's own tasks |
+| GET | `/api/tasks/{id}` | current_user | No | `_visible_task` (partner program check). Notes filtered by visibility. People list only for admins. Changed 2026-11-20: adds `can_delete` and `can_nudge` (admin view only) and `last_nudge` (hidden from partners) |
 | PATCH | `/api/tasks/{id}` | require_can_edit | Yes | Status: only assignees (or Admin); Skip, due date, name and depends-on: Admin only |
-| POST | `/api/tasks/{id}/nudge` | Admin | Yes; email | Open task, open program, Active assignees only. Once per person per task per day (from Reminders); 20 per admin per hour. Message escaped, not stored |
+| POST | `/api/tasks/{id}/nudge` | Admin | Yes; email | Open task, open program, Active assignees only. Once per person per task per day (from Reminders); 20 per admin per hour (its own rule, so it does not also count toward the 60 a minute write limit). Message escaped, not stored. See F20 and F21 |
 | DELETE | `/api/tasks/{id}` | Admin | Yes (deletes) | Refused on closed programs. History row written first; dependencies cleared; scheduled reminders cancelled; links moved to the program |
 | POST | `/api/tasks/{id}/assign` | Admin | Yes; email | Only existing, active users |
 | POST | `/api/tasks/reassign` | Admin | Yes; email | All-or-nothing; open tasks on open launches only |
