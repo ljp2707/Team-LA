@@ -901,6 +901,33 @@ it.
 
 **Commit.** "Remove a real address from .env.example and stray files from git (F38)".
 
+### F39. Dependencies were not locked to exact files — Medium (Fixed)
+
+**Problem.** `requirements.txt` pinned only the top-level Python packages; everything they
+depend on floated, and nothing checked that a downloaded file was the one that was tested. A
+compromised or replaced release on PyPI would have gone straight into the image. pytest and
+the Gmail setup library were installed on the server. Five npm devDependencies used `^`
+ranges.
+
+**Fix.**
+- `backend/requirements.in` (runtime) and `requirements-dev.in` (tests and tools) list exact
+  top-level versions. `uv pip compile --universal --generate-hashes` turns them into
+  `requirements.txt` and `requirements-dev.txt`: every package, including indirect ones, at an
+  exact version with its SHA-256 hashes, valid on Windows, Mac and Linux.
+- The Dockerfile installs `requirements.txt` with `--require-hashes --no-deps`, so any file
+  that does not match fails the build. Test tools and `google-auth-oauthlib` (laptop only) are
+  no longer in the image.
+- `package.json` uses exact versions; `frontend/.npmrc` has `save-exact=true`; builds use `npm ci`.
+- The README explains how to update dependencies.
+
+**Tests** (`test_dependency_pins.py`): every `.in` line is `name==version`; every lock entry has
+hashes; the runtime lock matches the `.in` pins; no test tools in the runtime lock; the
+Dockerfile uses `--require-hashes` and `npm ci`; npm versions are exact and match the lock.
+Against the old `package.json`, the npm test fails. The image builds with the hash check,
+imports the app, and contains no pytest or Google OAuth library.
+
+**Commit.** "Hash-locked Python dependencies and exact npm pins (F39)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

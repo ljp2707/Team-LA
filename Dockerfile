@@ -10,7 +10,9 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Every package, including the ones they depend on, must match a hash in the lock file,
+# so a tampered or swapped package on PyPI fails the build (findings F39).
+RUN pip install --no-cache-dir --require-hashes --no-deps -r requirements.txt
 COPY backend/ ./
 COPY --from=frontend /frontend/dist ./app/static
 

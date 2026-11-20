@@ -41,7 +41,7 @@ You need [Python 3.12](https://www.python.org/downloads/) and [Node.js 22](https
    python -m venv .venv
    .venv\Scripts\activate          (Windows)
    source .venv/bin/activate       (Mac)
-   pip install -r requirements.txt
+   pip install --require-hashes -r requirements-dev.txt
    uvicorn app.main:app --reload --port 8000
    ```
 
@@ -159,6 +159,22 @@ This script, and `jobs.dump_schema`, need a **separate, short-lived token**, nev
 On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds demo people, sites, templates and programs, all with `@example.org` emails. It refuses to run in production, and refuses to run twice.
 
 `docs/data-model.md` explains every table and field the app uses.
+
+## Updating dependencies
+
+Every dependency is pinned to an exact version, and the Python ones to exact file hashes too, so a build always installs exactly what was tested and a tampered package fails the install (findings F39).
+
+- **Python.** Edit the exact version in `backend/requirements.in` (what the app needs to run) or `backend/requirements-dev.in` (tests and tools). Then, from `backend`, regenerate both locks with [uv](https://docs.astral.sh/uv/):
+
+  ```
+  uv pip compile requirements.in --universal --generate-hashes --python-version 3.12 --no-header -o requirements.txt
+  uv pip compile requirements-dev.in --universal --generate-hashes --python-version 3.12 --no-header -o requirements-dev.txt
+  pip install --require-hashes -r requirements-dev.txt
+  ```
+
+  `--universal` makes one lock that works on Windows, Mac and Linux. Never edit the `.txt` files by hand. The Docker image installs only `requirements.txt`, so test tools never reach the server.
+- **Frontend.** `npm install some-package@1.2.3` saves the exact version (`frontend/.npmrc` has `save-exact=true`). Commit `package.json` and `package-lock.json` together; the Docker build and CI use `npm ci`, which installs exactly the lock file.
+- Dependabot opens a pull request when an update is out (`.github/dependabot.yml`). CI must pass before merging.
 
 ## How the app reads Airtable
 
