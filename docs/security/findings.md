@@ -654,6 +654,27 @@ Airtable ends older cookies; unit tests for the rules. With the check disabled, 
 
 **Commit.** "Sign people out everywhere with a Session Version (F30)".
 
+### F31. Changing view kept the same session — Low (Fixed)
+
+**Problem.** ASVS asks for a new session whenever someone's powers change. Sign in already
+started from an empty session, but switching between admin and staff view (allowed on
+localhost and staging only; production refuses `DEV_ALLOW_VIEW_SWITCH`) only rewrote one key,
+so any other data in the session, such as leftover Google sign-in state, carried over.
+
+**Fix.** `auth/session.regenerate_session` keeps only the four keys a signed-in session needs
+(who the person is, their view, and the sign-in and last-seen times), drops everything else,
+and sets a new random session ID (`sid`, 16 random bytes), so the cookie is always a new value.
+It runs at every sign in and after every allowed view switch. The 7-day limit still counts
+from sign in. A signed cookie cannot be cancelled on the server, so older copies are ended by
+Session Version (F30), which changes of access level and roles already raise.
+
+**Tests** (`test_session_regeneration.py`): only the kept keys survive and the ID changes;
+each sign in gets a new ID; a view switch gives a new cookie and ID with the same user and
+sign-in time and still works; a refused switch changes nothing; the ID is not sent to the
+page. With the call removed from the view switch, the view switch test fails.
+
+**Commit.** "New session at sign in and on view switch (F31)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

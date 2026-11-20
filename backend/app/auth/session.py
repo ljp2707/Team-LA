@@ -1,5 +1,7 @@
 """Reading and writing the signed in user in the signed session cookie."""
 
+import secrets
+
 from fastapi import Request
 
 from app.config import get_settings
@@ -11,6 +13,10 @@ USER_KEY = "user"
 VIEW_KEY = "view"
 SIGNED_IN_AT_KEY = "signed_in_at"
 SEEN_AT_KEY = "seen_at"
+# A random value, new at sign in and at every change of view, so the cookie is a new one (F31).
+SESSION_ID_KEY = "sid"
+# The only keys a signed-in session keeps when it is regenerated.
+KEPT_KEYS = (USER_KEY, VIEW_KEY, SIGNED_IN_AT_KEY, SEEN_AT_KEY)
 
 # A session ends this long after sign in, however active it is (findings F15).
 MAX_SESSION_DAYS = 7
@@ -37,6 +43,20 @@ def set_stored_view(request: Request, view: View) -> None:
 
 def clear_session(request: Request) -> None:
     request.session.clear()
+
+
+def regenerate_session(request: Request) -> None:
+    """Start a new session that keeps only who the person is, their view and its times.
+
+    Called at sign in and when someone changes view (findings F31). Anything else in the
+    session, such as leftover Google sign-in state, is dropped, and a new random session
+    ID makes the cookie a new value. A signed cookie cannot be cancelled on the server,
+    so ending older copies is done by Session Version (F30), not here.
+    """
+    kept = {key: request.session[key] for key in KEPT_KEYS if key in request.session}
+    request.session.clear()
+    request.session.update(kept)
+    request.session[SESSION_ID_KEY] = secrets.token_urlsafe(16)
 
 
 def start_session_clock(request: Request) -> None:

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app import permissions
 from app.auth.deps import current_user
-from app.auth.session import set_stored_view
+from app.auth.session import regenerate_session, set_stored_view
 from app.config import get_settings
 from app.models.user import CurrentUser
 
@@ -48,4 +48,5 @@ def switch_view(
     if not permissions.can_choose_view(user.access_level, choice.view, dev_switch):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot use that view")
     set_stored_view(request, choice.view)
+    regenerate_session(request)  # A change of powers gets a new session (F31)
     return _describe(user.model_copy(update={"view": choice.view}))

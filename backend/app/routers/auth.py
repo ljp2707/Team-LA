@@ -19,7 +19,13 @@ from app.airtable.schema import ACTIVE, Users
 from app.auth import revocation
 from app.auth.deps import current_user
 from app.auth.google import callback_url, email_allowed, oauth
-from app.auth.session import clear_session, set_session_user, set_stored_view, start_session_clock
+from app.auth.session import (
+    clear_session,
+    regenerate_session,
+    set_session_user,
+    set_stored_view,
+    start_session_clock,
+)
 from app.config import get_settings
 from app.models.user import find_active_user_by_email, find_user_record_by_email
 
@@ -88,6 +94,7 @@ async def _finish_sign_in(
     start_session_clock(request)
     view = permissions.base_view(user.access_level)
     set_stored_view(request, view)
+    regenerate_session(request)  # A new session ID for every sign in (F31)
     return _to_frontend(permissions.home_path(view))
 
 
