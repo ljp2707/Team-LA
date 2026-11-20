@@ -19,3 +19,9 @@ backend/app/static/
 # Playwright browser test output
 frontend/test-results/
 frontend/playwright-report/
+
+# Editor, OS and build leftovers (findings F38)
+.DS_Store
+*.tsbuildinfo
+.claude/launch.json
+.claude/settings.local.json

@@ -873,6 +873,34 @@ With the same-token refusal removed, 2 fail.
 
 **Commit.** "Least-privilege Airtable token and a separate migration token (F37)".
 
+## Phase 5: CI and supply chain (2026-11-20)
+
+### F38. The example settings named a real admin, and stray files were in git — Medium (Fixed)
+
+**Problem.** `.env.example`, the file everyone copies to set up a server, had
+`BOOTSTRAP_ADMIN_EMAILS` and `GMAIL_SENDER` set to a developer's personal Gmail address. An
+NMU maintainer copying it to Railway would make that personal account an Admin on first
+sign in. Git also tracked three macOS `.DS_Store` files (they list folder contents),
+`frontend/tsconfig.tsbuildinfo` (build output) and `.claude/launch.json`, a teammate's local
+editor settings with their home folder path.
+
+**Fix.** Both settings are blank in `.env.example`, with a note to remove the bootstrap list
+once used. The test data uses `example.org` addresses. The five files are removed from git
+(they stay on disk) and `.gitignore` now covers `.DS_Store`, `*.tsbuildinfo`,
+`.claude/launch.json` and `.claude/settings.local.json`. They remain in old commits; nothing
+in them is a secret, so the history was not rewritten.
+
+The README and the admin runbook still name that address on purpose, as the current owner of
+the Google Cloud project and the Gmail sender; the runbook's handoff table says what replaces
+it.
+
+**Tests** (`test_repo_hygiene.py`): every secret, address and person setting is blank in
+`.env.example`; it contains no email address outside `example.org`/`example.com`; git tracks no
+`.DS_Store`, `.tsbuildinfo`, `.env`, key, credential or editor-settings files. Against the old
+`.env.example`, 3 fail.
+
+**Commit.** "Remove a real address from .env.example and stray files from git (F38)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one
