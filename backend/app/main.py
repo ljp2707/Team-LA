@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.airtable.client import warm_cache, warn_about_schema_problems
 from app.auth.google import callback_url
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.routers import (
     admin,
     archive,
@@ -49,7 +49,17 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="NMU Launches", lifespan=lifespan)
+def api_docs_urls(current: Settings) -> dict:
+    """The interactive API docs, on a laptop only.
+
+    In production they would publish a map of every route, admin ones included (findings F2).
+    """
+    if current.is_production:
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
+app = FastAPI(title="NMU Launches", lifespan=lifespan, **api_docs_urls(settings))
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # Files are only ever read as the type they say

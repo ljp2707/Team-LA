@@ -192,8 +192,10 @@ The live site needs real Google sign in, because the test login only works on yo
 2. Under **Variables**, add everything from `.env.example`, with these production values:
    - `ENV=production`
    - `SESSION_SECRET`: a new random string of at least 32 characters. The app will not start without one. You can make one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
-   - `DEV_ALLOW_VIEW_SWITCH=false`
+   - `DEV_ALLOW_VIEW_SWITCH=false`. The app refuses to start with it `true` in production.
    - `DEV_LOGIN_EMAIL`: leave this out or blank
+
+   An `https` `APP_URL` always runs in production mode, even if `ENV` is missing, so the secret check and the Secure cookie cannot be turned off by accident. In production the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are turned off; they stay on for local development.
    - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email
    - `CONTACT_EMAIL` and `ORG_ADDRESS`: NMU's contact inbox and mailing address, shown on the Privacy page and in every email
 3. Under **Settings > Networking**, choose **Generate Domain**.

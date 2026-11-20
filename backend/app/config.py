@@ -48,7 +48,9 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        return self.ENV == "production"
+        # An https address means a real deployment, so a missing ENV can't turn off
+        # the production checks below (findings F12).
+        return self.ENV == "production" or self.APP_URL.strip().lower().startswith("https://")
 
     @property
     def bootstrap_admins(self) -> set[str]:
@@ -89,6 +91,9 @@ class Settings(BaseSettings):
             self.is_production or not self.APP_URL.startswith("http://localhost")
         ):
             raise ValueError("DEV_LOGIN_EMAIL only works on localhost, never in production")
+        # It lets any signed-in person use admin view with admin permissions (findings F4).
+        if self.DEV_ALLOW_VIEW_SWITCH and self.is_production:
+            raise ValueError("DEV_ALLOW_VIEW_SWITCH must be false in production")
         return self
 
 
