@@ -1669,9 +1669,7 @@ a.row-title:hover {
   font-weight: 800;
 }
 
-/* No width breakpoints. The app keeps its full screen layout at every window
-   size: below --layout-min-width the page scrolls sideways instead of stacking,
-   shrinking or overlapping. See .shell in global.css. */
+/* Width breakpoints live in responsive.css. */
 
 .table--archive tbody th .row-sub {
   font-weight: 500;
@@ -1719,7 +1717,6 @@ a.row-title:hover {
 
 /* Privacy Policy and Terms of Use */
 .legal {
-  min-width: 792px;
   min-height: 100vh;
   min-height: 100dvh;
   padding: var(--space-4);

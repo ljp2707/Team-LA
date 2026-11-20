@@ -1,0 +1,193 @@
+/* Width breakpoints for the app shell and pages. Loaded last so these win.
+   Home page breakpoints live at the end of home.css, which loads with that page.
+     1280px  four launch cards become three
+     1100px  side columns stack under the main column
+      860px  the sidebar becomes a top bar with a Menu button
+      600px  phones: one column everywhere, rows reflow */
+
+@media (max-width: 1280px) {
+  .card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .page--aside,
+  .two-col,
+  .two-col--task,
+  .two-col--even,
+  .two-col--list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .main {
+    padding: var(--space-5);
+  }
+}
+
+@media (max-width: 860px) {
+  /* Sidebar turns into a sticky top bar; the nav opens from the Menu button. */
+  .shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    z-index: 20;
+    width: auto;
+    height: auto;
+    max-height: 100vh;
+    max-height: 100dvh;
+    gap: 0;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-page);
+    box-shadow: 0 1px 0 var(--color-divider);
+  }
+
+  .menu-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-height);
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card);
+    color: var(--color-ink);
+    font: 600 15px/1 var(--font-body);
+    cursor: pointer;
+  }
+
+  .sidebar-menu {
+    display: none;
+    padding-top: var(--space-4);
+  }
+
+  .sidebar.is-open .sidebar-menu {
+    display: flex;
+  }
+
+  .main {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .toolbar,
+  .toolbar-filters {
+    flex-wrap: wrap;
+  }
+
+  .search-field {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .filter-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+  }
+
+  .page-header h1 {
+    font-size: 32px;
+  }
+
+  .dialog,
+  .dialog--wide {
+    width: calc(100vw - var(--space-4));
+    max-height: calc(100dvh - var(--space-4));
+  }
+
+  .legal-top {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 600px) {
+  .card-grid,
+  .form-grid,
+  .form-grid--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .segmented--status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-header h1,
+  .archive-title {
+    font-size: 28px;
+  }
+
+  .card {
+    padding: var(--space-4);
+  }
+
+  /* My Tasks rows: check, task, status on top; due date under the task name. */
+  .task-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .task-row > .row-due {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  /* Project rows: status and due date on top, then the task, then who. */
+  .project-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .project-row-status {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+
+  .project-row .row-due {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .project-row .row-main,
+  .project-row .row-who {
+    grid-column: 1 / -1;
+  }
+
+  /* People: avatar beside the name, details stacked underneath. */
+  .people-list li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .people-list li > :nth-child(n + 3) {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  /* Template steps: the timing sits above the step. */
+  .step-head {
+    display: none;
+  }
+
+  .step-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .step-row .step-when {
+    grid-column: 1 / -1;
+  }
+
+  .legal-nav {
+    gap: var(--space-4);
+  }
+}

@@ -1,11 +1,8 @@
 /* Home page, matching page 01 of the wireframes. All motion is CSS keyframes. */
 .home {
-  /* The home page keeps its two column layout at any window size. Narrower
-     windows scroll sideways. 1200px keeps the life ring clear of the intro text.
-     Sizes below use cqi, the width of this box, so they stay put once the window
-     is narrower than the page. */
+  /* Sizes below use cqi, the width of this box. Narrow screens stack the
+     layout; see responsive.css. */
   container-type: inline-size;
-  min-width: 1200px;
   height: 100vh;
   height: 100dvh;
   min-height: 680px;
@@ -517,4 +514,76 @@
 
 .hero-foot {
   pointer-events: none;
+}
+
+/* ---------- Narrow screens ---------- */
+
+/* Tablets: the stats move under the intro and the page grows to fit. */
+@media (max-width: 1000px) {
+  .home {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .hero {
+    min-height: calc(100dvh - 2 * var(--space-4));
+  }
+
+  .hero-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: 220px;
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .water {
+    height: 200px;
+  }
+
+  /* The ring sits over the intro text once the columns stack. */
+  .life-ring,
+  .splash {
+    display: none;
+  }
+}
+
+/* Phones */
+@media (max-width: 600px) {
+  .home {
+    padding: var(--space-2);
+  }
+
+  .hero-top {
+    flex-wrap: wrap;
+    padding: var(--space-4);
+  }
+
+  .hero-links {
+    gap: var(--space-4);
+  }
+
+  .hero-body {
+    padding: var(--space-3) var(--space-4) 200px;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(40px, 12cqi, 56px);
+  }
+
+  .hero-copy > p {
+    font-size: 16px;
+  }
+
+  .hero-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-foot {
+    padding: var(--space-4);
+    font-size: 14px;
+  }
 }

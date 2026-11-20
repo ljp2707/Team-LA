@@ -168,7 +168,6 @@ a {
 /* App shell */
 .shell {
   display: flex;
-  min-width: var(--layout-min-width);
   min-height: 100vh;
 }
 
