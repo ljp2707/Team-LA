@@ -252,6 +252,8 @@ After changing a variable in Railway, click **Deploy** if it asks you to apply t
 
 Railway schedules in UTC, so `0 15 * * *` is 8 AM Pacific during daylight time and 7 AM in winter. While `REMINDERS_DRY_RUN=true` the job only prints. Set it to `false` once the test email works.
 
+**Logs and monitoring.** In production the app writes one JSON object per log line, each with the request's ID, and marks security events (refused sign ins, 403s, rate limits, revoked sessions, CSP reports, admin actions) with an `event` field. `docs/security/monitoring.md` lists every event, what it means and which alerts to set up in Railway. Locally the lines stay plain text.
+
 ## Roles and the view switch
 
 Each person's **Access Level** in the Airtable Users table sets what they can do:

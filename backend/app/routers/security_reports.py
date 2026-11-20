@@ -10,6 +10,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.security import CSP_REPORT_PATH, parse_csp_reports
+from app.security_events import security_event
 
 router = APIRouter(tags=["security"])
 logger = logging.getLogger("app.security.csp")
@@ -27,4 +28,5 @@ async def csp_report(request: Request) -> Response:
             report["blocked"],
             report["page"],
         )
+        security_event("csp_violation", level=logging.WARNING, **report)  # Fields already cleaned (F36)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

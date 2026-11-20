@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app import log_redaction
+from app import log_redaction, logging_setup
 from app.audit import AuditTrail
 from app.airtable.client import warm_cache, warn_about_schema_problems
 from app.auth.google import callback_url
@@ -39,7 +39,8 @@ from app.routers import (
     users,
 )
 
-logging.basicConfig(level=logging.INFO)
+# One JSON object per line in production, plain text on a laptop (findings F36)
+logging_setup.install(json_lines=get_settings().is_production)
 logger = logging.getLogger("app")
 log_redaction.install()  # Calendar tokens and sign-in codes never reach the logs (findings F3)
 

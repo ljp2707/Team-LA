@@ -27,6 +27,8 @@ from app.auth.session import (
     start_session_clock,
 )
 from app.config import get_settings
+from app.log_redaction import mask_email
+from app.security_events import security_event
 from app.models.user import find_active_user_by_email, find_user_record_by_email
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,7 @@ def warn_if_bootstrap_not_needed() -> bool:
         r["fields"].get(Users.STATUS) == ACTIVE and r["fields"].get(Users.ACCESS_LEVEL) in permissions.ADMIN_ACCESS_LEVELS
         for r in rows
     ):
+        security_event("bootstrap_admins_still_set", level=logging.WARNING)
         logger.warning(
             "BOOTSTRAP_ADMIN_EMAILS is set, but an Active Admin already exists. "
             "Remove BOOTSTRAP_ADMIN_EMAILS from the environment; it is only for the first sign in."
@@ -96,11 +99,17 @@ def ensure_bootstrap_admin(email: str, first_name: str = "", last_name: str = ""
         )
 
 
+def _denied(reason: str, email: str | None, **fields) -> None:
+    """A refused sign in (findings F36). The address is masked: m***@example.org."""
+    security_event("sign_in_denied", level=logging.WARNING, reason=reason, email=mask_email(email), **fields)
+
+
 async def _finish_sign_in(
     request: Request, email: str, hosted_domain: str | None, first_name: str = "", last_name: str = ""
 ) -> RedirectResponse:
     """Check an email against the rules and Airtable, then start the session."""
     if not email_allowed(email, hosted_domain):
+        _denied("wrong_domain", email)
         return _to_frontend("/not-authorized?reason=domain")
 
     try:
@@ -108,8 +117,10 @@ async def _finish_sign_in(
         user = await run_in_threadpool(find_active_user_by_email, email)
     except RequestException as error:
         logger.warning("Airtable lookup failed: %s", type(error).__name__)
+        _denied("airtable_unreachable", email)
         return _to_frontend("/not-authorized?reason=airtable")
     if user is None:
+        _denied("not_an_active_user", email)
         clear_session(request)
         request.session[DENIED_EMAIL_KEY] = email.strip()
         return _to_frontend("/not-authorized")
@@ -121,6 +132,7 @@ async def _finish_sign_in(
     view = permissions.base_view(user.access_level)
     set_stored_view(request, view)
     regenerate_session(request)  # A new session ID for every sign in (F31)
+    security_event("sign_in", user=user.airtable_record_id, access_level=user.access_level)
     return _to_frontend(permissions.home_path(view))
 
 
@@ -150,11 +162,13 @@ async def callback(request: Request):
         token = await oauth.google.authorize_access_token(request)
     except OAuthError as error:
         logger.warning("Google sign in failed: %s", error.error)
+        _denied("google_error", None, google_error=error.error)
         return _to_frontend("/not-authorized?reason=google")
 
     google_user = token.get("userinfo") or {}
     email = google_user.get("email", "")
     if not email or not google_user.get("email_verified"):
+        _denied("email_not_verified", email)
         return _to_frontend("/not-authorized?reason=google")
     return await _finish_sign_in(
         request,
@@ -176,6 +190,9 @@ async def denied(request: Request):
 async def logout(request: Request):
     """Sign out. POST only: the SameSite cookie is never sent with another site's POST,
     so no other website can sign people out (findings F8)."""
+    user_id = (request.session.get("user") or {}).get("airtable_record_id")
+    if user_id:
+        security_event("sign_out", user=user_id)
     clear_session(request)
     # 303 so the browser follows with a GET to the home page. "/" rather than
     # FRONTEND_URL: the form is always posted from our own site, and the CSP's
@@ -196,7 +213,7 @@ def logout_everywhere(request: Request):
         user = None
     if user is not None:
         revocation.sign_out_everywhere(user.id, user.session_version)
-        logger.info("Signed out everywhere: %s", user.id)
+        security_event("sign_out_everywhere", user=user.id)
     clear_session(request)
     return RedirectResponse("/", status_code=303)
 

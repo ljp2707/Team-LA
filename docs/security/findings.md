@@ -795,6 +795,43 @@ nothing; admin only (matrix); the page loads under the enforced CSP and shows a 
 
 **Commit.** "Read-only Audit page for admins (F35)".
 
+### F36. Logs were hard to search and security events were not marked — Low (Fixed)
+
+**Problem.** Logs were plain text from `logging.basicConfig`, with uvicorn's lines in a second
+format. There was no way to filter for security events (refused sign ins, 403s, rate limits,
+revoked sessions) or to follow one request through the log, and no guide saying what to watch.
+A message with a line break could look like two log lines.
+
+**Fix.**
+- `app/logging_setup.py`: in production every line, the app's and uvicorn's, is one JSON
+  object (time in UTC, level, logger, message, and the exception on the same line). Locally,
+  plain text. Line breaks inside a message stay inside the JSON string.
+- Every line written during a request has its `request_id` (a context variable set by
+  `RequestContext`, which follows sync routes onto their worker thread), the same ID as the
+  `X-Request-ID` header and the Audit Log row.
+- `app/security_events.py`: `security_event(name, **fields)` writes one event with cleaned
+  one-line values (at most 200 characters). Events: `sign_in`, `sign_in_denied` (with a
+  reason and a masked email), `sign_out`, `sign_out_everywhere`, `session_revoked`,
+  `session_ended_inactive_user`, `session_expired`, `access_denied` (403), `rate_limited`
+  (429), `request_too_large` (413), `csp_violation`, `admin_action`, `audit_write_failed`,
+  `bootstrap_admins_still_set`, `unexpected_error`. 401s are not events: every signed-out
+  visit makes one. Refusals carry the declared route, the user's record ID and the client
+  address.
+- `docs/security/monitoring.md`: where the logs are, every event, when to act, five alerts to
+  set up in Railway, and a monthly review of the audit trail.
+
+**Tests** (`test_security_logging.py`): JSON lines are valid and single-line, including line
+breaks and exceptions; the request ID is added during a request and cleared after, also in a
+sync route; event fields become JSON fields without replacing the basic ones; uvicorn's
+loggers go through the same handler and keep the token redaction; values are cleaned; each
+event above fires with the right fields; emails are masked; signed-out 401s are not events;
+CSP events keep query strings out; the session cookie never reaches the log. With the refusal
+events removed, 3 fail; with the request ID not set, 1 fails.
+
+**Manual step.** Set up the alerts in `monitoring.md` on Railway.
+
+**Commit.** "JSON logs with request IDs and security events (F36)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

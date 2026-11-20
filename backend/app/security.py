@@ -16,6 +16,8 @@ from starlette.responses import JSONResponse
 
 from app.config import Settings, get_settings
 from app.log_redaction import redact_path
+from app.logging_setup import request_id_var
+from app.security_events import security_event
 
 logger = logging.getLogger("app.errors")
 
@@ -298,6 +300,35 @@ class RetireOldSessionCookie:
 ERROR_MESSAGE = "Something went wrong. If it keeps happening, send this code to the NMU team."
 
 
+# Answers worth a security event (findings F36). 401 is left out: every signed-out visit
+# to the home page asks /api/me and gets one, so it would drown out everything else.
+REFUSAL_EVENTS = {
+    403: "access_denied",  # Wrong role, wrong program, or a request from another site
+    413: "request_too_large",
+    429: "rate_limited",
+}
+
+
+def _route_of(scope) -> str:
+    """The route as declared ("/api/users/{user_id}") when known, else the redacted path."""
+    route = scope.get("route")
+    return getattr(route, "path", None) or redact_path(scope["path"])
+
+
+def report_refusal(scope, status: int) -> None:
+    event = REFUSAL_EVENTS.get(status)
+    if event:
+        security_event(
+            event,
+            level=logging.WARNING,
+            status=status,
+            method=scope["method"],
+            route=_route_of(scope),
+            user=scope.get("state", {}).get("user_id"),
+            client=(scope.get("client") or ("", 0))[0],
+        )
+
+
 class RequestContext:
     """Give every request an ID, add the security headers to every response, and turn
     crashes into a plain message.
@@ -317,17 +348,22 @@ class RequestContext:
         # Made here rather than taken from the request, so nobody can choose their own.
         request_id = uuid.uuid4().hex
         scope.setdefault("state", {})["request_id"] = request_id
+        # Every log line written during this request carries its ID (findings F36).
+        id_token = request_id_var.set(request_id)
         response_started = False
+        status = 0
 
         async def send_with_headers(message):
-            nonlocal response_started
+            nonlocal response_started, status
             if message["type"] == "http.response.start":
                 response_started = True
+                status = message["status"]
                 add_security_headers(MutableHeaders(scope=message), scope["path"], request_id)
             await send(message)
 
         try:
             await self.app(scope, receive, send_with_headers)
+            report_refusal(scope, status)
         except Exception:
             # The path only: never the query string or body, which can hold secrets.
             logger.exception(
@@ -336,7 +372,10 @@ class RequestContext:
                 redact_path(scope["path"]),
                 request_id,
             )
+            security_event("unexpected_error", level=logging.ERROR, method=scope["method"], route=_route_of(scope))
             if response_started:
                 raise  # Too late to send a different answer
             response = JSONResponse({"detail": ERROR_MESSAGE, "request_id": request_id}, status_code=500)
             await response(scope, receive, send_with_headers)
+        finally:
+            request_id_var.reset(id_token)

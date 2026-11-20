@@ -18,6 +18,7 @@ from app.auth.session import (
     set_session_user,
 )
 from app.config import get_settings
+from app.security_events import security_event
 from app.models.user import CurrentUser, find_active_user_by_id
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ def current_user(request: Request) -> CurrentUser:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
     if session_expired(request):
         clear_session(request)
+        security_event("session_expired", user=session_user.airtable_record_id)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
 
     try:
@@ -48,12 +50,17 @@ def current_user(request: Request) -> CurrentUser:
 
     if fresh is None:
         clear_session(request)
+        # Deactivated, or removed from Users, while signed in
+        security_event("session_ended_inactive_user", level=logging.WARNING, user=session_user.airtable_record_id)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
     # F30: signed out everywhere since this cookie was issued. Checked before the cookie
     # is refreshed below, which would otherwise copy in the new number.
     if revocation.is_revoked(session_user.session_version, fresh.session_version):
         clear_session(request)
+        # Normal after "sign out everywhere"; many in a row for one person can mean a copied cookie.
+        security_event("session_revoked", level=logging.WARNING, user=session_user.airtable_record_id)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
+    request.state.user_id = fresh.airtable_record_id  # For security events (F36)
 
     set_session_user(request, fresh)
     view = permissions.effective_view(
