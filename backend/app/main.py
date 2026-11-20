@@ -8,9 +8,11 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from app import log_redaction
 from app.airtable.client import warm_cache, warn_about_schema_problems
 from app.auth.google import callback_url
 from app.config import Settings, get_settings
+from app.request_limits import RequestSizeLimit
 from app.routers import (
     admin,
     archive,
@@ -30,6 +32,7 @@ from app.routers import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("app")
+log_redaction.install()  # Calendar tokens and sign-in codes never reach the logs (findings F3)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SESSION_DAYS = 7
@@ -61,11 +64,40 @@ def api_docs_urls(current: Settings) -> dict:
 
 app = FastAPI(title="NMU Launches", lifespan=lifespan, **api_docs_urls(settings))
 
+# Caps request size before sign-in or form parsing read the body (findings F6). Added
+# first, so it sits next to the routes, where its 413 answers still get the headers below.
+app.add_middleware(RequestSizeLimit)
+
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # Files are only ever read as the type they say
     "X-Frame-Options": "DENY",  # No other site can show the app inside a frame
     "Referrer-Policy": "strict-origin-when-cross-origin",  # Links out do not leak task URLs
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",  # The app never needs these
+}
+
+# Browsers only ever use https for this site once they have seen it (production only:
+# on localhost it would stop http://localhost working for a year). Findings F1.
+HSTS_VALUE = "max-age=31536000"
+
+# Only this site's own scripts, styles, fonts and images may load, and no other site may
+# frame it. A second line of defence if a bad link or value ever reaches the page (F1).
+CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+    ]
+)
+CSP_HEADER_BY_MODE = {
+    "report-only": "Content-Security-Policy-Report-Only",  # Browsers warn, nothing is blocked
+    "enforce": "Content-Security-Policy",
 }
 
 
@@ -74,6 +106,12 @@ async def security_headers(request: Request, call_next):
     response = await call_next(request)
     for name, value in SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
+    current = get_settings()
+    if current.is_production:
+        response.headers.setdefault("Strict-Transport-Security", HSTS_VALUE)
+    csp_header = CSP_HEADER_BY_MODE.get(current.CSP_MODE)
+    if csp_header:
+        response.headers.setdefault(csp_header, CONTENT_SECURITY_POLICY)
     return response
 
 

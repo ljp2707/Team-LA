@@ -19,6 +19,16 @@ def link_kind(url: str) -> str:
     return "Other"
 
 
+def safe_link(url: str | None) -> str | None:
+    """The URL if it is https, otherwise None.
+
+    The API only accepts https links, but values typed straight into Airtable skip
+    that check. A "javascript:" link there would run as whoever clicks it (findings F7).
+    """
+    value = (url or "").strip()
+    return value if value.lower().startswith("https://") else None
+
+
 def calendar_url(title: str, due_iso: str | None, details: str) -> str | None:
     """An "Add to Google Calendar" link for an all-day event on the due date."""
     from datetime import date, timedelta

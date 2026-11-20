@@ -21,7 +21,7 @@ from app.models.project import (
 from app.models.task import LinkIn, OneOffTaskIn
 from app.models.user import CurrentUser
 from app.services import export, history, logic, projects, reminders, timeline
-from app.services.links import FILE_KIND, link_kind, read_upload, save_upload
+from app.services.links import FILE_KIND, link_kind, read_upload, safe_link, save_upload
 from app.services.records import load_reminders, safe
 from app.services.views import (
     World,
@@ -117,7 +117,7 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
             "phone": project.partner_phone,
         },
         "shipping_address": project.shipping_address,
-        "drive_folder": project.drive_folder,
+        "drive_folder": safe_link(project.drive_folder),
         "groups": groups,
         "links": [
             link_dict(world, link, is_admin)
@@ -160,7 +160,7 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
             "partner_email": project.partner_email,
             "partner_phone": project.partner_phone,
             "shipping_address": project.shipping_address,
-            "drive_folder": project.drive_folder,
+            "drive_folder": safe_link(project.drive_folder),
             "partner_ids": project.partner_ids,
         }
         if is_admin

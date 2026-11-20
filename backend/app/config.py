@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,10 @@ class Settings(BaseSettings):
     BOOTSTRAP_ADMIN_EMAILS: str = ""
 
     APP_TIMEZONE: str = "America/Los_Angeles"
+
+    # Content-Security-Policy (findings F1): "report-only" makes browsers warn about anything
+    # the policy would block, "enforce" blocks it, "off" sends no policy.
+    CSP_MODE: Literal["off", "report-only", "enforce"] = "report-only"
 
     DEV_ALLOW_VIEW_SWITCH: bool = False
     DEV_LOGIN_EMAIL: str = ""

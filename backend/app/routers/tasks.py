@@ -16,7 +16,7 @@ from app.email.templates import task_url
 from app.models.task import AssignIn, LinkIn, NoteIn, ReassignIn, ReminderIn, TaskUpdateIn
 from app.models.user import CurrentUser
 from app.services import calendar_feed, clock, history, logic, reminders
-from app.services.links import FILE_KIND, calendar_url, link_kind, read_upload, save_upload
+from app.services.links import FILE_KIND, calendar_url, link_kind, read_upload, safe_link, save_upload
 from app.services.records import TaskRec, load_reminders, safe
 from app.services.timeline import find_cycle
 from app.services.views import World, check_project_access, link_dict, note_dict, task_row
@@ -171,13 +171,13 @@ def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
         for link in world.links
         if link.work_id == task.id
     ]
-    if task.resource_link:
+    if safe_link(task.resource_link):
         links.insert(
             0,
             {
                 "id": None,
                 "title": "Resource from the template",
-                "url": task.resource_link,
+                "url": safe_link(task.resource_link),
                 "kind": link_kind(task.resource_link),
                 "is_file": False,
                 "file_name": None,

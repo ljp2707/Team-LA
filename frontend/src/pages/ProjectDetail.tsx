@@ -1,3 +1,4 @@
+import { safeHref } from "../lib/safeHref";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -239,8 +240,8 @@ export function ProjectDetail() {
                 </div>
               )}
             </dl>
-            {p.drive_folder && (
-              <a href={p.drive_folder} target="_blank" rel="noreferrer" className="strong-link">
+            {safeHref(p.drive_folder) && (
+              <a href={safeHref(p.drive_folder) ?? undefined} target="_blank" rel="noreferrer" className="strong-link">
                 Open Google Drive folder
               </a>
             )}
@@ -301,10 +302,22 @@ export function ProjectDetail() {
               <ul className="link-list">
                 {p.links.map((link) => (
                   <li key={link.id ?? link.url}>
-                    <a href={link.url} target="_blank" rel="noreferrer">
-                      <strong>{link.title}</strong>
-                      <span className="muted">{link.is_file ? ["File", fileSize(link.file_size)].filter(Boolean).join(" · ") : link.kind}</span>
-                    </a>
+                    {(() => {
+                      const label = (
+                        <>
+                          <strong>{link.title}</strong>
+                          <span className="muted">{link.is_file ? ["File", fileSize(link.file_size)].filter(Boolean).join(" · ") : link.kind}</span>
+                        </>
+                      );
+                      const href = safeHref(link.url);
+                      return href ? (
+                        <a href={href} target="_blank" rel="noreferrer">
+                          {label}
+                        </a>
+                      ) : (
+                        <span>{label}</span>
+                      );
+                    })()}
                     {link.can_remove && link.id && (
                       <button
                         type="button"

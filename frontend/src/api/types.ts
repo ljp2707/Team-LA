@@ -85,7 +85,7 @@ export interface ProjectList {
 export interface LinkItem {
   id: string | null;
   title: string;
-  url: string;
+  url: string | null;
   kind: string;
   /** Uploaded from someone's computer. url then opens it through the app. */
   is_file: boolean;

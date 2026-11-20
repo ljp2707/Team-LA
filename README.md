@@ -196,6 +196,15 @@ The live site needs real Google sign in, because the test login only works on yo
    - `DEV_LOGIN_EMAIL`: leave this out or blank
 
    An `https` `APP_URL` always runs in production mode, even if `ENV` is missing, so the secret check and the Secure cookie cannot be turned off by accident. In production the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are turned off; they stay on for local development.
+
+   **Security headers and limits.** Every response carries `nosniff`, `X-Frame-Options: DENY`, a Referrer-Policy and a Permissions-Policy. Production also sends `Strict-Transport-Security`, so browsers only ever use https. A Content-Security-Policy is controlled by `CSP_MODE`:
+   - `report-only` (the default) sends it as `Content-Security-Policy-Report-Only`, so browsers only warn in their developer console.
+   - `enforce` makes browsers block anything outside the policy.
+   - `off` sends nothing.
+
+   To move to `enforce`: open the live site with the browser's developer console open, click through the main pages, and check for "Content-Security-Policy" warnings. If there are none, set `CSP_MODE=enforce` on Railway and redeploy.
+
+   Request bodies are capped at 6 MB on the two file upload routes and 2 MB everywhere else. Bigger requests get a 413 before anything reads them. The access log replaces calendar feed tokens and Google sign-in codes with `[redacted]`.
    - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email
    - `CONTACT_EMAIL` and `ORG_ADDRESS`: NMU's contact inbox and mailing address, shown on the Privacy page and in every email
 3. Under **Settings > Networking**, choose **Generate Domain**.
