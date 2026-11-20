@@ -402,8 +402,9 @@ def _last_nudge(world: World, task: TaskRec) -> dict | None:
 def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_admin)):
     """Admin only: email everyone on an open task a reminder now, with an optional message.
 
-    Each person can be nudged about the same task once every 24 hours. The per-admin
-    hourly cap is in rate_limit.py. Nothing is sent while REMINDERS_DRY_RUN is on.
+    Each person can be nudged about the same task once every 24 hours, and gets at most
+    3 nudges a day in total (reminders.nudge_blocks). The per-admin hourly cap is in
+    rate_limit.py. Nothing is sent while REMINDERS_DRY_RUN is on.
     """
     if not permissions.can_nudge(user.actor):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can nudge")
@@ -419,19 +420,21 @@ def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_
         raise HTTPException(status.HTTP_409_CONFLICT, "Nobody active is assigned to this task. Assign someone first.")
 
     now = clock.now()
-    recent = reminders.recent_nudges(safe(load_reminders), task.id, now)
-    to_send = [p for p in people if p.id not in recent]
+    blocks = reminders.nudge_blocks(safe(load_reminders), task.id, [p.id for p in people], now)
+    to_send = [p for p in people if p.id not in blocks]
     if not to_send:
-        again = min(recent[p.id] for p in people) + timedelta(hours=reminders.NUDGE_EVERY_HOURS)
-        again = again.astimezone(clock.tz())
-        who = people[0].short_name if len(people) == 1 else "Everyone on this task"
+        again = min(b.until for b in blocks.values()).astimezone(clock.tz())
         when = f"{again.strftime('%I:%M %p').lstrip('0')} on {logic.fmt_date(again.date(), world.today)}"
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            f"{who} was already nudged about this task in the last day. You can nudge again after {when}.",
-        )
+        who = people[0].short_name if len(people) == 1 else "Everyone on this task"
+        if all(b.reason == reminders.SAME_TASK for b in blocks.values()):
+            why = f"{who} was already nudged about this task in the last day."
+        elif len(people) == 1:
+            why = f"{who} has already had {reminders.NUDGES_PER_PERSON_PER_DAY} reminders today, the most anyone gets in a day."
+        else:
+            why = "Everyone on this task has already been nudged about it or has had the most reminders anyone gets in a day."
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, f"{why} You can nudge again after {when}.")
     names = lambda ps: logic.name_list([p.short_name for p in ps], 3)  # noqa: E731
-    skipped = [p for p in people if p.id in recent]
+    skipped = [p for p in people if p.id in blocks]
     if get_settings().REMINDERS_DRY_RUN:
         return {
             "sent": [],
@@ -452,7 +455,7 @@ def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_
     history.log_event(project.id, task.id, user.id, history.NUDGE, f"nudged {names(sent)} about {task.name}")
     message = f"Reminder sent to {names(sent)}."
     if skipped:
-        message += f" {names(skipped)} {'was' if len(skipped) == 1 else 'were'} already nudged today, so not again."
+        message += f" {names(skipped)} {'was' if len(skipped) == 1 else 'were'} skipped, having been nudged enough today."
     if len(sent) < len(to_send):
         message += f" It could not be sent to everyone: {errors[0]}"
     return {"sent": [p.short_name for p in sent], "skipped": [p.short_name for p in skipped], "message": message}

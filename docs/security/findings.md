@@ -354,7 +354,7 @@ Reviewed: Nudge, Delete task, the My Tasks filters and sort, the Overdue section
 program's page, and the Launches to Programs wording. Status for each finding is **Open**
 until it is fixed and its commit and tests are listed here.
 
-### F20. Nudge has no limit per person across tasks — Medium (Open)
+### F20. Nudge has no limit per person across tasks — Medium (Fixed)
 
 **Problem.** The once-a-day limit is per person *per task*, and the 20-an-hour cap is per
 *admin*. Nothing limits how many nudges one person receives in total. One admin can nudge
@@ -362,15 +362,20 @@ the same person about 20 different tasks in an hour, and every other admin can d
 so a staff member or partner can be flooded with email by a careless or compromised admin
 account. It also risks the Gmail sender being marked as spam.
 
-**Proposed fix.** A limit per recipient across all tasks and all admins (proposed: 3 nudges
-per person per 24 hours), counted from the Reminders table like the per-task limit, so it
-survives a restart. People already at the limit are skipped with a clear message, and the
-route answers 429 if everyone is. The logic goes in `services/reminders.py` next to
-`recent_nudges`.
+**Fix.** `reminders.nudge_blocks` decides who can be nudged now. Besides once per task per
+day, nobody gets more than `NUDGES_PER_PERSON_PER_DAY` (3) nudges in 24 hours, from any
+admin about any task, counted from Sent Nudge rows in the Reminders table so it survives a
+restart. People at the limit are skipped with a note in the success message; if everyone
+on the task is blocked the route answers 429 saying when to try again.
 
-**Tests.** Nudging one person about a 4th task within a day is refused; a different person
-on the same task is still nudged; the limit counts nudges from every admin; it resets after
-24 hours.
+**Tests** (`test_nudge.py`): a 4th nudge to one person in a day is refused with the time it
+frees up; nudges recorded from other admins count; nudges over a day old and failed ones do
+not; someone else on the same task is still nudged while the person at the limit is
+skipped; the limit resets after 24 hours. The hourly-cap test now uses a different person
+per task so it still tests only the admin cap. With the limit switched off, 4 of these
+tests fail.
+
+**Commit.** "Limit nudges to 3 a day per person across tasks (F20)".
 
 ### F21. Two nudges at the same moment can both send — Low (Open)
 

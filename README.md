@@ -218,7 +218,7 @@ The live site needs real Google sign in, because the test login only works on yo
    |---|---|
    | Sign in (`/auth/login`, `/auth/callback`) | 10 a minute per address |
    | File uploads | 20 an hour per person |
-   | Nudges (`POST /api/tasks/{id}/nudge`) | 20 an hour per admin, and once a day per person per task (that one is read from the Reminders table, so it survives a restart) |
+   | Nudges (`POST /api/tasks/{id}/nudge`) | 20 an hour per admin. Each person gets at most one nudge per task a day and 3 nudges a day in total, from all admins (these two are read from the Reminders table, so they survive a restart) |
    | Any other change (POST, PUT, PATCH, DELETE under `/api/`) | 60 a minute per person |
    | Calendar feeds and `/api/public/*` | 60 a minute per address |
 
