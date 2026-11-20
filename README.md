@@ -204,6 +204,8 @@ The live site needs real Google sign in, because the test login only works on yo
 
    The policy allows only the app's own scripts, styles, fonts and images (fonts are self-hosted in `/fonts`, so Google Fonts is not allowed), no inline scripts, and forms that post to the app itself or to Google sign-in. If the app ever loads something from another site, add that site to `CONTENT_SECURITY_POLICY` in `backend/app/security.py`.
 
+   **CSP reports.** The policy tells browsers to report anything it blocks (or, in report-only mode, would block) to `POST /api/security/csp-report`. Each report becomes one Railway log line such as `CSP violation: directive=script-src-elem blocked=https://evil.example page=/tasks/recT2`: the rule, only the site or kind of thing blocked, and only the page path. Nothing else from the report is kept, so no names, emails, query strings or code samples reach the log. The endpoint accepts both report formats browsers use, takes up to 64 KB and 20 reports per request, and is limited to 30 requests a minute per address. It is the one change route without the Origin check below, because browsers send reports on their own and it changes nothing.
+
    To move to `enforce`: open the live site with the browser's developer console open, click through the main pages, and check for "Content-Security-Policy" warnings. If there are none, set `CSP_MODE=enforce` on Railway and redeploy.
 
    **Changes must come from this site (CSRF).** POST, PUT, PATCH and DELETE on `/api` and `/auth` are refused with a 403 unless the browser's `Origin` header (or `Referer`, if there is no `Origin`) is `APP_URL` or `FRONTEND_URL`. Browsers always send one of these, so this only stops other websites and scripts that send neither. In local development, open the app at the exact `FRONTEND_URL` (`http://localhost:5173`, not `127.0.0.1`), or changes are refused.
@@ -221,6 +223,7 @@ The live site needs real Google sign in, because the test login only works on yo
    | Nudges (`POST /api/tasks/{id}/nudge`) | 20 an hour per admin. Each person gets at most one nudge per task a day and 3 nudges a day in total, from all admins (these two are read from the Reminders table, so they survive a restart) |
    | Any other change (POST, PUT, PATCH, DELETE under `/api/`) | 60 a minute per person |
    | Calendar feeds and `/api/public/*` | 60 a minute per address |
+   | CSP reports (`POST /api/security/csp-report`) | 30 a minute per address |
 
    The counts live in memory, which is right for one Railway instance. If the app is ever scaled to several instances, each counts separately, and the lock that stops two nudges from sending at once (`reminders.NUDGE_LOCK`) would also need to become a shared one.
 

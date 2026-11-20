@@ -47,6 +47,8 @@ RULES = [
         per_person=True,
         message="You have sent a lot of nudges this hour. Please try again later.",
     ),
+    # Browsers send these on their own; this stops anyone flooding the logs (F25).
+    Rule("csp reports", frozenset({"POST"}), re.compile(r"^/api/security/csp-report$"), 30, 60, per_person=False),
     Rule("uploads", frozenset({"POST"}), re.compile(r"^/api/.+/files$"), 20, 3600, per_person=True),
     Rule("calendar feed", frozenset({"GET"}), re.compile(r"^/calendar/"), 60, 60, per_person=False),
     Rule("public", frozenset({"GET"}), re.compile(r"^/api/public/"), 60, 60, per_person=False),

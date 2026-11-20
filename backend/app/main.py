@@ -28,6 +28,7 @@ from app.routers import (
     projects,
     public,
     reminders,
+    security_reports,
     sites,
     tasks,
     templates,
@@ -108,6 +109,7 @@ for module in (
     sites,
     admin,
     calendar,
+    security_reports,
 ):
     app.include_router(module.router)
 app.include_router(users.roles_router)

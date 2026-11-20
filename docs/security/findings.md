@@ -468,6 +468,39 @@ still filters. Without the pattern, 7 of these fail.
 Known and documented, not a finding: a deleted task's event on the shared Google Calendar
 is not removed by the app (admin runbook says to remove it by hand).
 
+## Phase 1: browser-side protection (2026-11-20)
+
+### F25. Nowhere to collect CSP violation reports — Low (Fixed)
+
+**Problem.** The Content-Security-Policy was in report-only mode, but browsers had nowhere
+to send their reports, so the only way to see what it would block was to open the
+developer console on each page. Without reports there is no evidence that enforcing it is
+safe, and no warning if someone later manages to inject a script.
+
+**Fix.** `POST /api/security/csp-report` (`routers/security_reports.py`) takes both formats
+browsers use: the older report-uri one (`application/csp-report`, `{"csp-report": {...}}`)
+and the Reporting API one (`application/reports+json`, a list). `security.parse_csp_reports`
+keeps only three cleaned values per report and logs one line: the directive (plain
+directive names only), what was blocked (only the site, such as `https://evil.example`, or
+a keyword such as `inline`), and the page path (no query string, calendar tokens redacted,
+control characters removed). Names, emails, query strings, full URLs and code samples are
+never logged. Limits: 64 KB body (`request_limits.py`), 20 reports per request, 30 requests
+a minute per address (`rate_limit.py`). It is exempt from the Origin check
+(`security.ORIGIN_CHECK_EXEMPT`) because browsers may send reports without an Origin header
+and the route changes nothing. The policy now ends with `report-uri` and `report-to`, and a
+`Reporting-Endpoints` header names the endpoint.
+
+**Tests** (`test_csp_reports.py`, access matrix row): both formats produce the expected
+single log lines; emails, tokens, query strings, blocked script names and code samples never
+appear in the log; newlines, escape codes and odd values are replaced; requests without or
+with a foreign Origin are accepted while other routes still refuse a foreign Origin; bad
+JSON, other shapes and other content types get 400; over 64 KB gets 413; only 20 reports per
+request are logged; the 31st request in a minute gets 429; nothing is written to Airtable;
+the policy and `Reporting-Endpoints` header point at the endpoint in both CSP modes and are
+absent when CSP is off.
+
+**Commit.** "Collect CSP violation reports (F25)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

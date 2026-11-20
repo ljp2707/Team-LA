@@ -115,6 +115,9 @@ ROWS: list[Row] = [
     Row("GET", "/api/health/auth", admin_only(200)),
     Row("GET", "/api/public/season-stats", everyone(200)),
     Row("GET", "/api/public/about", everyone(200)),
+    Row("POST", "/api/security/csp-report", everyone(204),
+        json={"csp-report": {"effective-directive": "img-src", "blocked-uri": "data"}},
+        note="Browsers send CSP reports on their own; it only logs (F25)"),
     Row("GET", "/calendar/{token}.ics", everyone(404), url="/calendar/" + "A" * 43 + ".ics"),
     # The signed-in person (4.2)
     Row("GET", "/api/me", signed_in(200)),
@@ -379,7 +382,12 @@ def test_partner_cannot_read_another_programs_history(client, world, as_role):
     assert client.get("/api/projects/recOther/history").status_code == 403
 
 
-VIEWER_WRITES = [r for r in ROWS if r.method != "GET" and not r.route.startswith(("/auth/", "/api/me/view"))]
+# The CSP report endpoint accepts anyone and writes nothing (test_csp_reports.py checks that).
+VIEWER_WRITES = [
+    r
+    for r in ROWS
+    if r.method != "GET" and not r.route.startswith(("/auth/", "/api/me/view", "/api/security/csp-report"))
+]
 
 
 @pytest.mark.parametrize("role", ["viewer", "lead"])

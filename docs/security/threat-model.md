@@ -67,6 +67,7 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | GET | `/api/health` | Anyone | No | Railway health check |
 | GET | `/api/public/season-stats` | Anyone | No | Three counts for the home page, cached for 5 minutes |
 | GET | `/api/public/about` | Anyone | No | Org name, contact email, address, app URL |
+| POST | `/api/security/csp-report` | Anyone | No (writes one cleaned log line per report) | F25. No Origin check (browsers send reports on their own). 64 KB body cap, 20 reports per request, 30 a minute per address. Logs only directive, blocked site or keyword, and page path |
 | GET | `/calendar/{token}.ics` | Anyone holding the token | No | Token is 32 random bytes, checked with a regex and then `hmac.compare_digest`. Unknown token → 404 |
 | GET | `/docs`, `/redoc`, `/openapi.json`, `/docs/oauth2-redirect` | Anyone, local development only | No | Turned off in production (F2) |
 | GET | `/{path}` | Anyone | No | Static frontend; path is resolved and must stay inside `static/` |
