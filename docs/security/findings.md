@@ -727,6 +727,52 @@ remove `BOOTSTRAP_ADMIN_EMAILS` there if the warning appears.
 
 **Commit.** "Refuse unsafe production settings at startup (F33)".
 
+## Phase 3: audit trail and monitoring (2026-11-20)
+
+### F34. Admin actions left no trail that could not be changed — Medium (Fixed)
+
+**Problem.** Admin actions (changing someone's access, erasing a person, deleting a program,
+publishing a template) were only described in the project history, the Activity Log. That
+table is meant to be edited: "Remove personal details" rewrites names in it, and admins can
+delete notes. Nothing recorded who did what in a way that could not later be changed, and
+many admin routes wrote no history at all.
+
+**Decision.** A new **Audit Log** table rather than the Activity Log, because an audit trail
+must never be rewritten, and the Activity Log has to be (erasure). The audit rows hold record
+IDs only, so erasing someone never needs to touch them.
+
+**Fix.** `app/audit.py`:
+- `require_admin` marks the request with the admin's record ID.
+- The `AuditTrail` middleware writes one row after every **successful** (status below 400)
+  POST, PUT, PATCH or DELETE that was marked: method and route
+  (`PATCH /api/users/{user_id}`), the admin's ID, the record IDs from the address, the status,
+  the time (UTC) and the request ID. Never the body, names or emails. The row is written
+  after the answer, so the admin does not wait.
+- Routes that turn out to change nothing call `audit.nothing_changed`: the new-program
+  preview, the Day 1 move preview and a nudge in dry run mode.
+- **Append only:** `client.APPEND_ONLY_TABLES` makes `update_records` and `delete_records`
+  refuse the Audit Log before any request to Airtable. (Airtable itself cannot enforce this:
+  a base editor can still change rows by hand. Limit who has editor access to the base.)
+- If Airtable refuses the row, the action stands and an `audit_write_failed` security event
+  (ERROR) carries the same details in the server log, so the log is the backup copy.
+- Every admin action also writes an `admin_action` security event (`app/security_events.py`).
+
+**Airtable.** New table **Audit Log** (Action, When, Actor ID, Target, Status Code, Request
+ID), added by `python -m jobs.migrate_airtable --apply`. Created in the shared base on
+2026-11-20 (only the table; the migration's other pending items were left alone). It grows by
+one row per admin change. Check the plan's record limit per base once a year; export old rows
+to CSV before any clean-up rather than deleting them through the app.
+
+**Tests** (`test_audit.py`, and `test_every_admin_change_is_audited` in the access matrix,
+which runs every admin-only change in the matrix, so a new admin route is covered
+automatically): one row with the right action, actor, target, status, request ID and time;
+no names, emails or body text; reads, refusals, failures and staff changes leave no row; the
+three no-change calls leave none and their real versions leave one; a failed audit write
+keeps the action and logs `audit_write_failed`; edits and deletes are refused by the fake and
+by the real client; erasure does not touch the table. With the write removed, 32 fail.
+
+**Commit.** "Append-only audit trail of admin actions (F34)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

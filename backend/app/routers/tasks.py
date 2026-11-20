@@ -7,9 +7,9 @@ projects they are listed on. Viewers change nothing.
 import logging
 from datetime import timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 
-from app import permissions
+from app import audit, permissions
 from app.airtable import client
 from app.airtable.schema import Links, Reminders, Work
 from app.auth.deps import current_user, require_admin, require_can_edit
@@ -402,7 +402,7 @@ def _last_nudge(world: World, task: TaskRec) -> dict | None:
 
 
 @router.post("/{task_id}/nudge")
-def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_admin)):
+def nudge_task(task_id: str, body: NudgeIn, request: Request, user: CurrentUser = Depends(require_admin)):
     """Admin only: email everyone on an open task a reminder now, with an optional message.
 
     Each person can be nudged about the same task once every 24 hours, and gets at most
@@ -441,6 +441,7 @@ def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_
         names = lambda ps: logic.name_list([p.short_name for p in ps], 3)  # noqa: E731
         skipped = [p for p in people if p.id in blocks]
         if get_settings().REMINDERS_DRY_RUN:
+            audit.nothing_changed(request)  # Nothing was sent, so nothing to audit (F34)
             return {
                 "sent": [],
                 "skipped": [p.short_name for p in skipped],

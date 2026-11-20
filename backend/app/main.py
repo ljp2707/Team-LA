@@ -11,6 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app import log_redaction
+from app.audit import AuditTrail
 from app.airtable.client import warm_cache, warn_about_schema_problems
 from app.auth.google import callback_url
 from app.auth.session import MAX_SESSION_DAYS
@@ -83,6 +84,8 @@ app.add_middleware(RateLimit)
 # Refuses changes sent from other websites (CSRF). Outside RateLimit, so a forged
 # request is refused before it counts against the person it targets.
 app.add_middleware(OriginCheck)
+# One Audit Log row per successful admin change (findings F34)
+app.add_middleware(AuditTrail)
 
 app.add_middleware(
     SessionMiddleware,

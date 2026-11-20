@@ -270,6 +270,21 @@ Used by: Reminders panel, the daily job.
 | Created By | Link to the Users table. |
 | Note | Read and written by the app. |
 
+## Audit Log
+
+One row per admin action, for the audit trail (findings F34). Append only: the app never edits or deletes rows, and nobody should by hand. Holds record IDs only, never names or emails.
+
+Used by: Audit page; written after every successful admin change.
+
+| Field | What it is for |
+|---|---|
+| Action | The method and route, such as PATCH /api/users/{user_id}. The Audit page shows it in plain words. |
+| When | When it happened (UTC). |
+| Actor ID | The admin's Users record ID. |
+| Target | The record IDs in the address, such as user_id=rec123. |
+| Status Code | The HTTP status the app answered with. |
+| Request ID | Matches the X-Request-ID header and the server log lines for the same request. |
+
 ## Template Versions
 
 A frozen copy of a template's steps for each published version, plus the current draft.

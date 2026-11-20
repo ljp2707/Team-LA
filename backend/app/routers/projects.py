@@ -4,9 +4,9 @@ Dashboard (/dashboard, admin) and Projects (/projects, staff, read only) use
 GET /api/projects. Partners get only the projects they are listed on.
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 
-from app import permissions
+from app import audit, permissions
 from app.airtable import client
 from app.airtable.schema import Links, Work
 from app.auth.deps import current_user, require_admin, require_internal
@@ -72,8 +72,9 @@ def list_projects(
 
 
 @router.post("/preview")
-def preview_project(body: ProjectPreviewIn, _: CurrentUser = Depends(require_admin)):
-    """The task list a new launch would get. Writes nothing."""
+def preview_project(body: ProjectPreviewIn, request: Request, _: CurrentUser = Depends(require_admin)):
+    """The task list a new launch would get. Writes nothing, so no audit row (F34)."""
+    audit.nothing_changed(request)
     return projects.preview(World(), body)
 
 
@@ -219,13 +220,14 @@ def delete_project(project_id: str, user: CurrentUser = Depends(require_admin)):
 
 @router.post("/{project_id}/move-day-one")
 def move_day_one(
-    project_id: str, body: MoveDayOneIn, user: CurrentUser = Depends(require_admin)
+    project_id: str, body: MoveDayOneIn, request: Request, user: CurrentUser = Depends(require_admin)
 ):
     world = World()
     project = world.project(project_id)
     if project.closed:
         raise HTTPException(status.HTTP_409_CONFLICT, "Reopen the program before moving Day 1")
     if body.preview:
+        audit.nothing_changed(request)  # A preview writes nothing (F34)
         plan = timeline.plan_shift(project, world.tasks, safe(load_reminders), body.new_day_one)
         return {
             "moved_tasks": len(plan.moved),

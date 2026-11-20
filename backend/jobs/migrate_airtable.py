@@ -28,6 +28,7 @@ from app.airtable.client import get_base, is_configured
 from app.airtable.schema import (
     SITE_TYPES,
     ActivityLog,
+    AuditLog,
     Links,
     Reminders,
     Session,
@@ -176,6 +177,14 @@ NEW_TABLES = {
         (Reminders.ERROR, long_text()),
         (Reminders.CREATED_BY, link(Users.TABLE)),
         (Reminders.NOTE, long_text()),
+    ],
+    AuditLog.TABLE: [
+        (AuditLog.ACTION, text()),
+        (AuditLog.WHEN, date_time()),
+        (AuditLog.ACTOR, text()),
+        (AuditLog.TARGET, text()),
+        (AuditLog.STATUS, number()),
+        (AuditLog.REQUEST_ID, text()),
     ],
     TemplateVersions.TABLE: [
         (TemplateVersions.NAME, text()),

@@ -28,6 +28,7 @@ TABLES: dict[str, tuple[str, str]] = {
     "ActivityLog": ("Every change and every note. Notes are rows with Type Note.", "Project history, notes, Move Day 1 undo, Archive"),
     "Links": ("Google Drive, Canva and other links on tasks and programs.", "Task page, Project page"),
     "Reminders": ("Custom reminders people set, and a log of every reminder email sent, failed or skipped.", "Reminders panel, the daily job"),
+    "AuditLog": ("One row per admin action, for the audit trail (findings F34). Append only: the app never edits or deletes rows, and nobody should by hand. Holds record IDs only, never names or emails.", "Audit page; written after every successful admin change"),
     "TemplateVersions": ("A frozen copy of a template's steps for each published version, plus the current draft.", "Templates: drafts, publishing, version history"),
 }
 
@@ -86,6 +87,12 @@ FIELDS: dict[tuple[str, str], str] = {
     ("Links", "KIND"): "Google Drive, Canva or Other, worked out from the address.",
     ("Reminders", "KIND"): "7 Days Before, Due Date, Custom, Weekly Digest, Assignment or Welcome.",
     ("Reminders", "STATUS"): "Scheduled, Sent, Failed, Skipped or Cancelled. A Sent row stops the same email going out twice.",
+    ("AuditLog", "ACTION"): "The method and route, such as PATCH /api/users/{user_id}. The Audit page shows it in plain words.",
+    ("AuditLog", "WHEN"): "When it happened (UTC).",
+    ("AuditLog", "ACTOR"): "The admin's Users record ID.",
+    ("AuditLog", "TARGET"): "The record IDs in the address, such as user_id=rec123.",
+    ("AuditLog", "STATUS"): "The HTTP status the app answered with.",
+    ("AuditLog", "REQUEST_ID"): "Matches the X-Request-ID header and the server log lines for the same request.",
     ("TemplateVersions", "STATUS"): "Draft, Live or Retired.",
     ("TemplateVersions", "STEPS_JSON"): "Every step in that version, saved as JSON.",
 }

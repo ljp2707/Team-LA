@@ -280,6 +280,23 @@ class Reminders:
     NOTE = "Note"
 
 
+class AuditLog:
+    """One row per admin action (findings F34). Added by migrate_airtable.
+
+    Append only: the app never edits or deletes these rows (client.APPEND_ONLY_TABLES).
+    Holds record IDs, never names, emails or what was typed, so erasing a person's
+    details never needs to change it.
+    """
+
+    TABLE = "Audit Log"
+    ACTION = "Action"  # Primary field, such as "PATCH /api/users/{user_id}"
+    WHEN = "When"
+    ACTOR = "Actor ID"  # The admin's Users record ID
+    TARGET = "Target"  # The record IDs in the address, such as "user_id=rec123"
+    STATUS = "Status Code"
+    REQUEST_ID = "Request ID"  # Matches the X-Request-ID header and the server log
+
+
 class TemplateVersions:
     """One row per template version. Added by migrate_airtable."""
 
@@ -309,6 +326,7 @@ ALL_TABLES = [
     Links,
     Reminders,
     TemplateVersions,
+    AuditLog,
 ]
 
 

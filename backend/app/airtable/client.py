@@ -33,6 +33,7 @@ from pyairtable import Api, retry_strategy
 from app.airtable.schema import (
     ALL_TABLES,
     AUTOMATION_OWNED,
+    AuditLog,
     Instructors,
     Region,
     Roles,
@@ -283,6 +284,15 @@ def _refuse_automation_fields(table_name: str, rows: list[dict[str, Any]]) -> No
         raise ValueError(f"The app must not write {', '.join(touched)} on {table_name}")
 
 
+# Tables the app may only add to (findings F34). Editing or deleting their rows is refused.
+APPEND_ONLY_TABLES = {AuditLog.TABLE}
+
+
+def _refuse_append_only_changes(table_name: str) -> None:
+    if table_name in APPEND_ONLY_TABLES:
+        raise ValueError(f"{table_name} is append only: the app never edits or deletes its rows")
+
+
 def create_records(
     table_name: str, rows: list[dict[str, Any]], typecast: bool = False
 ) -> list[dict[str, Any]]:
@@ -315,6 +325,7 @@ def update_records(
     updated: list[dict[str, Any]] = []
     if not updates:
         return updated
+    _refuse_append_only_changes(table_name)
     _refuse_automation_fields(table_name, [u["fields"] for u in updates])
     table = get_base().table(table_name)
     try:
@@ -343,6 +354,7 @@ def delete_records(table_name: str, record_ids: list[str]) -> None:
     """
     if not record_ids:
         return
+    _refuse_append_only_changes(table_name)
     table = get_base().table(table_name)
     try:
         for chunk in _chunks(record_ids):

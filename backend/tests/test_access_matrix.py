@@ -425,3 +425,44 @@ def test_admin_in_staff_view_gets_staff_results_everywhere():
         staff, as_staff = row.expect["staff"], row.expect["admin_as_staff"]
         if staff >= 400:
             assert as_staff >= 400, f"{row.method} {row.route}: admin in staff view is allowed, staff is not"
+
+
+# --- F34: every admin-only change leaves an audit row ----------------------------------
+
+ADMIN_CHANGES = [
+    r
+    for r in ROWS
+    if r.method != "GET"
+    and r.expect.get("admin", 0) < 400
+    and r.expect.get("staff", 0) == 403
+    and r.expect.get("admin_as_staff", 0) == 403
+]
+
+
+# These matrix calls change nothing (two previews, and a nudge in dry run mode), so they
+# leave no audit row. test_audit.py checks that their real versions are audited.
+CHANGES_NOTHING = {
+    ("POST", "/api/projects/preview"),
+    ("POST", "/api/projects/{project_id}/move-day-one"),
+    ("POST", "/api/tasks/{task_id}/nudge"),
+}
+
+
+def test_admin_changes_are_found():
+    assert len(ADMIN_CHANGES) >= 20
+
+
+@pytest.mark.parametrize("row", ADMIN_CHANGES, ids=lambda r: f"{r.method} {r.target}")
+def test_every_admin_change_is_audited(client, world, as_role, row):
+    as_role("admin")
+    before = len(world.writes_to("Audit Log"))
+    response = call(client, row.method, row.target, row.json, row.upload)
+    assert response.status_code == row.expect["admin"]
+    rows = world.writes_to("Audit Log")[before:]
+    if (row.method, row.route) in CHANGES_NOTHING:
+        assert rows == []
+        return
+    assert len(rows) == 1, f"{row.method} {row.route} left {len(rows)} audit rows"
+    fields = rows[0][3]
+    assert fields["Action"] == f"{row.method} {row.route}"
+    assert fields["Actor ID"] == "recAdmin"

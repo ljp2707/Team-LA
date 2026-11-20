@@ -8,7 +8,7 @@ import logging
 from fastapi import Depends, HTTPException, Request, status
 from requests import RequestException
 
-from app import permissions
+from app import audit, permissions
 from app.auth import revocation
 from app.auth.session import (
     clear_session,
@@ -64,10 +64,11 @@ def current_user(request: Request) -> CurrentUser:
     return CurrentUser(**fresh.model_dump(), view=view)
 
 
-def require_admin(user: CurrentUser = Depends(current_user)) -> CurrentUser:
-    """Allow only someone currently in admin view."""
+def require_admin(request: Request, user: CurrentUser = Depends(current_user)) -> CurrentUser:
+    """Allow only someone currently in admin view. Their changes go in the audit trail (F34)."""
     if not permissions.can_use_admin_pages(user.actor):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin view required")
+    audit.mark_admin_action(request, user.id)
     return user
 
 
