@@ -976,6 +976,61 @@ with and without `-O`.
 
 **Commit.** "Lint and security rules for the backend (F41)".
 
+### F42. No CI, and nothing watched dependencies — Medium (Fixed)
+
+**Problem.** Tests, the type check and the browser test ran only when someone remembered to
+run them on a laptop. Nothing scanned for leaked secrets, risky code, vulnerable packages or a
+vulnerable image, and nobody was told when a dependency had a security fix.
+
+**Fix.** `.github/workflows/ci.yml` runs on every push to `main` and every pull request, in six
+jobs:
+
+| Job | What it checks |
+|---|---|
+| Backend | All tests with coverage (fails under 85%; today 88%), the access matrix, ruff, pip-audit on both locks |
+| Frontend | `npm ci`, `npm audit --audit-level=high`, type check and build, the Playwright browser test under the enforced CSP |
+| Secrets | gitleaks over the whole git history |
+| Code scan | Semgrep with its default rules (Python, TypeScript, Docker, config files) |
+| Image | Builds the image; Trivy fails on any fixable HIGH or CRITICAL issue in the image or the Dockerfile; the image must start in production mode and report healthy |
+| Workflows | actionlint and zizmor on `.github` |
+
+Supply chain rules in the workflow: every action is pinned to a full commit SHA (tag in a
+comment); scanners run as Docker images pinned by digest instead of third-party actions; Python
+tools install from the hash-locked dev requirements; `permissions: contents: read`;
+`persist-credentials: false` on every checkout; no `pull_request_target`.
+`.github/dependabot.yml` covers pip, npm, GitHub Actions and the Docker base images, weekly and
+grouped, with a 7-day cooldown.
+
+Fixed while setting it up:
+- Semgrep: `frontend/.npmrc` now has `min-release-age=7`, so npm never installs a version
+  published less than a week ago (most malicious releases are pulled within days). This needs
+  npm 11.10+, so the Docker build stage moved from Node 22 to Node 24, matching CI and laptops.
+- Trivy: the image had a fixable HIGH issue in Debian's zlib (CVE-2026-85091) not yet in the
+  pinned Python image. The final stage now installs Debian's security updates.
+- gitleaks: an old commit's `.env.example` held the Airtable base ID, which a rule mistakes for
+  a key. A base ID is not a credential (it needs a token), so that one fingerprint is accepted
+  in `.gitleaksignore` with the reason. The rest of the history is clean.
+
+**Verified locally**, since nothing is pushed: actionlint and zizmor find nothing; the backend
+job in a Linux Python 3.12 container (1360 passed, 88% coverage, ruff clean, pip-audit clean);
+the frontend job in Playwright's Linux image (`npm ci`, 0 vulnerabilities, build, 3 browser
+tests passed); gitleaks on all history; Semgrep with no findings; Trivy with no fixable HIGH or
+CRITICAL issues and no Dockerfile misconfigurations; the image healthy in production mode.
+
+**Tests** (`test_ci_workflow.py`): every action pinned to a 40-character SHA; scanner images
+pinned by digest; read-only token, never kept, no `pull_request_target`; every check above is
+in the workflow; every pip install uses hashes; Dependabot covers all four ecosystems. With one
+action on a tag and one checkout keeping credentials, 2 fail.
+
+**Manual steps (GitHub, once the branch is pushed).**
+1. **Settings > Branches**: protect `main`; require a pull request and the six CI checks to pass.
+2. **Settings > Actions > General**: workflow permissions "Read repository contents"; turn on
+   "Require actions to be pinned to a full-length commit SHA".
+3. **Settings > Code security**: turn on Dependabot alerts and security updates, secret
+   scanning and push protection.
+
+**Commit.** "CI with tests, browser test and security scans; Dependabot (F42)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

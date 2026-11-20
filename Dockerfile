@@ -2,7 +2,7 @@
 # exact image that was tested; Dependabot proposes new digests (findings F40).
 
 # Stage 1: build the frontend
-FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS frontend
+FROM node:24-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS frontend
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -14,6 +14,9 @@ RUN npm run build
 # frontend go in. Tests, dev requirements and source maps stay out (.dockerignore).
 FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# Debian security fixes that are newer than the pinned base image (Trivy in CI fails the
+# build on any fixable HIGH or CRITICAL issue, findings F42). Nothing new is installed.
+RUN apt-get update     && apt-get upgrade -y --no-install-recommends     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY backend/requirements.txt ./
 # Every package, including the ones they depend on, must match a hash in the lock file,

@@ -1,0 +1,165 @@
+# Every push and pull request: tests, type check, build, browser test, and security scans
+# (findings F42). A failing job blocks merging once branch protection requires these checks.
+#
+# Supply chain rules for this file:
+# - Every action is pinned to a full commit SHA (the tag is in the comment). Dependabot
+#   proposes updates (.github/dependabot.yml).
+# - Scanners run as Docker images pinned by digest, not as third-party actions.
+# - Python tools come from the hash-locked backend/requirements-dev.txt.
+# - The token can only read the code, and checkout does not keep it on disk.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  GITLEAKS_IMAGE: zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f # v8.30.1
+  SEMGREP_IMAGE: semgrep/semgrep@sha256:67518c174185a2043fdbed16c70631b79209499b3671178e7194379b48295a0d # 1.185.0
+  TRIVY_IMAGE: aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb # 0.76.2
+
+jobs:
+  backend:
+    name: Backend tests, access matrix, lint and audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install (hash-locked)
+        run: python -m pip install --require-hashes -r requirements-dev.txt
+      - name: Tests with coverage
+        run: python -m pytest -q --cov=app --cov=jobs --cov-report=term --cov-fail-under=85
+      - name: Access matrix
+        run: python -m pytest -q tests/test_access_matrix.py
+      - name: Lint and security rules
+        run: python -m ruff check .
+      - name: Known vulnerabilities in Python packages
+        run: |
+          python -m pip_audit --require-hashes --disable-pip -r requirements.txt
+          python -m pip_audit --require-hashes --disable-pip -r requirements-dev.txt
+
+  frontend:
+    name: Frontend type check, build, audit and browser test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install the backend for the browser test (hash-locked)
+        run: python -m pip install --require-hashes -r backend/requirements-dev.txt
+      - name: Install (exactly the lock file)
+        working-directory: frontend
+        run: npm ci
+      - name: Known vulnerabilities in npm packages
+        working-directory: frontend
+        run: npm audit --audit-level=high
+      - name: Type check and build
+        working-directory: frontend
+        run: npm run build
+      - name: Browser test (every page under the enforced CSP)
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test
+
+  secrets:
+    name: Secret scan (whole history)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: gitleaks
+        run: >-
+          docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE"
+          git /repo --no-banner --redact --gitleaks-ignore-path /repo/.gitleaksignore
+
+  code-scan:
+    name: Code scan (Semgrep)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Semgrep
+        run: >-
+          docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE"
+          semgrep scan --config p/default --metrics=off --error --quiet
+
+  image:
+    name: Docker image build and scan (Trivy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: docker build -t nmu-programs:ci .
+      - name: Known vulnerabilities in the image
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE"
+          image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 nmu-programs:ci
+      - name: Dockerfile misconfigurations
+        run: >-
+          docker run --rm -v "$PWD:/src" "$TRIVY_IMAGE"
+          config --severity HIGH,CRITICAL --exit-code 1 /src/Dockerfile
+      - name: The image starts in production mode and reports healthy
+        run: |
+          docker run -d --name app -p 8000:8000 \
+            -e ENV=production -e APP_URL=https://ci.example.org -e FRONTEND_URL=https://ci.example.org \
+            -e SESSION_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')" \
+            nmu-programs:ci
+          for _ in $(seq 1 30); do
+            [ "$(docker inspect app --format '{{.State.Health.Status}}')" = healthy ] && break
+            sleep 2
+          done
+          docker logs app
+          test "$(docker inspect app --format '{{.State.Health.Status}}')" = healthy
+
+  workflows:
+    name: Workflow lint (actionlint, zizmor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install (hash-locked)
+        run: python -m pip install --require-hashes -r backend/requirements-dev.txt
+      - name: actionlint
+        run: actionlint
+      - name: zizmor
+        run: zizmor --offline .github

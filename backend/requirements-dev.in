@@ -8,3 +8,6 @@ google-auth-oauthlib==1.5.0
 # Lint (ruff.toml) and known-vulnerability checks, run in CI
 ruff==0.17.6
 pip-audit==2.10.1
+# Check the GitHub Actions workflows for mistakes and security problems (CI)
+zizmor==1.32.0
+actionlint-py==1.7.12.25
