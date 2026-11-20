@@ -250,7 +250,7 @@ def note_dict(world: World, row: LogRec, user: CurrentUser) -> dict:
         "can_delete": permissions.can_delete_note(
             user.actor, row.author_id == user.id, minutes
         ),
-        "can_share": permissions.can_share_notes(user.actor),
+        "can_share": permissions.can_share_note(user.actor, row.author_id == user.id),
     }
 
 

@@ -21,6 +21,7 @@ from app.airtable.schema import Reminders, Users
 from app.config import get_settings
 from app.email import gmail, templates
 from app.email.templates import TaskLine
+from app.log_redaction import mask_email
 from app.services import clock
 from app.services.logic import due_text, fmt_date, is_open, waiting_on, waiting_text
 from app.services.records import (
@@ -199,7 +200,7 @@ def _attempt(
     send_on: date,
     existing: ReminderRec | None,
 ) -> None:
-    label = f"{kind} to {recipient.email}: {email[0]}"
+    label = f"{kind} to {mask_email(recipient.email)}: {email[0]}"
     if existing and existing.status == SENT:
         result.already.append(label)
         return
@@ -283,7 +284,7 @@ def run_custom(ctx: Context, day: date, send: Sender, dry_run: bool, result: Res
             result.skipped.append(f"Custom: {reminder.name} (person inactive)")
             continue
         email = templates.custom_reminder(ctx.line(task), reminder.note)
-        label = f"Custom to {person.email}: {email[0]}"
+        label = f"Custom to {mask_email(person.email)}: {email[0]}"
         if dry_run:
             result.planned.append(label)
             continue
@@ -393,7 +394,7 @@ def send_assignment_emails(by_user: dict[str, list[str]], assigned_by: str) -> N
                 continue
             email = templates.assignment([ctx.line(t) for t in tasks], assigned_by)
             if dry_run:
-                logger.info("Dry run email to %s: %s", person.email, email[0])
+                logger.info("Dry run email to %s: %s", mask_email(person.email), email[0])
                 continue
             status, error = SENT, ""
             try:
@@ -425,7 +426,7 @@ def send_welcome(user_id: str) -> None:
         email = templates.welcome(person.first_name, person.email)
         today = clock.today()
         if get_settings().REMINDERS_DRY_RUN:
-            logger.info("Dry run email to %s: %s", person.email, email[0])
+            logger.info("Dry run email to %s: %s", mask_email(person.email), email[0])
             return
         status, error = SENT, ""
         try:

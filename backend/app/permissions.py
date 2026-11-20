@@ -191,6 +191,15 @@ def can_share_notes(actor: Actor) -> bool:
     return not actor.is_partner and can_update_own_tasks(actor)
 
 
+def can_share_note(actor: Actor, is_author: bool) -> bool:
+    """Flip one note between Internal and Shared.
+
+    Only its author or an admin: otherwise staff on a task could pass someone else's
+    staff-only note to the partner (findings F11).
+    """
+    return can_share_notes(actor) and (actor.is_admin or is_author)
+
+
 def default_note_visibility(actor: Actor) -> str:
     """Partners' notes are shared with everyone on the project. Others are internal."""
     return "Shared" if actor.is_partner else "Internal"

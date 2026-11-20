@@ -1,10 +1,11 @@
 """App settings, read from environment variables (or a local .env file)."""
 
 from functools import lru_cache
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +22,8 @@ class Settings(BaseSettings):
     APP_URL: str = "http://localhost:8000"
     FRONTEND_URL: str = "http://localhost:5173"
     SESSION_SECRET: str = PLACEHOLDER_SECRET
+    # Sign people out after this many hours without using the app (findings F15).
+    SESSION_IDLE_HOURS: int = Field(default=24, ge=1)
 
     AIRTABLE_TOKEN: str = ""
     AIRTABLE_BASE_ID: str = ""
@@ -56,6 +59,14 @@ class Settings(BaseSettings):
         # An https address means a real deployment, so a missing ENV can't turn off
         # the production checks below (findings F12).
         return self.ENV == "production" or self.APP_URL.strip().lower().startswith("https://")
+
+    @property
+    def allowed_hosts(self) -> list[str]:
+        """Host names the app answers to. Others get 400 (findings F14)."""
+        hosts = {urlparse(self.APP_URL).hostname, urlparse(self.FRONTEND_URL).hostname}
+        # Local development and tests, and Railway's deploy health check.
+        hosts |= {"localhost", "127.0.0.1", "testserver", "healthcheck.railway.app"}
+        return sorted(h for h in hosts if h)
 
     @property
     def bootstrap_admins(self) -> set[str]:

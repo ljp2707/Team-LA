@@ -7,11 +7,14 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app import log_redaction
 from app.airtable.client import warm_cache, warn_about_schema_problems
 from app.auth.google import callback_url
+from app.auth.session import MAX_SESSION_DAYS
 from app.config import Settings, get_settings
+from app.rate_limit import RateLimit
 from app.request_limits import RequestSizeLimit
 from app.routers import (
     admin,
@@ -35,7 +38,6 @@ logger = logging.getLogger("app")
 log_redaction.install()  # Calendar tokens and sign-in codes never reach the logs (findings F3)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-SESSION_DAYS = 7
 
 settings = get_settings()
 
@@ -67,6 +69,10 @@ app = FastAPI(title="NMU Launches", lifespan=lifespan, **api_docs_urls(settings)
 # Caps request size before sign-in or form parsing read the body (findings F6). Added
 # first, so it sits next to the routes, where its 413 answers still get the headers below.
 app.add_middleware(RequestSizeLimit)
+# Limits requests per person or address, so no one can push Airtable past its rate
+# limit (findings F5). Added before SessionMiddleware, so it runs inside it and can
+# tell who is signed in.
+app.add_middleware(RateLimit)
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # Files are only ever read as the type they say
@@ -119,10 +125,12 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SESSION_SECRET,
     session_cookie="nmu_session",
-    max_age=SESSION_DAYS * 24 * 60 * 60,
+    max_age=MAX_SESSION_DAYS * 24 * 60 * 60,
     same_site="lax",
     https_only=settings.is_production,
 )
+# Only answer to our own host names, so a forged Host header cannot reach the app (F14).
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
 for module in (
     auth,

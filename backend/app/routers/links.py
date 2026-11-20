@@ -70,6 +70,10 @@ def _note(world: World, note_id: str, user: CurrentUser):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found")
     if row.session_id:
         check_project_access(user, world.project(row.session_id))
+    elif user.actor.is_partner:
+        # A note with no launch cannot be checked against a partner's launches, so
+        # partners never see it (findings F16).
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found")
     return row
 
 
@@ -101,7 +105,7 @@ def share_note(note_id: str, body: NoteVisibilityIn, user: CurrentUser = Depends
     world = World()
     row = _note(world, note_id, user)
     task = world.tasks_by_id.get(row.work_id or "")
-    if not permissions.can_share_notes(user.actor) or (
+    if not permissions.can_share_note(user.actor, row.author_id == user.id) or (
         task and not permissions.can_edit_task(user.actor, user.id, task.assignees)
     ):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot change who sees this note")

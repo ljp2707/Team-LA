@@ -19,7 +19,7 @@ def project(fake):
 
 
 def _upload(client, path, size, name="photo.png"):
-    return client.post(path, files={"file": (name, b"\x89PNG" + b"x" * (size - 4), "image/png")})
+    return client.post(path, files={"file": (name, b"\x89PNG\r\n\x1a\n" + b"x" * (size - 8), "image/png")})
 
 
 # --- F6: request size limits, checked before sign-in and form parsing ---------------

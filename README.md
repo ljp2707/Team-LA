@@ -204,7 +204,26 @@ The live site needs real Google sign in, because the test login only works on yo
 
    To move to `enforce`: open the live site with the browser's developer console open, click through the main pages, and check for "Content-Security-Policy" warnings. If there are none, set `CSP_MODE=enforce` on Railway and redeploy.
 
-   Request bodies are capped at 6 MB on the two file upload routes and 2 MB everywhere else. Bigger requests get a 413 before anything reads them. The access log replaces calendar feed tokens and Google sign-in codes with `[redacted]`.
+   Request bodies are capped at 6 MB on the two file upload routes and 2 MB everywhere else. Bigger requests get a 413 before anything reads them. The access log replaces calendar feed tokens and Google sign-in codes with `[redacted]`. Dry-run and reminder-job logs show addresses shortened, such as `m***@example.org`.
+
+   **Rate limits** (per person when signed in, otherwise per internet address) keep any one script from pushing Airtable past its 5-requests-a-second limit. Going over gets a 429 with a `Retry-After` header:
+
+   | What | Limit |
+   |---|---|
+   | Sign in (`/auth/login`, `/auth/callback`) | 10 a minute per address |
+   | File uploads | 20 an hour per person |
+   | Any other change (POST, PUT, PATCH, DELETE under `/api/`) | 60 a minute per person |
+   | Calendar feeds and `/api/public/*` | 60 a minute per address |
+
+   The counts live in memory, which is right for one Railway instance. If the app is ever scaled to several instances, each counts separately.
+
+   **Hosts and proxy.** The app only answers to the host names in `APP_URL` and `FRONTEND_URL`, plus `localhost`, `127.0.0.1` and Railway's health check (`healthcheck.railway.app`). Anything else gets a 400. **If you add a custom domain, update `APP_URL` and `FRONTEND_URL` to it**, or requests to the new domain are refused. The Dockerfile runs uvicorn with `--proxy-headers --forwarded-allow-ips='*'`, so the app sees each visitor's real address through Railway's proxy.
+
+   **Sessions** end after `SESSION_IDLE_HOURS` (default 24) without use, and 7 days after sign in however active they are. **Sign out** is a POST from the sidebar button. An old `/auth/logout` link only goes to the home page, so no other website can sign people out.
+
+   **Uploads** must match their extension: a file named `.pdf` has to start like a PDF, a `.png` like a PNG, and so on. Text and CSV files must not contain binary data.
+
+   **Notes:** only a note's author or an admin can switch an Internal note to Shared with partners.
    - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email
    - `CONTACT_EMAIL` and `ORG_ADDRESS`: NMU's contact inbox and mailing address, shown on the Privacy page and in every email
 3. Under **Settings > Networking**, choose **Generate Domain**.

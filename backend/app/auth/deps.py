@@ -13,6 +13,7 @@ from app.auth.session import (
     clear_session,
     get_session_user,
     get_stored_view,
+    session_expired,
     set_session_user,
 )
 from app.config import get_settings
@@ -30,6 +31,9 @@ def current_user(request: Request) -> CurrentUser:
     """
     session_user = get_session_user(request)
     if session_user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
+    if session_expired(request):
+        clear_session(request)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
 
     try:

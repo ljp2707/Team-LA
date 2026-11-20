@@ -88,6 +88,37 @@ def file_content_type(filename: str) -> str | None:
     return ALLOWED_FILE_TYPES.get(f".{ext.lower()}") if dot else None
 
 
+# How each kind of file starts, so a program renamed to "report.pdf" is refused
+# (findings F10). Only the standard library: these are the published file signatures.
+ZIP_START = b"PK\x03\x04"  # docx, xlsx and pptx are zip files
+OLE_START = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"  # Older doc, xls and ppt files
+HEIF_BRANDS = {b"heic", b"heix", b"hevc", b"hevx", b"heim", b"heis", b"mif1", b"msf1"}
+
+
+def _looks_like(ext: str, head: bytes) -> bool:
+    """Does the start of the file match what its extension says it is?"""
+    if ext in (".jpg", ".jpeg"):
+        return head.startswith(b"\xff\xd8\xff")
+    if ext == ".png":
+        return head.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext == ".gif":
+        return head.startswith((b"GIF87a", b"GIF89a"))
+    if ext == ".webp":
+        return head.startswith(b"RIFF") and head[8:12] == b"WEBP"
+    if ext in (".heic", ".heif"):
+        return head[4:8] == b"ftyp" and head[8:12] in HEIF_BRANDS
+    if ext == ".pdf":
+        return b"%PDF-" in head[:1024]  # The PDF format allows a little before the header
+    if ext in (".docx", ".xlsx", ".pptx"):
+        return head.startswith(ZIP_START)
+    if ext in (".doc", ".xls", ".ppt"):
+        return head.startswith(OLE_START)
+    if ext in (".txt", ".csv"):
+        # Any text encoding, but programs and other binary files contain zero bytes.
+        return b"\x00" not in head
+    return False
+
+
 def allowed_extensions_text() -> str:
     return "photos, PDFs, Word, Excel, PowerPoint, text and CSV files"
 
@@ -106,6 +137,9 @@ def read_upload(upload) -> tuple[str, bytes, str]:
         raise ValueError(f"Files can be up to {MAX_FILE_MB} MB. Put bigger files in Google Drive and attach a link.")
     if not content:
         raise ValueError("That file is empty.")
+    ext = "." + filename.rpartition(".")[2].lower()
+    if not _looks_like(ext, content[:8192]):
+        raise ValueError(f"That file does not look like a {ext} file. Check it opens, then try again.")
     return filename, content, content_type
 
 

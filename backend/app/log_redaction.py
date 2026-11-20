@@ -20,6 +20,18 @@ def redact_path(path: str) -> str:
     return path
 
 
+def mask_email(address: str | None) -> str:
+    """An address shortened for logs: mary.smith@example.org becomes m***@example.org (F13).
+
+    Enough to tell people apart when debugging, without putting a list of everyone's
+    address in the server logs.
+    """
+    local, at, domain = (address or "").strip().partition("@")
+    if not at:
+        return "***"
+    return f"{local[:1]}***@{domain}"
+
+
 class RedactSecretsFilter(logging.Filter):
     """Rewrites the path in uvicorn access log lines. Never drops a line."""
 

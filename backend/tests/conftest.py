@@ -174,6 +174,16 @@ def fake_airtable(monkeypatch, fake):
 
 
 @pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Every test starts with no requests counted."""
+    from app import rate_limit
+
+    rate_limit.reset()
+    yield
+    rate_limit.reset()
+
+
+@pytest.fixture(autouse=True)
 def fixed_clock(monkeypatch):
     """Today is always Wednesday, Nov 4, 2026 at 9 AM Pacific, unless a test moves it."""
     state = {"now": datetime(2026, 11, 4, 9, 0, tzinfo=PACIFIC)}

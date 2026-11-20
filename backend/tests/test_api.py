@@ -174,6 +174,7 @@ def test_one_off_task_and_close_and_reopen(client, sign_in, project, fixed_clock
 
     assert client.post("/api/projects/recProj/close", json={}).status_code == 409  # before Day 1
     fixed_clock(datetime(2026, 11, 30, 9, tzinfo=ZoneInfo("America/Los_Angeles")))
+    sign_in("admin@example.org")  # The clock jumped weeks ahead, so the old session has expired
     assert client.post("/api/projects/recProj/close", json={"skip_open": True}).status_code == 200
     session = fields(project, Session.TABLE, "recProj")
     assert session[Session.STATUS] == "Complete" and session[Session.CLOSED_DATE] == "2026-11-30"
@@ -237,6 +238,7 @@ def test_one_off_on_a_closed_launch_sends_no_email(client, sign_in, project, fix
     monkeypatch.setattr(reminders, "send_assignment_emails", lambda *a, **k: sent.append(a))
     sign_in("admin@example.org")
     fixed_clock(datetime(2026, 11, 30, 9, tzinfo=ZoneInfo("America/Los_Angeles")))
+    sign_in("admin@example.org")  # The clock jumped weeks ahead, so the old session has expired
     assert client.post("/api/projects/recProj/close", json={}).status_code == 200
     response = client.post(
         "/api/projects/recProj/tasks",
@@ -351,7 +353,14 @@ def test_notes_and_links_on_own_task(client, sign_in, project):
     assert not any(r["id"] == link.json()["id"] for r in project.rows(Links.TABLE))
 
 
-def _upload(client, path, name="flyer.png", content=b"png bytes", title=""):
+PNG_BYTES = b"\x89PNG\r\n\x1a\n png bytes"
+# A real start for each kind of file, since uploads are checked against their extension.
+SAMPLE_CONTENT = {".png": PNG_BYTES, ".jpg": b"\xff\xd8\xff jpeg bytes", ".pdf": b"%PDF-1.7 pdf bytes"}
+
+
+def _upload(client, path, name="flyer.png", content=None, title=""):
+    if content is None:
+        content = SAMPLE_CONTENT.get("." + name.rpartition(".")[2].lower(), PNG_BYTES)
     return client.post(path, files={"file": (name, content, "image/png")}, data={"title": title})
 
 
@@ -367,7 +376,7 @@ def test_files_on_own_task(client, sign_in, project):
     shown = client.get("/api/tasks/recT2").json()["links"]
     item = next(l for l in shown if l["id"] == made.json()["id"])
     assert item["is_file"] and item["url"] == f"/api/links/{made.json()['id']}/file"
-    assert item["file_name"] == "flyer.png" and item["file_size"] == len(b"png bytes")
+    assert item["file_name"] == "flyer.png" and item["file_size"] == len(PNG_BYTES)
 
     opened = client.get(item["url"], follow_redirects=False)
     assert opened.status_code == 302

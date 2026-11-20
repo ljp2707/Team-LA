@@ -111,9 +111,12 @@ export function Sidebar({ menuOpen, onToggleMenu }: { menuOpen: boolean; onToggl
               <div className="user-subtitle">{subtitle}</div>
             </div>
           </div>
-          <a className="sign-out" href="/auth/logout">
-            Sign out
-          </a>
+          {/* A form POST, so no other website can sign people out with a link. */}
+          <form method="post" action="/auth/logout" className="sign-out-form">
+            <button type="submit" className="sign-out">
+              Sign out
+            </button>
+          </form>
           <nav className="sidebar-legal" aria-label="Policies">
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>

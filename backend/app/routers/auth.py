@@ -17,7 +17,7 @@ from app import permissions
 from app.airtable import client
 from app.airtable.schema import ACTIVE, Users
 from app.auth.google import callback_url, email_allowed, oauth
-from app.auth.session import clear_session, set_session_user, set_stored_view
+from app.auth.session import clear_session, set_session_user, set_stored_view, start_session_clock
 from app.config import get_settings
 from app.models.user import find_active_user_by_email, find_user_record_by_email
 
@@ -83,6 +83,7 @@ async def _finish_sign_in(
     # Start from a clean session so nothing carries over from before sign in.
     clear_session(request)
     set_session_user(request, user)
+    start_session_clock(request)
     view = permissions.base_view(user.access_level)
     set_stored_view(request, view)
     return _to_frontend(permissions.home_path(view))
@@ -129,7 +130,17 @@ async def denied(request: Request):
     return {"email": email}
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def logout(request: Request):
+    """Sign out. POST only: the SameSite cookie is never sent with another site's POST,
+    so no other website can sign people out (findings F8)."""
     clear_session(request)
+    base = get_settings().FRONTEND_URL.rstrip("/")
+    # 303 so the browser follows with a GET to the home page.
+    return RedirectResponse(f"{base}/", status_code=303)
+
+
+@router.get("/logout")
+async def old_logout_link(request: Request):
+    """Old bookmarks: go home without signing out, since any site could link here."""
     return _to_frontend("/")

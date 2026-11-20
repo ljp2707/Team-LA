@@ -24,6 +24,7 @@ from email.utils import formataddr
 import httpx
 
 from app.config import get_settings
+from app.log_redaction import mask_email
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ def send_email(to: str, subject: str, text: str, html: str) -> str | None:
     """
     settings = get_settings()
     if settings.REMINDERS_DRY_RUN:
-        logger.info("Dry run email to %s: %s", to, subject)
+        logger.info("Dry run email to %s: %s", mask_email(to), subject)
         return None
     if not settings.GMAIL_SENDER:
         raise EmailError("Email is not set up: GMAIL_SENDER is empty.")

@@ -82,8 +82,8 @@ def test_allowed_domain_is_enforced(client, sign_in, settings):
 
 def test_logout_clears_the_session(client, sign_in):
     sign_in("admin@example.org")
-    response = client.get("/auth/logout")
-    assert response.status_code == 302
+    response = client.post("/auth/logout", follow_redirects=False)
+    assert response.status_code == 303
     assert client.get("/api/me").status_code == 401
 
 
