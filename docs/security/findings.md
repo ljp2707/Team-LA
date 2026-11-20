@@ -675,6 +675,26 @@ page. With the call removed from the view switch, the view switch test fails.
 
 **Commit.** "New session at sign in and on view switch (F31)".
 
+### F32. The domain rule trusted the email alone — Low (Fixed)
+
+**Problem.** With `ALLOWED_EMAIL_DOMAIN` set, sign in only checked that the email ended in
+that domain. Anyone can create a personal Google account with a work address (a former
+employee before their mailbox closes, for example), and Google marks that email verified.
+
+**Fix.** `auth/google.email_allowed(email, hosted_domain)` now also requires Google's `hd`
+(hosted domain) claim to equal the domain. Google only sends `hd` for accounts that the
+organisation's Google Workspace manages. `/auth/login` passes `hd` to Google as a hint so the
+work account is offered first; the callback is what enforces it. Nothing changes while the
+setting is blank, which is how NMU runs today because partners sign in with their own
+accounts. Local `DEV_LOGIN_EMAIL` sign in treats the address's own domain as its `hd`.
+
+**Tests** (`test_hosted_domain.py`): a Workspace account gets in; a personal account with a
+work address, another Workspace, and a wrong email with the right `hd` are refused; a blank
+setting still allows personal accounts; case is ignored and subdomains do not match; the
+sign-in redirect carries the hint; dev login still works. With the `hd` check removed, 5 fail.
+
+**Commit.** "Require Google's hosted domain claim when a domain is set (F32)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

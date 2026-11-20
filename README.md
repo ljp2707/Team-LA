@@ -112,7 +112,7 @@ Google now calls this part of the console **Google Auth Platform**.
    - `http://localhost:8765/` for the one-time Gmail authorization in **Set up email**, where the trailing slash is required
 6. Copy the client ID and the secret right away, because the secret is only shown in full once. Put them in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 7. **Audience**, then **Publish app**, to set the status to **In production**. Sign in only uses basic scopes, so no verification is needed. In Testing mode only listed test users can sign in. Publishing also stops the Gmail refresh token from expiring every 7 days.
-8. Leave `ALLOWED_EMAIL_DOMAIN` blank. Any Google account can try to sign in, and the Airtable Users table decides who gets in.
+8. Leave `ALLOWED_EMAIL_DOMAIN` blank. Any Google account can try to sign in, and the Airtable Users table decides who gets in. Partners use their own Google accounts, so a domain would lock them out. If you ever do set it (for example `nomoreunder.org`), only accounts that NMU's Google Workspace manages can sign in: the email must end in that domain **and** Google must say the account belongs to that Workspace (its `hd` claim), so a personal Google account made with a work address is refused (findings F32).
 
 When the backend starts, it prints the redirect URI it uses, for example `Google sign in redirect URI: http://localhost:8000/auth/callback`. That exact address must be on the client. In developer mode, admins can also see it on **Users and roles > System**.
 

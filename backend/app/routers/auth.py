@@ -18,7 +18,7 @@ from app.airtable import client
 from app.airtable.schema import ACTIVE, Users
 from app.auth import revocation
 from app.auth.deps import current_user
-from app.auth.google import callback_url, email_allowed, oauth
+from app.auth.google import allowed_domain, callback_url, email_allowed, oauth
 from app.auth.session import (
     clear_session,
     regenerate_session,
@@ -71,10 +71,10 @@ def ensure_bootstrap_admin(email: str, first_name: str = "", last_name: str = ""
 
 
 async def _finish_sign_in(
-    request: Request, email: str, first_name: str = "", last_name: str = ""
+    request: Request, email: str, hosted_domain: str | None, first_name: str = "", last_name: str = ""
 ) -> RedirectResponse:
     """Check an email against the rules and Airtable, then start the session."""
-    if not email_allowed(email):
+    if not email_allowed(email, hosted_domain):
         return _to_frontend("/not-authorized?reason=domain")
 
     try:
@@ -103,12 +103,18 @@ async def login(request: Request):
     settings = get_settings()
     # Local testing without Google. config.py refuses this outside localhost.
     if settings.DEV_LOGIN_EMAIL:
-        return await _finish_sign_in(request, settings.DEV_LOGIN_EMAIL)
+        # No Google here, so treat the address's own domain as its hosted domain.
+        dev_domain = settings.DEV_LOGIN_EMAIL.rsplit("@", 1)[-1]
+        return await _finish_sign_in(request, settings.DEV_LOGIN_EMAIL, dev_domain)
     if not settings.google_configured:
         return _to_frontend("/not-authorized?reason=not-configured")
     # select_account lets people signed in to several Google accounts pick one.
+    extra = {}
+    if allowed_domain():
+        # Only a hint so Google offers the work account first; the callback checks "hd" (F32).
+        extra["hd"] = allowed_domain()
     return await oauth.google.authorize_redirect(
-        request, callback_url(), prompt="select_account"
+        request, callback_url(), prompt="select_account", **extra
     )
 
 
@@ -127,6 +133,7 @@ async def callback(request: Request):
     return await _finish_sign_in(
         request,
         email,
+        google_user.get("hd"),
         google_user.get("given_name", "") or "",
         google_user.get("family_name", "") or "",
     )
