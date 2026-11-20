@@ -695,6 +695,38 @@ sign-in redirect carries the hint; dev login still works. With the `hd` check re
 
 **Commit.** "Require Google's hosted domain claim when a domain is set (F32)".
 
+### F33. Some unsafe production settings were accepted silently — Low (Fixed)
+
+**Problem.** Production already refused a weak `SESSION_SECRET`, `DEV_LOGIN_EMAIL` and the view
+switch. It still started with an `http://` `APP_URL` or `FRONTEND_URL` (no encryption, and the
+Secure `__Host-` cookie would never be sent back), with real email on but no Gmail settings
+(every reminder fails quietly), with a bootstrap admin address that `ALLOWED_EMAIL_DOMAIN`
+would never let in (a typo, or an address that should not be there), and gave no sign that
+`BOOTSTRAP_ADMIN_EMAILS` was still set long after the first admin existed.
+
+**Fix.** In `config.py`, `_refuse_unsafe_production_settings` refuses to start production
+without `https://` for both addresses, or with `REMINDERS_DRY_RUN=false` and any of
+`GMAIL_SENDER`, `GMAIL_REFRESH_TOKEN`, the client ID or the client secret missing; the error
+names what is missing. `_refuse_bootstrap_outside_domain` refuses a bootstrap address outside
+the domain, everywhere. `CSP_MODE` was already limited to its three values; it now has tests.
+At startup, `auth.warn_if_bootstrap_not_needed` (in a background thread, so a slow Airtable
+never delays startup) logs a warning, with no emails, when the bootstrap list is set and an
+Active Admin exists. Local development is unchanged.
+
+**Tests** (`test_production_settings.py`): a correct config starts; http for either address is
+refused in production and allowed locally; unknown `CSP_MODE` values are refused; each missing
+Gmail setting is refused when real email is on; the separate Gmail client counts; dry run and
+localhost need none; bootstrap outside the domain is refused (also locally), inside or with no
+domain it is fine; the warning appears with an Active Admin and logs no email, not before the
+first admin or with an empty list, and Airtable being down only logs. Three older tests in
+`test_security_settings.py` built production with localhost addresses; they now use https and
+check the same things. With the new checks removed, 8 fail.
+
+**Manual step.** Check that Railway's `APP_URL` and `FRONTEND_URL` start with `https://`, and
+remove `BOOTSTRAP_ADMIN_EMAILS` there if the warning appears.
+
+**Commit.** "Refuse unsafe production settings at startup (F33)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

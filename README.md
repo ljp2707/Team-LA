@@ -234,10 +234,12 @@ The live site needs real Google sign in, because the test login only works on yo
    **Uploads** must match their extension: a file named `.pdf` has to start like a PDF, a `.png` like a PNG, and so on. Text and CSV files must not contain binary data.
 
    **Notes:** only a note's author or an admin can switch an Internal note to Shared with partners.
-   - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email
+   - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email. **Remove it once that admin has signed in**; the app logs a warning at every start while it is set and an Active Admin exists.
    - `CONTACT_EMAIL` and `ORG_ADDRESS`: NMU's contact inbox and mailing address, shown on the Privacy page and in every email
 3. Under **Settings > Networking**, choose **Generate Domain**.
 4. Set both `APP_URL` and `FRONTEND_URL` to that domain, starting with `https://`.
+
+   **Production refuses to start** (findings F33) if `APP_URL` or `FRONTEND_URL` is not `https://`, if `REMINDERS_DRY_RUN=false` but `GMAIL_SENDER`, `GMAIL_REFRESH_TOKEN` or a Google client ID and secret is missing, if `CSP_MODE` is not `enforce`, `report-only` or `off`, or if a `BOOTSTRAP_ADMIN_EMAILS` address is outside `ALLOWED_EMAIL_DOMAIN`. The deploy log names the setting to fix.
 5. Add `https://YOUR-APP-DOMAIN/auth/callback` to the Google OAuth client's redirect URIs.
 
 After changing a variable in Railway, click **Deploy** if it asks you to apply the change, so the app picks up the new value.

@@ -1,6 +1,7 @@
 """The FastAPI app: middleware, API routes, and the built frontend."""
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from app.config import Settings, get_settings
 from app.rate_limit import RateLimit
 from app.request_limits import RequestSizeLimit
 from app.security import OriginCheck, RequestContext, RetireOldSessionCookie, session_cookie_options
+from app.routers.auth import warn_if_bootstrap_not_needed
 from app.routers import (
     admin,
     archive,
@@ -52,6 +54,8 @@ async def lifespan(_: FastAPI):
     )
     if not settings.is_production:
         warn_about_schema_problems()
+    # In the background, so a slow Airtable never holds up startup (findings F33).
+    threading.Thread(target=warn_if_bootstrap_not_needed, daemon=True).start()
     warm_cache()  # In the background, so the first sign in does not wait on Airtable
     yield
 

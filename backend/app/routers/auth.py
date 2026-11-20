@@ -40,6 +40,32 @@ def _to_frontend(path: str) -> RedirectResponse:
     return RedirectResponse(f"{base}{path}", status_code=302)
 
 
+def warn_if_bootstrap_not_needed() -> bool:
+    """At startup: say so if BOOTSTRAP_ADMIN_EMAILS is set although an Active Admin exists.
+
+    The list is only for the very first sign in. Left in place, it would recreate an Admin
+    for any of those addresses whose Users row was later deleted (findings F33). Logs no
+    emails. Returns True if it warned.
+    """
+    if not get_settings().bootstrap_admins:
+        return False
+    try:
+        rows = client.all_records(Users.TABLE)
+    except RequestException as error:
+        logger.warning("Could not check BOOTSTRAP_ADMIN_EMAILS: %s", type(error).__name__)
+        return False
+    if any(
+        r["fields"].get(Users.STATUS) == ACTIVE and r["fields"].get(Users.ACCESS_LEVEL) in permissions.ADMIN_ACCESS_LEVELS
+        for r in rows
+    ):
+        logger.warning(
+            "BOOTSTRAP_ADMIN_EMAILS is set, but an Active Admin already exists. "
+            "Remove BOOTSTRAP_ADMIN_EMAILS from the environment; it is only for the first sign in."
+        )
+        return True
+    return False
+
+
 def ensure_bootstrap_admin(email: str, first_name: str = "", last_name: str = "") -> None:
     """Create an Active Admin row for a bootstrap email that has no row at all.
 
