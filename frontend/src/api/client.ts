@@ -39,7 +39,7 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
       headers: { ...(json ? { "Content-Type": "application/json" } : {}), ...options.headers },
     });
   } catch {
-    throw new ApiError(0, "Could not reach NMU Launches. Check your connection.");
+    throw new ApiError(0, "Could not reach NMU Programs. Check your connection.");
   }
 
   if (!response.ok) {

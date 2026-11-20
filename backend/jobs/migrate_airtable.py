@@ -14,7 +14,8 @@ allow adding options to an existing select field:
 
 - The "Partner" Access Level on Users
 - The new Activity Log Types (Link, Task Added, Handoff, Project Created, Project
-  Closed)
+  Closed, Nudge)
+- The "Nudge" Reminders Kind
 
 The app writes those with typecast, which makes Airtable add the option the first
 time it is used. Admins can also add them by hand in Airtable.
@@ -90,6 +91,8 @@ NEW_FIELDS = {
         (Site.SHIPPING_ADDRESS, long_text()),
         (Site.LAST_HEAD_COACH, text()),
         (Site.DRIVE_FOLDER, ("url", None)),
+        (Site.CITY, text()),
+        (Site.STATE, text()),
     ],
     Session.TABLE: [
         (Session.PROGRAM_NAME, text()),
@@ -163,6 +166,7 @@ NEW_TABLES = {
                 "Weekly Digest",
                 "Assignment",
                 "Welcome",
+                "Nudge",
             ),
         ),
         (Reminders.SEND_ON, date_field()),

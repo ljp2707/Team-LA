@@ -451,7 +451,7 @@ def delete_template(template_id: str, actor_id: str) -> None:
     if in_use:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "Launches were made from this template, so it cannot be deleted. Make it inactive instead.",
+            "Programs were made from this template, so it cannot be deleted. Make it inactive instead.",
         )
     versions = [v.id for v in safe(load_versions) if v.template_id == template_id]
     client.delete_records(Steps.TABLE, sorted(step_ids))

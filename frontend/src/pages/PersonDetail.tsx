@@ -61,14 +61,14 @@ export function PersonDetail() {
 
       {launches.length === 0 ? (
         <Card>
-          <EmptyState title={`${firstName} is not on any active launches`}>
-            Launches show here when they are on the team or have a task. Closed launches are in the archive.
+          <EmptyState title={`${firstName} is not on any active programs`}>
+            Programs show here when they are on the team or have a task. Closed programs are in the archive.
           </EmptyState>
         </Card>
       ) : (
         <>
           <p className="muted">
-            {launches.length === 1 ? "1 active launch" : `${launches.length} active launches`} ·{" "}
+            {launches.length === 1 ? "1 active program" : `${launches.length} active programs`} ·{" "}
             {openCount === 1 ? "1 open task" : `${openCount} open tasks`}
           </p>
           {launches.map((launch) => (
@@ -92,8 +92,8 @@ export function PersonDetail() {
               {launch.tasks.length === 0 ? (
                 <p className="muted person-launch-empty">
                   {launch.done > 0
-                    ? `No open tasks. ${firstName} has finished all ${launch.done === 1 ? "1 task" : `${launch.done} tasks`} on this launch.`
-                    : `No tasks assigned to ${firstName} on this launch.`}
+                    ? `No open tasks. ${firstName} has finished all ${launch.done === 1 ? "1 task" : `${launch.done} tasks`} on this program.`
+                    : `No tasks assigned to ${firstName} on this program.`}
                 </p>
               ) : (
                 <>

@@ -1,6 +1,6 @@
 # Data model
 
-Every Airtable table and field NMU Launches uses, and what it is for. Generated from `backend/app/airtable/schema.py` by `python -m jobs.data_model`. Fields marked *added* were added by `python -m jobs.migrate_airtable`. For the full live base, including fields the app does not use, see `airtable-schema.md`.
+Every Airtable table and field NMU Programs uses, and what it is for. Generated from `backend/app/airtable/schema.py` by `python -m jobs.data_model`. Fields marked *added* were added by `python -m jobs.migrate_airtable`. For the full live base, including fields the app does not use, see `airtable-schema.md`.
 
 ## Users
 
@@ -26,25 +26,25 @@ Used by: Sign in, Users and roles, every assignment.
 
 ## Template List
 
-One row per template (kind of launch), for example Swim Safely.
+One row per template (kind of program), for example Swim Safely.
 
-Used by: Templates, Start a launch.
+Used by: Templates, Start a program.
 
 | Field | What it is for |
 |---|---|
 | List Name (Unique) | Shown in the app. |
-| Status | Inactive templates are hidden on Start a launch. |
+| Status | Inactive templates are hidden on Start a program. |
 | Created | When the row was made. |
 | Steps | Link to the Steps table. |
 | Session | Link to the Session table. |
-| Live Version *(added)* | The version new launches use. |
+| Live Version *(added)* | The version new programs use. |
 | Description *(added)* | Read and written by the app. |
 
 ## Roles
 
-Jobs such as Operations or Marketing. Template steps and launch teams point at roles, not people.
+Jobs such as Operations or Marketing. Template steps and program teams point at roles, not people.
 
-Used by: Users and roles, Templates, Start a launch.
+Used by: Users and roles, Templates, Start a program.
 
 | Field | What it is for |
 |---|---|
@@ -59,7 +59,7 @@ Used by: Users and roles, Templates, Start a launch.
 
 The tasks inside a template, with their timing and default role.
 
-Used by: Templates, Start a launch.
+Used by: Templates, Start a program.
 
 | Field | What it is for |
 |---|---|
@@ -74,7 +74,7 @@ Used by: Templates, Start a launch.
 | ID | Worked out by Airtable. The app only reads it. |
 | Work | Link to the Work table. |
 | Anchor | Start (Day 1) or End (the last day). |
-| Retired | Removed from the template. Kept so old launches still make sense. |
+| Retired | Removed from the template. Kept so old programs still make sense. |
 | Sort Order *(added)* | The order on the Templates page. |
 | Added In Version *(added)* | The template version that added this step. |
 | Retired In Version *(added)* | The template version that removed this step. |
@@ -94,13 +94,13 @@ Used by: Dashboard region filter.
 
 A place where programs run, with its partner contact and shipping details (the site profile).
 
-Used by: Start a launch, Archive search.
+Used by: Start a program, Archive search.
 
 | Field | What it is for |
 |---|---|
 | Region Site | Formula: "Region - Program Name" |
 | Program Name | The site's own name, for example Rainier Beach. |
-| Program Location | The city, for example Seattle, WA. Fills in Location on a new launch. |
+| Program Location | The city, for example Seattle, WA. Fills in Location on a new program. |
 | Region | Link to the Region table. |
 | Session | Link to the Session table. |
 | Instructors | Link to the Instructors table. |
@@ -110,11 +110,13 @@ Used by: Start a launch, Archive search.
 | Partner Contact Email *(added)* | Read and written by the app. |
 | Partner Contact Phone *(added)* | Read and written by the app. |
 | Shipping Address *(added)* | Read and written by the app. |
-| Last Head Coach *(added)* | Shown on Start a launch as a reminder of who coached last season. |
+| Last Head Coach *(added)* | Shown on Start a program as a reminder of who coached last season. |
+| City *(added)* | The site's city, for example Seattle. Used by the City filter and Location sort on My Tasks. |
+| State *(added)* | The site's state as two letters, for example WA. Used by the State filter on My Tasks. |
 
 ## Session
 
-One launch: one program at one site with a Day 1. The app calls this a project.
+One program at one site with a Day 1. The app calls this a project.
 
 Used by: Dashboard, Projects, Project page, Archive.
 
@@ -137,23 +139,23 @@ Used by: Dashboard, Projects, Project page, Archive.
 | Activity Log | Link to the Activity Log table. |
 | Drive Folder | Read and written by the app. |
 | Lessons Learned | Read and written by the app. |
-| Program Name *(added)* | The launch's name, for example Swim Safely Winter 2027. |
+| Program Name *(added)* | The program's name, for example Swim Safely Winter 2027. |
 | Site Type *(added)* | Read and written by the app. |
 | Location *(added)* | Read and written by the app. |
 | Partner Contact Name *(added)* | Shown in the app. |
 | Partner Contact Email *(added)* | Read and written by the app. |
 | Partner Contact Phone *(added)* | Read and written by the app. |
 | Shipping Address *(added)* | Read and written by the app. |
-| Template Version *(added)* | The template version this launch was made from. Publishing a new version never changes it. |
-| Created From *(added)* | The past launch it was copied from, if any. |
+| Template Version *(added)* | The template version this program was made from. Publishing a new version never changes it. |
+| Created From *(added)* | The past program it was copied from, if any. |
 | Closed Date *(added)* | When an admin closed it. |
-| Partners *(added)* | Partner users who can see this launch. |
+| Partners *(added)* | Partner users who can see this program. |
 
 ## Instructors
 
-Lead instructors, linked to sites and launches.
+Lead instructors, linked to sites and programs.
 
-Used by: Start a launch, project cards.
+Used by: Start a program, project cards.
 
 | Field | What it is for |
 |---|---|
@@ -164,7 +166,7 @@ Used by: Start a launch, project cards.
 
 ## Work
 
-One task in one launch, made from a template step or added as a one-off.
+One task in one program, made from a template step or added as a one-off.
 
 Used by: My Tasks, Task page, Project page, reminders.
 
@@ -191,7 +193,7 @@ Used by: My Tasks, Task page, Project page, reminders.
 | Blocks | The other side of Depends On |
 | Resource Link | A single link field from the original base. New links go in the Links table. |
 | Role *(added)* | The role responsible for the task. |
-| One-off *(added)* | Added to this launch only, not from the template. |
+| One-off *(added)* | Added to this program only, not from the template. |
 | Sort Order *(added)* | Read and written by the app. |
 | Completed By *(added)* | Who marked it Done. |
 | Calendar Event ID *(added)* | The task's Google Calendar event. Written only by the Airtable calendar automations; the app reads it and never writes it. |
@@ -200,9 +202,9 @@ Used by: My Tasks, Task page, Project page, reminders.
 
 ## Session Team
 
-Who fills each role on one launch.
+Who fills each role on one program.
 
-Used by: Start a launch, hand-off, reminders when a task has no assignee.
+Used by: Start a program, hand-off, reminders when a task has no assignee.
 
 | Field | What it is for |
 |---|---|
@@ -234,7 +236,7 @@ Used by: Project history, notes, Move Day 1 undo, Archive.
 
 ## Links
 
-Google Drive, Canva and other links on tasks and launches.
+Google Drive, Canva and other links on tasks and programs.
 
 Used by: Task page, Project page.
 

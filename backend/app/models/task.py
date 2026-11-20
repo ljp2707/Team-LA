@@ -57,6 +57,12 @@ class ReminderIn(BaseModel):
     note: str = Field(default="", max_length=500)
 
 
+class NudgeIn(BaseModel):
+    """An optional short message from the admin. It is escaped in the email."""
+
+    message: str = Field(default="", max_length=500)
+
+
 class OneOffTaskIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     due_date: date

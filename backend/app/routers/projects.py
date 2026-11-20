@@ -49,7 +49,7 @@ def list_projects(
     user: CurrentUser = Depends(current_user),
 ):
     if status_filter == "closed" and not permissions.can_see_archive(user.actor):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can see closed launches")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can see closed programs")
     world = World()
     wanted_closed = status_filter == "closed"
     cards = [
@@ -96,7 +96,14 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
         world.tasks_by_project.get(project.id, []),
         key=lambda t: (t.due is None, t.due, t.sort_order or 0, t.name),
     )
-    rows = [task_row(world, t, user) for t in tasks]
+    # Overdue tasks go in their own list at the top, most overdue first, and are left
+    # out of their phase so each task shows once. Sorted here so every client agrees.
+    late = sorted(
+        (t for t in tasks if logic.is_overdue(t, world.today)),
+        key=lambda t: (t.due, t.sort_order or 0, t.name),
+    )
+    late_ids = {t.id for t in late}
+    rows = [task_row(world, t, user) for t in tasks if t.id not in late_ids]
     groups = [
         {"phase": phase, "tasks": [r for r in rows if r["phase"] == phase]}
         for phase in logic.PHASES
@@ -118,6 +125,7 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
         },
         "shipping_address": project.shipping_address,
         "drive_folder": safe_link(project.drive_folder),
+        "overdue_tasks": [task_row(world, t, user) for t in late],
         "groups": groups,
         "links": [
             link_dict(world, link, is_admin)
@@ -178,7 +186,7 @@ def get_project(project_id: str, user: CurrentUser = Depends(current_user)):
 def export_project(project_id: str, user: CurrentUser = Depends(require_admin)):
     """The launch's tasks as a CSV download, for Google Sheets or Excel. Admins only."""
     if not permissions.can_export_projects(user.actor):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can export launches")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can export programs")
     world = World()
     project = world.project(project_id)
     return Response(
@@ -204,7 +212,7 @@ def update_project(
 def delete_project(project_id: str, user: CurrentUser = Depends(require_admin)):
     """Delete a launch and everything that belongs to it. Admins only. Cannot be undone."""
     if not permissions.can_delete_projects(user.actor):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can delete launches")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can delete programs")
     world = World()
     return projects.delete(world, world.project(project_id), user)
 
@@ -216,7 +224,7 @@ def move_day_one(
     world = World()
     project = world.project(project_id)
     if project.closed:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Reopen the launch before moving Day 1")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Reopen the program before moving Day 1")
     if body.preview:
         plan = timeline.plan_shift(project, world.tasks, safe(load_reminders), body.new_day_one)
         return {

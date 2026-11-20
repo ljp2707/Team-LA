@@ -24,8 +24,8 @@ def today() -> date:
 
 
 def utc_now_iso() -> str:
-    """For Airtable date time fields, which are stored in UTC."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+    """For Airtable date time fields, which are stored in UTC. Follows now(), so tests agree."""
+    return now().astimezone(timezone.utc).replace(microsecond=0).isoformat().replace(
         "+00:00", "Z"
     )
 

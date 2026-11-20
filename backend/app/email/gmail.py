@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
-FROM_NAME = "NMU Launches"
+FROM_NAME = "NMU Programs"
 TIMEOUT_SECONDS = 20
 
 EXPIRED_MESSAGE = (
@@ -110,7 +110,7 @@ def build_message(to: str, subject: str, text: str, html: str) -> EmailMessage:
     # Lets mail apps show their own "Unsubscribe" button. It opens an email to NMU.
     contact = settings.CONTACT_EMAIL or settings.GMAIL_SENDER
     if contact:
-        message["List-Unsubscribe"] = f"<mailto:{contact}?subject=Stop%20NMU%20Launches%20emails>"
+        message["List-Unsubscribe"] = f"<mailto:{contact}?subject=Stop%20NMU%20Programs%20emails>"
     message.set_content(text)
     message.add_alternative(html, subtype="html")
     return message

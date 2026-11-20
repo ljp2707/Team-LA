@@ -117,7 +117,7 @@ export function ProjectFields({ value, onChange, siteTypes, instructors, partner
       {partners.length > 0 && (
         <fieldset className="check-group">
           <legend>Partner access</legend>
-          <p className="muted small">Partners can see this launch and update the tasks assigned to them.</p>
+          <p className="muted small">Partners can see this program and update the tasks assigned to them.</p>
           {partners.map((person) => (
             <label key={person.id} className="check-option">
               <input

@@ -163,7 +163,7 @@ export function NewProject() {
   async function create() {
     if (!siteId) return setFormError("Pick a site.");
     if (!dayOne) return setFormError("Pick Day 1.");
-    if (!details.name.trim()) return setFormError("Give the launch a program name.");
+    if (!details.name.trim()) return setFormError("Give the program a name.");
     if (Object.keys(errors).length) return setFormError("Fix the fields marked in the form.");
     setBusy(true);
     setFormError(null);
@@ -181,7 +181,7 @@ export function NewProject() {
         one_offs: oneOffs,
         update_site_profile: updateProfile,
       });
-      toast.show("Launch created. Everyone with a task gets an email.");
+      toast.show("Program created. Everyone with a task gets an email.");
       navigate(`/projects/${created.id}`);
     } catch (caught) {
       setFormError(errorText(caught));
@@ -208,7 +208,7 @@ export function NewProject() {
     <div className="page">
       <PageHeader
         back={{ to: "/dashboard", label: "Back to dashboard" }}
-        title="Start a launch"
+        title="Start a program"
       />
 
       <div className="two-col two-col--even">
@@ -228,7 +228,7 @@ export function NewProject() {
               onChange={setSource}
               options={[
                 { value: "template", label: "A template" },
-                { value: "past", label: "A past launch" },
+                { value: "past", label: "A past program" },
               ]}
             />
 
@@ -260,11 +260,11 @@ export function NewProject() {
                 )}
               </fieldset>
             ) : past.error ? (
-              <p className="field-error">Past launches did not load. {past.error.message}</p>
+              <p className="field-error">Past programs did not load. {past.error.message}</p>
             ) : (
               <Combobox
-                label="Past launch"
-                placeholder="Search finished launches"
+                label="Past program"
+                placeholder="Search finished programs"
                 value={pastId}
                 onChange={setPastId}
                 hint="Copies its tasks, owners and timing, moved to the new Day 1."
@@ -337,7 +337,7 @@ export function NewProject() {
             </p>
           ) : !preview ? (
             source === "past" && !pastId ? (
-              <EmptyState title="Pick a past launch">Its tasks show up here.</EmptyState>
+              <EmptyState title="Pick a past program">Its tasks show up here.</EmptyState>
             ) : (
               <LoadingState label="Building the task list" />
             )
@@ -446,7 +446,7 @@ export function NewProject() {
               Add task
             </Button>
             <Button type="submit" form="new-project" disabled={busy || !preview}>
-              {busy ? "Creating" : "Create launch"}
+              {busy ? "Creating" : "Create program"}
             </Button>
           </div>
         </Card>
@@ -525,7 +525,7 @@ function OneOffDraftDialog({
     <Dialog
       open={open}
       title="Add task"
-      description="Only this launch gets it. The template stays the same."
+      description="Only this program gets it. The template stays the same."
       onClose={onClose}
       actions={
         <>

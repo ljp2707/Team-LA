@@ -271,11 +271,15 @@ def link_dict(world: World, link: LinkRec, can_remove: bool) -> dict:
 
 
 def history_dict(world: World, row: LogRec) -> dict:
-    author = world.user_short(row.author_id) or "NMU Launches"
+    author = world.user_short(row.author_id) or "NMU Programs"
     task = world.tasks_by_id.get(row.work_id or "")
     text = row.text
     if row.type == "Note" and task:
         text = f"added a note to {task.name}"
+    elif row.type == "Note":
+        # Notes are only ever written on tasks, so this task was deleted (Airtable also
+        # clears the link). Say so rather than print the note itself in the history.
+        text = "added a note to a task that was later deleted"
     elif row.type == "Status Change" and task and row.to_value:
         text = row.text or f"marked {task.name} {row.to_value.lower()}"
     return {

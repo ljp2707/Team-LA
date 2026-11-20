@@ -243,7 +243,7 @@ function HandOffCard({ people, onDone }: { people: Person[]; onDone: (moved: num
         />
         <label className="check-option">
           <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-          Also put them on those launch teams
+          Also put them on those program teams
         </label>
         {preview && (
           <div className="small" role="status">
@@ -375,7 +375,7 @@ function PersonDialog({
       description={
         person
           ? person.email
-          : "They can sign in with Google once you add them. They get one welcome email, and NMU Launches keeps their name and email so their team can see who does what."
+          : "They can sign in with Google once you add them. They get one welcome email, and NMU Programs keeps their name and email so their team can see who does what."
       }
       onClose={onClose}
       wide
@@ -476,7 +476,7 @@ function RolesDialog({ open, onClose, onChanged }: { open: boolean; onClose: () 
   }
 
   return (
-    <Dialog open={open} title="Manage roles" description="Steps and launch teams point at roles. A role in use cannot be removed, only made inactive." onClose={onClose} wide>
+    <Dialog open={open} title="Manage roles" description="Steps and program teams point at roles. A role in use cannot be removed, only made inactive." onClose={onClose} wide>
       {roles.error ? (
         <ErrorState error={roles.error} onRetry={roles.reload} />
       ) : !roles.data ? (

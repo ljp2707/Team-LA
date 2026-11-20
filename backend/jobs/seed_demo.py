@@ -441,7 +441,7 @@ def main(argv: list[str] | None = None) -> int:
                 ActivityLog.SESSION: [sessions[site]],
                 ActivityLog.AUTHOR: [people["Catalina"]],
                 ActivityLog.TYPE: "Project Created",
-                ActivityLog.TEXT: f"created this launch with {len(planned)} tasks",
+                ActivityLog.TEXT: f"created this program with {len(planned)} tasks",
                 ActivityLog.VISIBILITY: "Internal",
             }
         )
@@ -451,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
                     ActivityLog.SESSION: [sessions[site]],
                     ActivityLog.AUTHOR: [people["Catalina"]],
                     ActivityLog.TYPE: "Project Closed",
-                    ActivityLog.TEXT: "closed this launch",
+                    ActivityLog.TEXT: "closed this program",
                     ActivityLog.VISIBILITY: "Internal",
                 }
             )

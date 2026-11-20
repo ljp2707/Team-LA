@@ -20,7 +20,7 @@ export function Assignments() {
 
   return (
     <div className="page">
-      <PageHeader title="Assignments" description="What each person is assigned to. Choose a name to see their launches and open tasks." />
+      <PageHeader title="Assignments" description="What each person is assigned to. Choose a name to see their programs and open tasks." />
 
       <Card>
         <div className="split">

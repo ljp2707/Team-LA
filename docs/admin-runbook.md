@@ -223,7 +223,7 @@ If you would rather remove finished tasks from calendars and Airtable offers a *
 
 ### When a task or launch is deleted
 
-**Airtable cannot react to deleted records**, so a deleted task's event stays on the calendar. This happens when an admin uses **Delete launch** in the app, or someone deletes a Work row in Airtable.
+**Airtable cannot react to deleted records**, so a deleted task's event stays on the calendar. This happens when an admin uses **Delete launch** or **Delete task** in the app, or someone deletes a Work row in Airtable. After **Delete task**, find the task's name on the NMU Launches calendar and delete that event by hand. (People's own calendar feeds drop it on their own.)
 
 - Where possible, **close** a launch instead of deleting it. Its events then show as Done or Skipped instead of disappearing without a trace.
 - After deleting a launch, open the NMU Launches calendar, search for the launch's name (it is in every event title), and delete those events by hand.
@@ -280,3 +280,7 @@ Never put sensitive information (health details, anything about program particip
 The app expects the tables and fields listed in `docs/data-model.md`. Renaming or deleting one of them breaks the parts of the app that use it. Adding fields and tables is safe.
 
 If the code adds new fields, run `python -m jobs.migrate_airtable` to see what it would add, then `--apply`. It only ever adds.
+
+### City and State on sites (My Tasks filters)
+
+The **Site** table has a **City** field (for example `Seattle`) and a **State** field (two letters, for example `WA`). Fill them in for each site in Airtable. Until a site has them, its tasks have no location: the State and City filters on My Tasks stay hidden for anyone whose tasks all lack them, and **Sort by Location** puts those tasks last. The older **Program Location** text (for example "Seattle, WA") is not read for this, so the app never guesses.

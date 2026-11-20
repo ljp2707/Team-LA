@@ -26,7 +26,10 @@ TYPES = [
     "Handoff",
     "Project Created",
     "Project Closed",
+    "Nudge",
 ]
+
+NUDGE = "Nudge"
 
 INTERNAL = "Internal"
 SHARED = "Shared"

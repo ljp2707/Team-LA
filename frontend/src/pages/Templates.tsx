@@ -210,8 +210,8 @@ export function Templates() {
                 <p>
                   <strong>Editing a draft.</strong>{" "}
                   {runningOnLive.length
-                    ? `${runningOnLive.map((p) => p.site || p.name).join(" and ")} ${runningOnLive.length === 1 ? "keeps its" : "keep their"} current tasks, so nothing changes for launches already running.`
-                    : "Launches already running are not changed."}
+                    ? `${runningOnLive.map((p) => p.site || p.name).join(" and ")} ${runningOnLive.length === 1 ? "keeps its" : "keep their"} current tasks, so nothing changes for programs already running.`
+                    : "Programs already running are not changed."}
                   {dirty && " You have unsaved changes."}
                 </p>
                 <div className="banner-actions">
@@ -253,7 +253,7 @@ export function Templates() {
                         .then((saved) => {
                           detail.setData(saved);
                           void list.reload();
-                          toast.show(saved.active ? "Template is active." : "Template is inactive. It is hidden on Start a launch.");
+                          toast.show(saved.active ? "Template is active." : "Template is inactive. It is hidden on Start a program.");
                         })
                         .catch((caught) => toast.error(errorText(caught)))
                     }
@@ -398,7 +398,7 @@ export function Templates() {
               close();
               detail.setData(saved);
               void list.reload();
-              toast.show("Published. New launches use it from now on.");
+              toast.show("Published. New programs use it from now on.");
             }}
           />
           <VersionsDialog open={open === "versions"} templateId={t.id} onClose={close} />
@@ -459,18 +459,18 @@ function InsightsCard({
   if (insights.error) return null;
   return (
     <Card>
-      <h2>From past launches</h2>
+      <h2>From past programs</h2>
       {!data ? (
-        <LoadingState label="Looking at past launches" />
+        <LoadingState label="Looking at past programs" />
       ) : data.launches < 3 ? (
         <p className="muted small">
-          After 3 finished {templateName} launches, this shows which tasks run late, get skipped or get added. So far:{" "}
+          After 3 finished {templateName} programs, this shows which tasks run late, get skipped or get added. So far:{" "}
           {data.launches}.
         </p>
       ) : (
         <>
           <p className="muted small">
-            What happened to this template's tasks across {data.launches} finished {templateName} launches.
+            What happened to this template's tasks across {data.launches} finished {templateName} programs.
           </p>
           {!data.often_late.length && !data.often_skipped.length && !data.often_added.length && (
             <p className="muted">Nothing stands out. The template is working.</p>
@@ -711,7 +711,7 @@ function PublishDialog({
     <Dialog
       open={open}
       title="Publish changes"
-      description={`New ${template.name} launches use these changes. Launches already running keep their tasks.`}
+      description={`New ${template.name} programs use these changes. Programs already running keep their tasks.`}
       onClose={onClose}
       actions={
         <>
@@ -930,7 +930,7 @@ function FromProjectDialog({
 
   async function save() {
     if (!projectId || !name.trim()) {
-      setError("Pick a launch and give the template a name.");
+      setError("Pick a program and give the template a name.");
       return;
     }
     setBusy(true);
@@ -951,7 +951,7 @@ function FromProjectDialog({
     <Dialog
       open={open}
       title="Save a project as a template"
-      description="Copies the launch's tasks, roles, order and timing, including tasks added to the launch."
+      description="Copies the program's tasks, roles, order and timing, including tasks added to the program."
       onClose={onClose}
       actions={
         <>
@@ -965,9 +965,9 @@ function FromProjectDialog({
       }
     >
       <Select
-        label="Launch"
+        label="Program"
         value={projectId}
-        placeholder={active.data ? "Pick a launch" : "Loading launches"}
+        placeholder={active.data ? "Pick a program" : "Loading programs"}
         onChange={(e) => setProjectId(e.target.value)}
         options={projects.map((p) => ({
           value: p.id,

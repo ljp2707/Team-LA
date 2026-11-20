@@ -12,8 +12,9 @@ from app import permissions
 from app.airtable import client
 from app.airtable.schema import Links, Reminders, Work
 from app.auth.deps import current_user, require_admin, require_can_edit
-from app.email.templates import task_url
-from app.models.task import AssignIn, LinkIn, NoteIn, ReassignIn, ReminderIn, TaskUpdateIn
+from app.config import get_settings
+from app.email.templates import TaskLine, task_url
+from app.models.task import AssignIn, LinkIn, NoteIn, NudgeIn, ReassignIn, ReminderIn, TaskUpdateIn
 from app.models.user import CurrentUser
 from app.services import calendar_feed, clock, history, logic, reminders
 from app.services.links import FILE_KIND, calendar_url, link_kind, read_upload, safe_link, save_upload
@@ -47,8 +48,13 @@ def _require_edit(task: TaskRec, user: CurrentUser) -> None:
 def my_tasks(
     filter: str | None = Query(None, pattern="^(week|overdue)$"),
     project: str | None = None,
+    state: str | None = Query(None, max_length=50),
+    city: str | None = Query(None, max_length=100),
+    program_type: str | None = Query(None, max_length=200),
+    sort: str = Query("due", pattern="^(due|program|location)$"),
     user: CurrentUser = Depends(current_user),
 ):
+    """Only ever the caller's own tasks. Every filter narrows that list; none widens it."""
     world = World()
     today = world.today
     week_end = clock.end_of_week(today)
@@ -75,16 +81,51 @@ def my_tasks(
     project_ids = sorted({t.session_id for t in mine if t.session_id}, key=lambda p: world.projects[p].name)
     projects = [{"id": p, "name": world.site_name(world.projects[p])} for p in project_ids]
 
+    def site_of(t: TaskRec):
+        return world.sites.get(world.projects[t.session_id].site_id or "")
+
+    def place(t: TaskRec) -> tuple[str, str]:
+        """(state, city) from the site. Blank until someone fills them in Airtable."""
+        site = site_of(t)
+        return (site.state, site.city) if site else ("", "")
+
+    def kind(t: TaskRec) -> str:
+        return world.template_name(world.projects[t.session_id]) or ""
+
+    # Choices for each filter, from the person's own tasks only. A filter with no
+    # choices is hidden in the app (for example before anyone fills in State).
+    states = sorted({place(t)[0] for t in mine} - {""})
+    cities = sorted({place(t) for t in mine if place(t)[1]}, key=lambda p: (p[1].lower(), p[0]))
+    program_types = sorted({kind(t) for t in mine} - {""}, key=str.lower)
+
+    def order(t: TaskRec):
+        by_due = (t.due is None, t.due, t.name)
+        if sort == "program":
+            return (world.site_name(world.projects[t.session_id]).lower(), *by_due)
+        if sort == "location":
+            state_, city_ = place(t)
+            # Tasks with no location go last.
+            return (not state_ and not city_, state_, city_.lower(), world.site_name(world.projects[t.session_id]).lower(), *by_due)
+        return by_due
+
     def keep(tasks: list[TaskRec]) -> list[TaskRec]:
         if project:
             tasks = [t for t in tasks if t.session_id == project]
-        return sorted(tasks, key=lambda t: (t.due is None, t.due, t.name))
+        if state:
+            tasks = [t for t in tasks if place(t)[0] == state.strip().upper()]
+        if city:
+            tasks = [t for t in tasks if place(t)[1].lower() == city.strip().lower()]
+        if program_type:
+            tasks = [t for t in tasks if kind(t) == program_type]
+        return sorted(tasks, key=order)
 
     groups = {
         "overdue": keep(overdue),
         "this_week": keep(this_week),
         "later": keep(later),
-        "done_recently": sorted(keep(recent), key=lambda t: t.completed, reverse=True),
+        "done_recently": (
+            sorted(keep(recent), key=lambda t: t.completed, reverse=True) if sort == "due" else keep(recent)
+        ),
     }
     if filter == "week":
         groups.update(overdue=[], later=[], done_recently=[])
@@ -122,6 +163,11 @@ def my_tasks(
             "open": len(open_tasks),
         },
         "projects": projects,
+        "filters": {
+            "states": states,
+            "cities": [{"value": c, "label": f"{c}, {s}" if s else c} for s, c in cities],
+            "program_types": program_types,
+        },
         "do_this_first": first,
         "can_edit": permissions.can_update_own_tasks(user.actor),
     }
@@ -226,6 +272,12 @@ def get_task(task_id: str, user: CurrentUser = Depends(current_user)):
         "in_calendar_feed": _in_calendar_feed(world, task, user),
         "can_edit": can_edit,
         "can_admin": is_admin,
+        "can_delete": permissions.can_delete_tasks(user.actor) and not project.closed,
+        "can_nudge": permissions.can_nudge(user.actor)
+        and logic.is_open(task.status)
+        and not project.closed
+        and bool(_active_assignees(world, task)),
+        "last_nudge": _last_nudge(world, task) if permissions.can_see_history(user.actor) else None,
         "can_set_reminder": permissions.can_set_reminder(user.actor),
         "can_share_notes": permissions.can_share_notes(user.actor) and can_edit,
         "back": (
@@ -328,6 +380,130 @@ def update_task(task_id: str, body: TaskUpdateIn, user: CurrentUser = Depends(re
             )
     fresh = World()
     return task_row(fresh, fresh.task(task.id), user)
+
+
+def _active_assignees(world: World, task: TaskRec) -> list:
+    return [world.users[i] for i in task.assignees if i in world.users and world.users[i].active]
+
+
+def _last_nudge(world: World, task: TaskRec) -> dict | None:
+    """The newest Nudge row on this task, for "Last nudged by Catalina, Nov 20"."""
+    rows = [r for r in world.log if r.work_id == task.id and r.type == history.NUDGE and r.created]
+    if not rows:
+        return None
+    last = max(rows, key=lambda r: r.created)
+    return {
+        "by": world.user_short(last.author_id) or "An admin",
+        "date_text": logic.fmt_date(last.created.astimezone(clock.tz()).date(), world.today),
+    }
+
+
+@router.post("/{task_id}/nudge")
+def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_admin)):
+    """Admin only: email everyone on an open task a reminder now, with an optional message.
+
+    Each person can be nudged about the same task once every 24 hours. The per-admin
+    hourly cap is in rate_limit.py. Nothing is sent while REMINDERS_DRY_RUN is on.
+    """
+    if not permissions.can_nudge(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can nudge")
+    world = World()
+    task = _visible_task(world, task_id, user)
+    project = world.projects[task.session_id]
+    if not logic.is_open(task.status):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This task is already finished, so there is nothing to nudge.")
+    if project.closed:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This program is closed, so it sends no reminders.")
+    people = _active_assignees(world, task)
+    if not people:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Nobody active is assigned to this task. Assign someone first.")
+
+    now = clock.now()
+    recent = reminders.recent_nudges(safe(load_reminders), task.id, now)
+    to_send = [p for p in people if p.id not in recent]
+    if not to_send:
+        again = min(recent[p.id] for p in people) + timedelta(hours=reminders.NUDGE_EVERY_HOURS)
+        again = again.astimezone(clock.tz())
+        who = people[0].short_name if len(people) == 1 else "Everyone on this task"
+        when = f"{again.strftime('%I:%M %p').lstrip('0')} on {logic.fmt_date(again.date(), world.today)}"
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"{who} was already nudged about this task in the last day. You can nudge again after {when}.",
+        )
+    names = lambda ps: logic.name_list([p.short_name for p in ps], 3)  # noqa: E731
+    skipped = [p for p in people if p.id in recent]
+    if get_settings().REMINDERS_DRY_RUN:
+        return {
+            "sent": [],
+            "skipped": [p.short_name for p in skipped],
+            "message": "Email is in dry run mode, so nothing was sent.",
+        }
+
+    line = TaskLine(
+        name=task.name,
+        site=world.site_name(project),
+        due_text=logic.due_text(task, world.today),
+        url=task_url(task.id),
+    )
+    sent, errors = reminders.send_nudges(line, task.id, to_send, user.name, body.message)
+    if not sent:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"The reminder was not sent. {errors[0]}")
+    # The message itself is not stored or logged: only who nudged whom.
+    history.log_event(project.id, task.id, user.id, history.NUDGE, f"nudged {names(sent)} about {task.name}")
+    message = f"Reminder sent to {names(sent)}."
+    if skipped:
+        message += f" {names(skipped)} {'was' if len(skipped) == 1 else 'were'} already nudged today, so not again."
+    if len(sent) < len(to_send):
+        message += f" It could not be sent to everyone: {errors[0]}"
+    return {"sent": [p.short_name for p in sent], "skipped": [p.short_name for p in skipped], "message": message}
+
+
+@router.delete("/{task_id}")
+def delete_task(task_id: str, user: CurrentUser = Depends(require_admin)):
+    """Admin only: delete one task from a program that is not closed. Cannot be undone.
+
+    The history keeps a row naming the task, its due date and its people. Tasks that
+    waited on it stop waiting, its scheduled reminders are cancelled, and its links and
+    files move to the program so nothing uploaded is lost. Its notes stay in the history.
+    """
+    if not permissions.can_delete_tasks(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can delete tasks")
+    world = World()
+    task = _visible_task(world, task_id, user)
+    project = world.projects[task.session_id]
+    if project.closed:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This program is closed, so its tasks cannot be deleted. Reopen it first."
+        )
+    today = world.today
+    waiting = [t for t in world.tasks_by_project.get(project.id, []) if task.id in t.depends_on]
+    people = logic.name_list([world.user_name(i) or "Someone" for i in task.assignees], 3) or "nobody"
+    due = logic.fmt_date(task.due, today) if task.due else "no due date"
+
+    # The history row goes first, so a record of the task survives even if a later step fails.
+    history.log_event(
+        project.id,
+        None,
+        user.id,
+        "System",
+        f"deleted the task {task.name} (due {due}, assigned to {people})",
+        task.name,
+    )
+    client.update_records(
+        Work.TABLE,
+        [{"id": t.id, "fields": {Work.DEPENDS_ON: [d for d in t.depends_on if d != task.id]}} for t in waiting],
+    )
+    reminders.cancel_custom_for_task(task.id)
+    client.update_records(
+        Links.TABLE,
+        [
+            {"id": link.id, "fields": {Links.WORK: [], Links.SESSION: [project.id]}}
+            for link in world.links
+            if link.work_id == task.id
+        ],
+    )
+    client.delete_records(Work.TABLE, [task.id])
+    return {"deleted": True, "no_longer_waiting": [t.name for t in waiting]}
 
 
 @router.post("/reassign")

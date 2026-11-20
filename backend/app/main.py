@@ -65,7 +65,7 @@ def api_docs_urls(current: Settings) -> dict:
     return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
 
 
-app = FastAPI(title="NMU Launches", lifespan=lifespan, **api_docs_urls(settings))
+app = FastAPI(title="NMU Programs", lifespan=lifespan, **api_docs_urls(settings))
 
 # Caps request size before sign-in or form parsing read the body (findings F6). Added
 # first, so it sits next to the routes. Middleware added later wraps around it.

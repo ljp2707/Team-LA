@@ -26,13 +26,27 @@ class Rule:
     limit: int  # requests allowed...
     seconds: int  # ...in this many seconds
     per_person: bool  # count by signed-in person, otherwise by internet address
+    message: str = "Too many requests. Please wait a minute and try again."
 
 
 WRITES = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
+# Each nudge sends real email, so one admin is capped per hour on top of the usual write
+# limit. (Once per person per task per day is checked in the route, from Airtable.)
+NUDGES_PER_HOUR = 20
+
 # The first rule that matches a request applies. Requests no rule matches are not limited.
 RULES = [
     Rule("sign-in", frozenset({"GET"}), re.compile(r"^/auth/(login|callback)$"), 10, 60, per_person=False),
+    Rule(
+        "nudges",
+        frozenset({"POST"}),
+        re.compile(r"^/api/tasks/[^/]+/nudge$"),
+        NUDGES_PER_HOUR,
+        3600,
+        per_person=True,
+        message="You have sent a lot of nudges this hour. Please try again later.",
+    ),
     Rule("uploads", frozenset({"POST"}), re.compile(r"^/api/.+/files$"), 20, 3600, per_person=True),
     Rule("calendar feed", frozenset({"GET"}), re.compile(r"^/calendar/"), 60, 60, per_person=False),
     Rule("public", frozenset({"GET"}), re.compile(r"^/api/public/"), 60, 60, per_person=False),
@@ -95,7 +109,7 @@ class RateLimit:
                 wait = check(rule, _key(rule, scope))
                 if wait:
                     response = JSONResponse(
-                        {"detail": "Too many requests. Please wait a minute and try again."},
+                        {"detail": rule.message},
                         status_code=429,
                         headers={"Retry-After": str(wait)},
                     )

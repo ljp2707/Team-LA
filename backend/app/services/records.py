@@ -163,6 +163,8 @@ class SiteRec:
     last_head_coach: str = ""
     drive_folder: str = ""
     instructor_ids: list[str] = field(default_factory=list)
+    city: str = ""
+    state: str = ""
 
 
 def load_sites() -> list[SiteRec]:
@@ -183,6 +185,8 @@ def load_sites() -> list[SiteRec]:
                 last_head_coach=f.get(Site.LAST_HEAD_COACH, "") or "",
                 drive_folder=f.get(Site.DRIVE_FOLDER, "") or "",
                 instructor_ids=list(f.get(Site.INSTRUCTORS, []) or []),
+                city=(f.get(Site.CITY) or "").strip(),
+                state=(f.get(Site.STATE) or "").strip().upper(),
             )
         )
     return out
@@ -395,7 +399,7 @@ def load_projects() -> list[ProjectRec]:
         out.append(
             ProjectRec(
                 id=r["id"],
-                name=(f.get(Session.PROGRAM_NAME) or f.get(Session.NAME) or "Untitled launch"),
+                name=(f.get(Session.PROGRAM_NAME) or f.get(Session.NAME) or "Untitled program"),
                 session_name=f.get(Session.NAME, "") or "",
                 site_id=_first(f.get(Session.SITE)),
                 start=start,

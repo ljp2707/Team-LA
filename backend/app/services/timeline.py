@@ -291,7 +291,7 @@ def generate_timeline(
         None,
         actor_id,
         "Project Created",
-        f"created this launch with {plural(len(planned), 'task')}",
+        f"created this program with {plural(len(planned), 'task')}",
     )
     return planned
 
@@ -328,7 +328,7 @@ def start_from_past_launch(
         None,
         actor_id,
         "Project Created",
-        f"created this launch from {past.name} with {plural(len(planned), 'task')}",
+        f"created this program from {past.name} with {plural(len(planned), 'task')}",
     )
     return planned
 

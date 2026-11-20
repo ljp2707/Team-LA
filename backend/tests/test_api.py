@@ -93,7 +93,7 @@ def test_project_detail_groups_and_flags(client, sign_in, project):
     assert phases["Before the program"][0] == "Confirm head coach"
     assert phases["Program week"] == ["Day 1 check-in"]
     assert phases["After the program"] == ["Send participant survey"]
-    rows = {t["name"]: t for g in body["groups"] for t in g["tasks"]}
+    rows = {t["name"]: t for t in body["overdue_tasks"]} | {t["name"]: t for g in body["groups"] for t in g["tasks"]}
     assert rows["Design flyer"]["dependents"] == 1
     assert rows["Community outreach"]["display_status"] == "Blocked"
     assert rows["Community outreach"]["waiting_text"] == "Waiting on Design flyer"
@@ -516,7 +516,7 @@ def test_adding_a_person_sends_them_a_welcome_email(client, sign_in, fake, setti
     new = {"first_name": "Mary", "email": "mary@example.org", "access_level": "Staff", "role_ids": ["recRole"]}
     response = client.post("/api/users", json=new)
     assert response.status_code == 201
-    assert sent == [("mary@example.org", "You've been added to NMU Launches")]
+    assert sent == [("mary@example.org", "You've been added to NMU Programs")]
     row = fake.find(Users.TABLE, response.json()["id"])["fields"]
     assert row[Users.WELCOME_EMAIL_SENT]
     logged = [r["fields"] for r in fake.rows(Reminders.TABLE)]
@@ -802,7 +802,7 @@ def test_deleting_a_launch_deletes_everything_on_it(client, sign_in, project):
     # The launch goes last, so a failure part way never leaves rows without a launch.
     assert [w[1] for w in project.writes if w[0] == "delete"][-1] == Session.TABLE
     # One history row, not tied to any launch, records who deleted it.
-    deleted = [r for r in log if "deleted the launch" in r["fields"].get(ActivityLog.TEXT, "")]
+    deleted = [r for r in log if "deleted the program" in r["fields"].get(ActivityLog.TEXT, "")]
     assert len(deleted) == 1
     assert ActivityLog.SESSION not in deleted[0]["fields"]
     assert deleted[0]["fields"][ActivityLog.AUTHOR] == ["recAdmin"]
@@ -915,7 +915,7 @@ def test_export_is_one_row_per_task_sorted_by_due_date(client, sign_in, project)
         'attachment; filename="Rainier-Beach-Swim-Safely-2026-tasks-2026-11-04.csv"'
     )
     header, *rows = _csv_rows(response)
-    assert header[:5] == ["Launch", "Task", "Assigned to", "Status", "Due date"]
+    assert header[:5] == ["Program", "Task", "Assigned to", "Status", "Due date"]
     by_task = {r[1]: dict(zip(header, r)) for r in rows}
     assert [r[1] for r in rows] == [
         "Confirm head coach",
@@ -926,7 +926,7 @@ def test_export_is_one_row_per_task_sorted_by_due_date(client, sign_in, project)
         "Send participant survey",
     ]
     flyer = by_task["Design flyer"]
-    assert flyer["Launch"] == "Rainier Beach Swim Safely 2026"
+    assert flyer["Program"] == "Rainier Beach Swim Safely 2026"
     assert flyer["Assigned to"] == "Sam"  # A name, never a record ID
     assert flyer["Due date"] == "2026-10-30"  # YYYY-MM-DD, so Sheets reads a date
     assert by_task["Confirm head coach"]["Completed date"] == "2026-10-10"

@@ -143,7 +143,7 @@ def archive_detail(project_id: str, user: CurrentUser = Depends(require_admin)):
     world = World()
     p = world.project(project_id)
     if not p.closed:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "That launch is not closed")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That program is not closed")
     tasks = sorted(
         world.tasks_by_project.get(p.id, []), key=lambda t: (t.due is None, t.due, t.name)
     )

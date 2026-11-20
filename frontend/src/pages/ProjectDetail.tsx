@@ -34,6 +34,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
 import { Tag } from "../components/ui/Tag";
 import { useToast } from "../components/ui/Toast";
+import { DeleteTaskDialog } from "../components/DeleteTaskDialog";
 import { FileDialog, fileSize } from "../components/FileDialog";
 import { LinkDialog } from "../components/LinkDialog";
 import { PeoplePicker } from "../components/PeoplePicker";
@@ -46,6 +47,11 @@ function errorText(caught: unknown) {
   return caught instanceof Error ? caught.message : "That did not work. Please try again.";
 }
 
+/** Every task on the page: the Overdue section plus each phase. */
+function allTasks(project: Project): TaskRow[] {
+  return [...project.overdue_tasks, ...project.groups.flatMap((g) => g.tasks)];
+}
+
 export function ProjectDetail() {
   const { id = "" } = useParams();
   const { me } = useAuth();
@@ -56,20 +62,23 @@ export function ProjectDetail() {
   const [moved, setMoved] = useState<DayOneResult | null>(null);
   const [undoing, setUndoing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState<TaskRow | null>(null);
 
   if (project.error) return <ErrorState error={project.error} onRetry={project.reload} />;
-  if (!project.data) return <LoadingState label="Loading the launch" />;
+  if (!project.data) return <LoadingState label="Loading the program" />;
   const p = project.data;
   const close = () => setOpen(null);
 
   function update(taskId: string, change: Partial<TaskRow> | null, saved?: TaskRow) {
+    const swap = (t: TaskRow) => (t.id === taskId ? (saved ?? { ...t, ...change }) : t);
     project.setData((current) =>
       current
         ? {
             ...current,
+            overdue_tasks: current.overdue_tasks.map(swap),
             groups: current.groups.map((g) => ({
               ...g,
-              tasks: g.tasks.map((t) => (t.id === taskId ? (saved ?? { ...t, ...change }) : t)),
+              tasks: g.tasks.map(swap),
             })),
           }
         : current,
@@ -117,8 +126,10 @@ export function ProjectDetail() {
   const subtitle = [p.program_type, p.site_type, p.template_version ? `Template v${p.template_version}` : null]
     .filter(Boolean)
     .join(" · ");
-  const taskCount = p.groups.reduce((sum, g) => sum + g.tasks.length, 0);
-  const dateProblems = p.groups.flatMap((g) => g.tasks).filter((t) => t.date_warning);
+  const taskCount = allTasks(p).length;
+  const dateProblems = allTasks(p).filter((t) => t.date_warning);
+  // Admins may delete tasks while the program is open. The server checks this too.
+  const onDelete = p.can_manage && !p.closed ? setDeleting : undefined;
 
   return (
     <div className="page">
@@ -154,7 +165,7 @@ export function ProjectDetail() {
               <Button variant="outline" onClick={() => setOpen("oneoff")}>
                 Add task
               </Button>
-              <Button to={`/projects/new?from=${p.id}`}>Start a new launch from this</Button>
+              <Button to={`/projects/new?from=${p.id}`}>Start a new program from this</Button>
             </>
           ) : (
             exportButton ?? undefined
@@ -197,19 +208,31 @@ export function ProjectDetail() {
           {taskCount === 0 ? (
             <EmptyState title="No tasks yet">{p.can_manage ? "Add a task to get started." : "An admin has not added tasks yet."}</EmptyState>
           ) : (
-            p.groups.map(
-              (group) =>
-                group.tasks.length > 0 && (
-                  <section key={group.phase} className="task-group" aria-label={group.phase}>
-                    <SectionLabel>{group.phase}</SectionLabel>
-                    <ul className="rows">
-                      {group.tasks.map((task) => (
-                        <ProjectTaskRow key={task.id} task={task} onStatus={onStatus} />
-                      ))}
-                    </ul>
-                  </section>
-                ),
-            )
+            <>
+              {p.overdue_tasks.length > 0 && (
+                <section className="task-group" aria-label="Overdue">
+                  <SectionLabel tone="late">Overdue</SectionLabel>
+                  <ul className="rows">
+                    {p.overdue_tasks.map((task) => (
+                      <ProjectTaskRow key={task.id} task={task} onStatus={onStatus} onDelete={onDelete} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {p.groups.map(
+                (group) =>
+                  group.tasks.length > 0 && (
+                    <section key={group.phase} className="task-group" aria-label={group.phase}>
+                      <SectionLabel>{group.phase}</SectionLabel>
+                      <ul className="rows">
+                        {group.tasks.map((task) => (
+                          <ProjectTaskRow key={task.id} task={task} onStatus={onStatus} onDelete={onDelete} />
+                        ))}
+                      </ul>
+                    </section>
+                  ),
+              )}
+            </>
           )}
         </Card>
 
@@ -252,7 +275,7 @@ export function ProjectDetail() {
                 </Button>
                 {p.can_close && (
                   <Button variant="outline" size="sm" onClick={() => setOpen("close")}>
-                    Close launch
+                    Close program
                   </Button>
                 )}
                 {p.closed && (
@@ -262,7 +285,7 @@ export function ProjectDetail() {
                     onClick={() =>
                       void reopenProject(p.id)
                         .then(() => {
-                          toast.show("Launch reopened.");
+                          toast.show("Program reopened.");
                           return project.reload();
                         })
                         .catch((caught) => toast.error(errorText(caught)))
@@ -273,7 +296,7 @@ export function ProjectDetail() {
                 )}
                 {p.can_delete && (
                   <Button variant="danger" size="sm" onClick={() => setOpen("delete")}>
-                    Delete launch
+                    Delete program
                   </Button>
                 )}
               </div>
@@ -406,7 +429,7 @@ export function ProjectDetail() {
             onClose={close}
             onClosed={() => {
               close();
-              toast.show("Launch closed. It is in the archive now.");
+              toast.show("Program closed. It is in the archive now.");
               void project.reload();
             }}
           />
@@ -445,6 +468,19 @@ export function ProjectDetail() {
         />
       )}
       {p.can_see_history && <HistoryDialog open={open === "history"} projectId={p.id} onClose={close} />}
+      {onDelete && (
+        <DeleteTaskDialog
+          open={deleting !== null}
+          taskId={deleting?.id ?? ""}
+          taskName={deleting?.name ?? ""}
+          onClose={() => setDeleting(null)}
+          onDeleted={(name) => {
+            setDeleting(null);
+            toast.show(`Deleted ${name}.`);
+            void project.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -587,7 +623,7 @@ function OneOffDialog({
   const [busy, setBusy] = useState(false);
   const roles = useApi(() => (open ? listRoles() : Promise.resolve(null)), [open]);
   const people = useApi(() => (open ? listPeople(false) : Promise.resolve(null)), [open]);
-  const tasks = project.groups.flatMap((g) => g.tasks);
+  const tasks = allTasks(project);
   const isOpenTask = (t: TaskRow) => t.status !== "Done" && t.status !== "Skipped";
   const first = tasks.find((t) => t.id === needsFirst);
   const later = tasks.find((t) => t.id === comesBefore);
@@ -638,8 +674,8 @@ function OneOffDialog({
       title="Add task"
       description={
         project.closed
-          ? "This launch is closed, so the task gets no reminders or emails. The template stays the same."
-          : "Only this launch gets it. The template stays the same."
+          ? "This program is closed, so the task gets no reminders or emails. The template stays the same."
+          : "Only this program gets it. The template stays the same."
       }
       onClose={onClose}
       actions={
@@ -838,8 +874,8 @@ function CloseDialog({
   return (
     <Dialog
       open={open}
-      title="Close this launch"
-      description="Closed launches move to the archive. Reminders stop. You can reopen it later."
+      title="Close this program"
+      description="Closed programs move to the archive. Reminders stop. You can reopen it later."
       onClose={onClose}
       actions={
         <>
@@ -847,7 +883,7 @@ function CloseDialog({
             Cancel
           </Button>
           <Button onClick={() => void confirm()} disabled={busy}>
-            {busy ? "Closing" : "Close launch"}
+            {busy ? "Closing" : "Close program"}
           </Button>
         </>
       }
@@ -884,7 +920,7 @@ function DeleteDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const name = project.site || project.name;
-  const taskCount = project.groups.reduce((sum, g) => sum + g.tasks.length, 0);
+  const taskCount = allTasks(project).length;
   const label = project.day_one ? `${name} (Day 1 ${formatDate(project.day_one)})` : name;
 
   async function confirm() {
@@ -913,7 +949,7 @@ function DeleteDialog({
             Cancel
           </Button>
           <Button variant="danger" onClick={() => void confirm()} disabled={busy}>
-            {busy ? "Deleting" : "Delete launch"}
+            {busy ? "Deleting" : "Delete program"}
           </Button>
         </>
       }
@@ -925,7 +961,7 @@ function DeleteDialog({
       </p>
       {!project.closed && (
         <p className="muted small">
-          To keep a record of it instead, close the launch. Closed launches stay in the archive.
+          To keep a record of it instead, close the program. Closed programs stay in the archive.
         </p>
       )}
       {error && (
@@ -965,7 +1001,7 @@ function TemplateDialog({ open, project, onClose }: { open: boolean; project: Pr
     <Dialog
       open={open}
       title="Save as a template"
-      description={`Makes a new template from the ${project.site || project.name} tasks and their timing, including tasks added to this launch.`}
+      description={`Makes a new template from the ${project.site || project.name} tasks and their timing, including tasks added to this program.`}
       onClose={onClose}
       actions={
         <>

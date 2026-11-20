@@ -49,15 +49,15 @@ export function Archive() {
         <LoadingState label="Loading the archive" />
       ) : launches.length === 0 ? (
         <Card>
-          <EmptyState title={site || from || to ? "No launches match" : "No finished launches yet"}>
-            {site || from || to ? "Try a wider date range or another site name." : "Closed launches show up here."}
+          <EmptyState title={site || from || to ? "No programs match" : "No finished programs yet"}>
+            {site || from || to ? "Try a wider date range or another site name." : "Closed programs show up here."}
           </EmptyState>
         </Card>
       ) : (
         <div className="two-col two-col--even">
           <Card className="archive-list">
             <div className="split list-head" aria-hidden="true">
-              <span>Launch</span>
+              <span>Program</span>
               <span>On time</span>
             </div>
             <ul>
@@ -95,7 +95,7 @@ export function Archive() {
                 <h2 className="archive-title">{detail.data.site || detail.data.name}</h2>
                 <p className="muted">{detail.data.subtitle}</p>
                 <div className="card-actions">
-                  <Button to={`/projects/new?from=${detail.data.id}`}>Start a new launch from this</Button>
+                  <Button to={`/projects/new?from=${detail.data.id}`}>Start a new program from this</Button>
                 </div>
                 <div className="stat-row-plain">
                   <StatTile value={detail.data.counts.tasks} label="tasks" />

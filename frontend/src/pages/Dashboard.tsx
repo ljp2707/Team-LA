@@ -6,10 +6,10 @@ export function Dashboard() {
   return (
     <div className="page">
       <PageHeader
-        title="Active launches"
-        action={<Button to="/projects/new">Start a launch</Button>}
+        title="Active programs"
+        action={<Button to="/projects/new">Start a program</Button>}
       />
-      <ProjectGrid showSummary emptyText="Start a launch to see it here." />
+      <ProjectGrid showSummary emptyText="Start a program to see it here." />
     </div>
   );
 }

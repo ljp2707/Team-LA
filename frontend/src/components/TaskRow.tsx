@@ -72,7 +72,7 @@ export function MyTaskRow({
   const details = [
     ...context,
     task.shared_with.length > 0 ? `shared with ${task.shared_with.join(", ")}` : null,
-    task.one_off ? "added to this launch" : null,
+    task.one_off ? "added to this program" : null,
   ].filter(Boolean);
   const subtitle = task.waiting_text ? (
     <span className="row-sub is-late">{task.waiting_text}</span>
@@ -122,9 +122,12 @@ export function MyTaskRow({
 export function ProjectTaskRow({
   task,
   onStatus,
+  onDelete,
 }: {
   task: Task;
   onStatus: (task: Task, status: TaskStatus) => void;
+  /** Admins on a program that is not closed: adds Delete task to the status menu. */
+  onDelete?: (task: Task) => void;
 }) {
   const late = task.overdue && !isFinished(task.status);
   const blocked = task.display_status === "Blocked";
@@ -135,7 +138,7 @@ export function ProjectTaskRow({
     : late && task.dependents > 0
       ? `${task.dependents} ${task.dependents === 1 ? "task depends" : "tasks depend"} on this`
       : task.one_off
-        ? "Added to this launch only"
+        ? "Added to this program only"
         : !task.assignee
           ? "Needs an owner"
           : null;
@@ -153,6 +156,7 @@ export function ProjectTaskRow({
             taskName={task.name}
             canEdit
             onChange={(status) => onStatus(task, status)}
+            onDelete={onDelete ? () => onDelete(task) : undefined}
           />
         ) : (
           <StatusTag status={task.display_status} late={late} />

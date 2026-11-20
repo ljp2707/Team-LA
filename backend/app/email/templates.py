@@ -16,7 +16,7 @@ from app.config import get_settings
 NAVY = "#0d2438"
 MUTED = "#4e6175"
 BLUE = "#1767c9"
-FOOTER = "You get this because you have tasks in NMU Launches."
+FOOTER = "You get this because you have tasks in NMU Programs."
 
 
 def footer_lines() -> list[str]:
@@ -36,7 +36,7 @@ LAYOUT = Template(
     """<!doctype html>
 <html><body style="margin:0;padding:0;background:#ffffff;">
 <div style="max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff;color:$navy;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.5;">
-<p style="margin:0 0 24px;font-weight:bold;font-size:14px;color:$muted;">NMU Launches</p>
+<p style="margin:0 0 24px;font-weight:bold;font-size:14px;color:$muted;">NMU Programs</p>
 <h1 style="margin:0 0 16px;font-size:24px;line-height:1.2;color:$navy;">$heading</h1>
 $body
 <p style="margin:24px 0;"><a href="$url" style="display:inline-block;padding:12px 24px;border-radius:999px;background:$blue;color:#ffffff;text-decoration:none;font-weight:bold;">$button</a></p>
@@ -133,7 +133,7 @@ def due_today(task: TaskLine) -> Email:
     lines = [f"{task.name} at {task.site} is due today."]
     if task.waiting:
         lines.append(f"{task.waiting}.")
-    lines.append("Mark it done in NMU Launches when it is finished.")
+    lines.append("Mark it done in NMU Programs when it is finished.")
     text, html = _render(
         f"Due today: {task.name}",
         "".join(_p(line) for line in lines),
@@ -153,6 +153,26 @@ def custom_reminder(task: TaskLine, note: str = "") -> Email:
         f"Reminder: {task.name}",
         "".join(_p(line) for line in lines),
         "\n".join(lines),
+        task.url,
+        "Open task",
+    )
+    return subject, text, html
+
+
+def nudge(task: TaskLine, sent_by: str, message: str = "") -> Email:
+    """An admin's one-off reminder about one task, with their optional message."""
+    subject = f"Reminder from {sent_by}: {task.name} ({task.site})"
+    lines = [
+        f"{sent_by} sent you a reminder about {task.name} at {task.site}. "
+        f"It is {task.due_text[0].lower() + task.due_text[1:]}."
+    ]
+    if message.strip():
+        lines.append(f"{sent_by} wrote: {message.strip()}")
+    lines.append("Mark it done in NMU Programs when it is finished.")
+    text, html = _render(
+        f"Reminder: {task.name}",
+        "".join(_p(line) for line in lines),  # _p escapes, so the message cannot add HTML
+        "\n\n".join(lines),
         task.url,
         "Open task",
     )
@@ -194,7 +214,7 @@ def assignment(tasks: list[TaskLine], assigned_by: str) -> Email:
         heading = subject
         url = app_url("/my-tasks")
         button = "Open My Tasks"
-    intro = f"{assigned_by} gave you {'this task' if len(tasks) == 1 else 'these tasks'} in NMU Launches."
+    intro = f"{assigned_by} gave you {'this task' if len(tasks) == 1 else 'these tasks'} in NMU Programs."
     text, html = _render(
         heading,
         _p(intro) + _task_list_html(tasks),
@@ -206,14 +226,14 @@ def assignment(tasks: list[TaskLine], assigned_by: str) -> Email:
 
 
 def welcome(first_name: str, email: str) -> Email:
-    subject = "You've been added to NMU Launches"
+    subject = "You've been added to NMU Programs"
     lines = [
         f"Hi {first_name}," if first_name else "Hi,",
-        f"You've been added to NMU Launches. Sign in with Google at {app_url()} using this email ({email}).",
-        "NMU Launches is where No More Under plans every new swim program site. You will see your own tasks on My Tasks.",
+        f"You've been added to NMU Programs. Sign in with Google at {app_url()} using this email ({email}).",
+        "NMU Programs is where No More Under plans every new swim program site. You will see your own tasks on My Tasks.",
     ]
     text, html = _render(
-        "Welcome to NMU Launches",
+        "Welcome to NMU Programs",
         "".join(_p(line) for line in lines),
         "\n\n".join(lines),
         app_url("/"),
@@ -223,16 +243,16 @@ def welcome(first_name: str, email: str) -> Email:
 
 
 def test_email(first_name: str) -> Email:
-    subject = "NMU Launches test email"
+    subject = "NMU Programs test email"
     lines = [
         f"Hi {first_name}," if first_name else "Hi,",
-        "This is a test email from NMU Launches. If you can read it, email is working.",
+        "This is a test email from NMU Programs. If you can read it, email is working.",
     ]
     text, html = _render(
         "Email is working",
         "".join(_p(line) for line in lines),
         "\n\n".join(lines),
         app_url("/users"),
-        "Open NMU Launches",
+        "Open NMU Programs",
     )
     return subject, text, html

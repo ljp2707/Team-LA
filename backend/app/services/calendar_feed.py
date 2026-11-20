@@ -116,8 +116,8 @@ def build_feed(world: World, user: UserRec, now: datetime | None = None) -> str:
         "PRODID:-//No More Under//NMU Launches//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        f"X-WR-CALNAME:{escape_text('NMU Launches tasks')}",
-        f"X-WR-CALDESC:{escape_text(f'Tasks assigned to {user.name} in NMU Launches')}",
+        f"X-WR-CALNAME:{escape_text('NMU Programs tasks')}",
+        f"X-WR-CALDESC:{escape_text(f'Tasks assigned to {user.name} in NMU Programs')}",
         # Hints for apps that honor them. Google Calendar picks its own schedule.
         "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
         "X-PUBLISHED-TTL:PT1H",
@@ -128,8 +128,8 @@ def build_feed(world: World, user: UserRec, now: datetime | None = None) -> str:
         link = task_url(t.id)
         description = (
             f"Status: {logic.display_status(t, waiting)}\n"
-            f"Launch: {project.name}\n"
-            f"Open in NMU Launches: {link}"
+            f"Program: {project.name}\n"
+            f"Open in NMU Programs: {link}"
         )
         lines += [
             "BEGIN:VEVENT",

@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Callable
 
 from app.airtable import client
@@ -443,6 +443,49 @@ def send_welcome(user_id: str) -> None:
         logger.warning("Welcome email failed: %s", type(exc).__name__)
 
 
+NUDGE = "Nudge"
+# One nudge per person per task in this many hours. Counted from the Reminders table, so
+# it survives a redeploy (the in-memory rate limiter does not).
+NUDGE_EVERY_HOURS = 24
+
+
+def recent_nudges(rows: list[ReminderRec], task_id: str, now: datetime) -> dict[str, datetime]:
+    """Who was nudged about this task in the last 24 hours, and when (latest first wins)."""
+    since = now - timedelta(hours=NUDGE_EVERY_HOURS)
+    out: dict[str, datetime] = {}
+    for r in rows:
+        sent = clock.parse_datetime(r.sent_at)
+        if r.kind != NUDGE or r.status != SENT or r.work_id != task_id or not r.recipient_id or not sent:
+            continue
+        if sent >= since and sent > out.get(r.recipient_id, since):
+            out[r.recipient_id] = sent
+    return out
+
+
+def send_nudges(line: TaskLine, task_id: str, people: list[UserRec], sent_by: str, message: str) -> tuple[list[UserRec], list[str]]:
+    """Email each person now. Returns (who got it, error messages). Logs a Reminders row each.
+
+    The caller checks REMINDERS_DRY_RUN first. Errors are the safe EmailError text or an
+    exception type, never the address or the message.
+    """
+    email = templates.nudge(line, sent_by, message)
+    today = clock.today()
+    sent: list[UserRec] = []
+    errors: list[str] = []
+    for person in people:
+        try:
+            gmail.send_email(person.email, *email)
+        except Exception as exc:  # noqa: BLE001 - shown to the admin and logged on the row
+            error = str(exc) if isinstance(exc, gmail.EmailError) else type(exc).__name__
+            logger.warning("Nudge email failed: %s", error)
+            _write_row(None, f"Nudge: {line.name}", NUDGE, today, FAILED, task_id, person.id, error)
+            errors.append(error)
+            continue
+        _write_row(None, f"Nudge: {line.name}", NUDGE, today, SENT, task_id, person.id)
+        sent.append(person)
+    return sent, errors
+
+
 def cancel_custom_for_task(task_id: str) -> int:
     """When a task becomes Done or Skipped, its scheduled custom reminders stop."""
     ids = [
@@ -531,6 +574,7 @@ def mine(user_id: str, today: date, tasks: list[TaskRec], active_ids: set[str]) 
                     WEEKLY: "Weekly digest sent",
                     ASSIGNMENT: "New task email sent" + (f" for {task_name}" if task_name else ""),
                     WELCOME: "Welcome email sent",
+                    NUDGE: f"An admin sent you a reminder about {task_name}",
                 }.get(r.kind, f"{r.kind} email sent")
                 out.append({"date": sent_on, "text": what, "task_id": r.work_id, "sent": True})
         elif r.status == SCHEDULED and r.kind == CUSTOM and r.send_on and r.send_on <= horizon:

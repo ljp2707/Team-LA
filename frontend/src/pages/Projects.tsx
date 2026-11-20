@@ -12,7 +12,7 @@ export function Projects() {
       />
       <ProjectGrid
         showSummary={false}
-        emptyText={partner ? "You are not on a launch yet. Ask your NMU contact." : "No launches are in progress."}
+        emptyText={partner ? "You are not on a program yet. Ask your NMU contact." : "No programs are in progress."}
       />
     </div>
   );

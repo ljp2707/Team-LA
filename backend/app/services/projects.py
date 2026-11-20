@@ -305,10 +305,10 @@ def update_details(world: World, project: ProjectRec, body: ProjectDetailsIn, us
 def close(world: World, project: ProjectRec, skip_open: bool, user: CurrentUser) -> dict:
     today = world.today
     if project.closed:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This launch is already closed")
+        raise HTTPException(status.HTTP_409_CONFLICT, "This program is already closed")
     if project.start is None or project.start > today:
         raise HTTPException(
-            status.HTTP_409_CONFLICT, "You can close a launch once Day 1 has passed"
+            status.HTTP_409_CONFLICT, "You can close a program once Day 1 has passed"
         )
     open_tasks = [t for t in world.tasks_by_project.get(project.id, []) if logic.is_open(t.status)]
     if skip_open and open_tasks:
@@ -337,20 +337,20 @@ def close(world: World, project: ProjectRec, skip_open: bool, user: CurrentUser)
             if skip_open
             else f" with {logic.plural(len(open_tasks), 'open task')} left as they were"
         )
-    history.log_event(project.id, None, user.id, "Project Closed", f"closed this launch{note}")
+    history.log_event(project.id, None, user.id, "Project Closed", f"closed this program{note}")
     return {"closed": True, "skipped": len(open_tasks) if skip_open else 0}
 
 
 def reopen(project: ProjectRec, user: CurrentUser) -> None:
     if not project.closed:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This launch is not closed")
+        raise HTTPException(status.HTTP_409_CONFLICT, "This program is not closed")
     client.update_record(
         Session.TABLE,
         project.id,
         {Session.STATUS: SESSION_IN_PROGRESS, Session.CLOSED_DATE: None},
         typecast=True,
     )
-    history.log_event(project.id, None, user.id, "Project Closed", "reopened this launch", "Complete", "In progress")
+    history.log_event(project.id, None, user.id, "Project Closed", "reopened this program", "Complete", "In progress")
 
 
 def delete(world: World, project: ProjectRec, user: CurrentUser) -> dict:
@@ -389,7 +389,7 @@ def delete(world: World, project: ProjectRec, user: CurrentUser) -> dict:
         None,
         user.id,
         "System",
-        f"deleted the launch {name} and its {logic.plural(len(task_ids), 'task')}",
+        f"deleted the program {name} and its {logic.plural(len(task_ids), 'task')}",
     )
     return {"deleted": True, "tasks": len(task_ids)}
 

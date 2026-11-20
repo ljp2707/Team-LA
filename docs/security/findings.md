@@ -334,6 +334,18 @@ it.
 
 ---
 
+## New routes since the review (sponsor changes, 2026-11-20)
+
+Added after F1 to F19 were fixed, for the next security pass to review. Each one has a
+row in `backend/tests/test_access_matrix.py`, its rule in `app/permissions.py`, and sits
+behind the Origin check and the per-person write limit.
+
+| Route | Who | What it can change | Notes |
+|---|---|---|---|
+| `POST /api/tasks/{id}/nudge` | Admin view (`can_nudge`) | Sends one email to each Active assignee; writes a Reminders row (Kind Nudge) per email and one History row (Type Nudge) | Body `message` up to 500 characters, HTML-escaped in the email, never stored or logged. Once per person per task per 24 hours (read from Reminders, so it survives restarts; answers 429). 20 per admin per hour (`rate_limit.py`, in memory). Respects `REMINDERS_DRY_RUN`. Refused on finished tasks and closed programs. Gmail errors are returned to the admin as the safe `EmailError` text |
+| `GET /api/tasks/mine` (changed) | Anyone signed in | Nothing (read only) | New query parameters `state`, `city`, `program_type` (length-capped) and `sort` (`due`, `program` or `location` only). They only narrow the caller's own task list, filtered in Python. Filter choices are built from the caller's own tasks, so they never reveal other people's sites |
+| `DELETE /api/tasks/{id}` | Admin view (`can_delete_tasks`) | Deletes one Work row. Writes a History row first, removes it from other tasks' Depends On, cancels its Scheduled custom reminders, moves its Links rows to the program | Refused (409) on closed programs. Cannot be undone; no Airtable-side recovery other than Airtable's own trash. The task's Google Calendar event (shared-calendar sync) is not removed |
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

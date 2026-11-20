@@ -109,6 +109,8 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | GET | `/api/tasks/mine` | current_user | No | Own tasks on launches the caller can see |
 | GET | `/api/tasks/{id}` | current_user | No | `_visible_task` (partner launch check). Notes filtered by visibility. People list only for admins |
 | PATCH | `/api/tasks/{id}` | require_can_edit | Yes | Status: only assignees (or Admin); Skip, due date, name and depends-on: Admin only |
+| POST | `/api/tasks/{id}/nudge` | Admin | Yes; email | Open task, open program, Active assignees only. Once per person per task per day (from Reminders); 20 per admin per hour. Message escaped, not stored |
+| DELETE | `/api/tasks/{id}` | Admin | Yes (deletes) | Refused on closed programs. History row written first; dependencies cleared; scheduled reminders cancelled; links moved to the program |
 | POST | `/api/tasks/{id}/assign` | Admin | Yes; email | Only existing, active users |
 | POST | `/api/tasks/reassign` | Admin | Yes; email | All-or-nothing; open tasks on open launches only |
 | POST | `/api/tasks/{id}/notes` | require_can_edit | Yes | Assignee or Admin. Partners' notes default to Shared |

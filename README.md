@@ -1,6 +1,6 @@
-# NMU Launches
+# NMU Programs
 
-NMU Launches is where No More Under plans and tracks every new swim program site. An admin picks a template and a Day 1, and the app creates every task with a due date and an owner, so staff only need to look at their own list.
+NMU Programs is where No More Under plans and tracks every new swim program site. An admin picks a template and a Day 1, and the app creates every task with a due date and an owner, so staff only need to look at their own list.
 
 Airtable holds all the data. Staff never need Airtable seats, because only this app's server talks to Airtable.
 
@@ -152,7 +152,7 @@ The app needs some fields and tables the original base did not have: the Links, 
 3. Run `python -m jobs.migrate_airtable --apply` to add them. Running it again prints "Nothing to add".
 4. `python -m jobs.dump_schema` rewrites `docs/airtable-schema.md` from the live base, so you can check the result.
 
-On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds demo people, sites, templates and launches, all with `@example.org` emails. It refuses to run in production, and refuses to run twice.
+On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds demo people, sites, templates and programs, all with `@example.org` emails. It refuses to run in production, and refuses to run twice.
 
 `docs/data-model.md` explains every table and field the app uses.
 
@@ -170,7 +170,7 @@ Airtable answers at most 5 requests a second per base and sends 100 rows per req
 
 **Edits made directly in Airtable** show within about 30 seconds. Sometimes the first page after that still shows the old copy, and the page after it shows the change.
 
-**Fields that come from another table.** Some fields are filled in by Airtable from a different table. For example, a task's due date follows its launch's Day 1, and a site's name includes its region. So when one table is edited, the app also throws away its copy of any table that takes fields from it. `DEPENDS_ON_WRITES_TO` in `client.py` lists these, for example "after editing Session, fetch Work again". If you make the app read a new formula, lookup or linked field that comes from another table, add that pair to the list. Otherwise that field can show its old value for about a second after an edit, until the background refresh catches up.
+**Fields that come from another table.** Some fields are filled in by Airtable from a different table. For example, a task's due date follows its program's Day 1, and a site's name includes its region. So when one table is edited, the app also throws away its copy of any table that takes fields from it. `DEPENDS_ON_WRITES_TO` in `client.py` lists these, for example "after editing Session, fetch Work again". If you make the app read a new formula, lookup or linked field that comes from another table, add that pair to the list. Otherwise that field can show its old value for about a second after an edit, until the background refresh catches up.
 
 ## Adding and removing people
 
@@ -218,6 +218,7 @@ The live site needs real Google sign in, because the test login only works on yo
    |---|---|
    | Sign in (`/auth/login`, `/auth/callback`) | 10 a minute per address |
    | File uploads | 20 an hour per person |
+   | Nudges (`POST /api/tasks/{id}/nudge`) | 20 an hour per admin, and once a day per person per task (that one is read from the Reminders table, so it survives a restart) |
    | Any other change (POST, PUT, PATCH, DELETE under `/api/`) | 60 a minute per person |
    | Calendar feeds and `/api/public/*` | 60 a minute per address |
 
@@ -255,7 +256,7 @@ Each person's **Access Level** in the Airtable Users table sets what they can do
 | Admin | Admin view | Full access |
 | Staff | Staff view | Can update their own tasks |
 | Viewer | Staff view | Read only |
-| Partner | Partner view | Sees only the launches they are added to, and updates their own tasks. Never sees internal notes or history |
+| Partner | Partner view | Sees only the programs they are added to, and updates their own tasks. Never sees internal notes or history |
 | Blank or anything else | Staff view | Read only |
 
 Admins can use the switch in the sidebar to see the app exactly as staff do. While in staff view they have staff permissions, on the server as well as on screen.

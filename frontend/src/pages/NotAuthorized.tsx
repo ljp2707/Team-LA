@@ -10,11 +10,11 @@ const MESSAGES: Record<string, { title: string; text: string }> = {
   },
   domain: {
     title: "That account is not allowed here",
-    text: "NMU Launches only accepts Google accounts from your organization's domain. Try a different account.",
+    text: "NMU Programs only accepts Google accounts from your organization's domain. Try a different account.",
   },
   airtable: {
     title: "We could not check your account",
-    text: "NMU Launches could not reach its records just now. Please try again in a minute.",
+    text: "NMU Programs could not reach its records just now. Please try again in a minute.",
   },
   "not-configured": {
     title: "Google sign in is not set up yet",
@@ -39,8 +39,8 @@ export function NotAuthorized() {
   const text =
     known?.text ??
     (email
-      ? `${email} is not on the NMU Launches list. Ask an admin to add you, or sign in with the account they added.`
-      : "Your Google account is not on the NMU Launches list. Ask an admin to add you, or sign in with the account they added.");
+      ? `${email} is not on the NMU Programs list. Ask an admin to add you, or sign in with the account they added.`
+      : "Your Google account is not on the NMU Programs list. Ask an admin to add you, or sign in with the account they added.");
 
   return (
     <main className="standalone">

@@ -166,6 +166,16 @@ def can_edit_task_details(actor: Actor) -> bool:
     return actor.is_admin
 
 
+def can_nudge(actor: Actor) -> bool:
+    """Email a task's people a reminder right now, on top of the automatic ones."""
+    return actor.is_admin
+
+
+def can_delete_tasks(actor: Actor) -> bool:
+    """Delete a task from a program that is not closed. Cannot be undone, so admins only."""
+    return actor.is_admin
+
+
 def can_edit_setup(actor: Actor) -> bool:
     """Edit templates, users and roles."""
     return actor.is_admin
@@ -241,7 +251,7 @@ PROGRAM_ACCESS: dict[str, str] = {
     "Admin": "All programs",
     "Staff": "Program Assistants, Operations, Marketing, Grants",
     "Viewer": "Assigned program only",
-    "Partner": "Launches they are added to",
+    "Partner": "Programs they are added to",
 }
 
 

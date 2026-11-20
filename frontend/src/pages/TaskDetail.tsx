@@ -1,6 +1,6 @@
 import { safeHref } from "../lib/safeHref";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   addNote,
   addReminder,
@@ -10,6 +10,7 @@ import {
   cancelReminder,
   deleteNote,
   getTask,
+  nudgeTask,
   setStatus,
   shareNote,
   updateTask,
@@ -20,13 +21,14 @@ import { Avatar } from "../components/ui/Bits";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Dialog } from "../components/ui/Dialog";
-import { DateInput, TextInput } from "../components/ui/Field";
+import { DateInput, TextArea, TextInput } from "../components/ui/Field";
 import { PageHeader } from "../components/ui/PageHeader";
 import { ErrorState, LoadingState } from "../components/ui/States";
 import { StatusTag } from "../components/ui/StatusTag";
 import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { addDays, formatDate } from "../lib/dates";
+import { DeleteTaskDialog } from "../components/DeleteTaskDialog";
 import { FileDialog, fileSize } from "../components/FileDialog";
 import { LinkDialog } from "../components/LinkDialog";
 import { PeoplePicker } from "../components/PeoplePicker";
@@ -42,11 +44,12 @@ function errorText(caught: unknown) {
   return caught instanceof Error ? caught.message : "That did not work. Please try again.";
 }
 
-type Open = null | "link" | "file" | "reminder" | "assign" | "due" | "rename";
+type Open = null | "link" | "file" | "reminder" | "assign" | "due" | "rename" | "delete" | "nudge";
 
 export function TaskDetail() {
   const { id = "" } = useParams();
   const toast = useToast();
+  const navigate = useNavigate();
   const task = useApi(() => getTask(id), [id]);
   const [note, setNote] = useState("");
   const [posting, setPosting] = useState(false);
@@ -105,14 +108,21 @@ export function TaskDetail() {
                 </strong>
               </>
             )}
-            {t.one_off && " · Added to this launch only"}
+            {t.one_off && " · Added to this program only"}
           </>
         }
         action={
           t.can_admin ? (
-            <Button variant="outline" onClick={() => setOpen("rename")}>
-              Rename
-            </Button>
+            <>
+              {t.can_nudge && (
+                <Button variant="outline" onClick={() => setOpen("nudge")}>
+                  Nudge
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setOpen("rename")}>
+                Rename
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -143,7 +153,12 @@ export function TaskDetail() {
                 </p>
                 {t.can_admin && t.status !== "Skipped" && (
                   <button type="button" className="text-button" onClick={() => void changeTo("Skipped")}>
-                    Skip this task for this launch
+                    Skip this task for this program
+                  </button>
+                )}
+                {t.can_delete && (
+                  <button type="button" className="text-button text-button--danger" onClick={() => setOpen("delete")}>
+                    Delete task
                   </button>
                 )}
               </>
@@ -323,6 +338,11 @@ export function TaskDetail() {
                 </dd>
               </div>
             </dl>
+            {t.last_nudge && (
+              <p className="muted small">
+                Last nudged by {t.last_nudge.by}, {t.last_nudge.date_text}
+              </p>
+            )}
             {!t.can_admin && <p className="muted small">Only admins can reassign tasks.</p>}
             {t.calendar_url && !done && (
               <a href={t.calendar_url} target="_blank" rel="noreferrer" className="strong-link small">
@@ -482,7 +502,101 @@ export function TaskDetail() {
           />
         </>
       )}
+      {t.can_nudge && (
+        <NudgeDialog
+          open={open === "nudge"}
+          task={t}
+          onClose={close}
+          onSent={(message) => {
+            close();
+            toast.show(message);
+            void task.reload();
+          }}
+        />
+      )}
+      {t.can_delete && (
+        <DeleteTaskDialog
+          open={open === "delete"}
+          taskId={t.id}
+          taskName={t.name}
+          onClose={close}
+          onDeleted={(name) => {
+            toast.show(`Deleted ${name}.`);
+            // The task is gone, so go to its program.
+            navigate(t.project_id ? `/projects/${t.project_id}` : t.back.to, { replace: true });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/** Admins only: confirm, add an optional message, and email everyone on the task now. */
+function NudgeDialog({
+  open,
+  task,
+  onClose,
+  onSent,
+}: {
+  open: boolean;
+  task: Task;
+  onClose: () => void;
+  onSent: (message: string) => void;
+}) {
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const names = task.assignees.map((a) => a.name);
+  const who = names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+  async function send() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await nudgeTask(task.id, message.trim());
+      setMessage("");
+      onSent(result.message);
+    } catch (caught) {
+      setError(errorText(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      title={`Send a reminder to ${who} about ${task.name}?`}
+      description="They get one email now with the task, its due date and a link to it. Each person can be nudged about a task once a day."
+      onClose={() => {
+        setError(null);
+        onClose();
+      }}
+      actions={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={() => void send()} disabled={busy}>
+            {busy ? "Sending" : "Send reminder"}
+          </Button>
+        </>
+      }
+    >
+      <TextArea
+        label="Message (optional)"
+        rows={3}
+        maxLength={500}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        hint={`${500 - message.length} characters left`}
+      />
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+    </Dialog>
   );
 }
 
@@ -638,7 +752,7 @@ function DueDialog({
     <Dialog
       open={open}
       title="Change the due date"
-      description="Only this task moves. To move the whole launch, use Move Day 1 on the project."
+      description="Only this task moves. To move the whole program, use Move Day 1 on the project."
       onClose={onClose}
       actions={
         <>
@@ -697,7 +811,7 @@ function RenameDialog({
     <Dialog
       open={open}
       title="Rename this task"
-      description="Only this launch changes. Edit the template to rename it for future launches."
+      description="Only this program changes. Edit the template to rename it for future programs."
       onClose={onClose}
       actions={
         <>

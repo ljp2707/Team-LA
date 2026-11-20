@@ -79,7 +79,7 @@ def test_feed_has_only_that_persons_open_dated_tasks(client, sign_in, project):
     assert flyer["DTSTART;VALUE=DATE"] == "20261030"
     assert flyer["DTEND;VALUE=DATE"] == "20261031"  # All day: ends the next day
     assert "Status: Not Started" in flyer["DESCRIPTION"]
-    assert "Launch: Rainier Beach Swim Safely 2026" in flyer["DESCRIPTION"]
+    assert "Program: Rainier Beach Swim Safely 2026" in flyer["DESCRIPTION"]
     assert flyer["URL"].endswith("/tasks/recT2")
     assert "Status: Blocked" in events["recT3@nmu-launches"]["DESCRIPTION"]  # As the app shows it
     for hidden in ("Admin only", "Finished", "Someday", "Leftover"):

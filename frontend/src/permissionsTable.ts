@@ -42,21 +42,21 @@ export const PERMISSION_TABLE: PermissionRow[] = [
   },
   {
     // can_delete_projects
-    action: "Delete a launch",
+    action: "Delete a program",
     admin: "Yes",
     staff: "No",
     partner: "No",
   },
   {
     // can_export_projects
-    action: "Export a launch to a spreadsheet",
+    action: "Export a program to a spreadsheet",
     admin: "Yes",
     staff: "No",
     partner: "No",
   },
   {
     // can_view_user_work
-    action: "See anyone's launches and tasks",
+    action: "See anyone's programs and tasks",
     admin: "Yes",
     staff: "No",
     partner: "No",

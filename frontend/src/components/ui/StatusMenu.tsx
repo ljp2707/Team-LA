@@ -10,10 +10,12 @@ interface StatusMenuProps {
   canEdit: boolean;
   canSkip?: boolean;
   onChange: (status: TaskStatus) => void;
+  /** Admins only: adds "Delete task" at the bottom of the menu. */
+  onDelete?: () => void;
 }
 
 /** One-click status: the tag opens a small menu. Read only people just see the tag. */
-export function StatusMenu({ status, taskName, canEdit, canSkip = false, onChange }: StatusMenuProps) {
+export function StatusMenu({ status, taskName, canEdit, canSkip = false, onChange, onDelete }: StatusMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -47,7 +49,9 @@ export function StatusMenu({ status, taskName, canEdit, canSkip = false, onChang
   function onMenuKey(event: React.KeyboardEvent) {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
-    const items = Array.from(wrapper.current?.querySelectorAll<HTMLButtonElement>("[role=menuitemradio]") ?? []);
+    const items = Array.from(
+      wrapper.current?.querySelectorAll<HTMLButtonElement>("[role=menuitemradio], [role=menuitem]") ?? [],
+    );
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
     const next = event.key === "ArrowDown" ? (index + 1) % items.length : (index - 1 + items.length) % items.length;
     items[next]?.focus();
@@ -87,6 +91,19 @@ export function StatusMenu({ status, taskName, canEdit, canSkip = false, onChang
               {STATUS_LABELS[choice]}
             </button>
           ))}
+          {onDelete && (
+            <button
+              type="button"
+              role="menuitem"
+              className="status-popover-danger"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+            >
+              Delete task
+            </button>
+          )}
         </div>
       )}
     </div>

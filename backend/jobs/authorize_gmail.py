@@ -50,7 +50,7 @@ def main() -> int:
         access_type="offline",
         prompt="consent",
         open_browser=True,
-        success_message="NMU Launches can now send email. You can close this tab.",
+        success_message="NMU Programs can now send email. You can close this tab.",
     )
     if not credentials.refresh_token:
         print("Google did not return a refresh token. Run this again.")

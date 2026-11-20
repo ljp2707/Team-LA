@@ -261,6 +261,11 @@
   align-items: start;
 }
 
+/* Two columns under a full-width header and toolbar (My Tasks). */
+.page-columns {
+  gap: var(--space-5);
+}
+
 .page-main {
   display: flex;
   flex-direction: column;
@@ -357,6 +362,11 @@
   flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* A toolbar with many filters goes onto a second line instead of overflowing. */
+.toolbar.toolbar--wrap {
+  flex-wrap: wrap;
 }
 
 .chips,
@@ -716,6 +726,18 @@ input.select {
 .status-popover button:hover,
 .status-popover button:focus-visible {
   background: var(--color-hover-tint);
+}
+
+/* Deleting is not a status, so it sits apart in the late colour. */
+.status-popover .status-popover-danger {
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--color-divider);
+  border-radius: 0 0 8px 8px;
+  color: var(--tag-late-text);
+}
+
+.text-button.text-button--danger {
+  color: var(--tag-late-text);
 }
 
 .status-popover button[aria-checked="true"]::after {

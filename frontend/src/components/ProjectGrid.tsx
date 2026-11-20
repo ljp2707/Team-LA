@@ -42,14 +42,14 @@ export function ProjectGrid({ showSummary, emptyText }: { showSummary: boolean; 
   );
 
   if (list.error) return <ErrorState error={list.error} onRetry={list.reload} />;
-  if (!list.data) return <LoadingState label="Loading launches" />;
+  if (!list.data) return <LoadingState label="Loading programs" />;
   const { summary, regions, program_types } = list.data;
 
   return (
     <>
       {showSummary && (
         <Card className="stat-strip">
-          <StatTile value={summary.active} label={summary.active === 1 ? "active launch" : "active launches"} />
+          <StatTile value={summary.active} label={summary.active === 1 ? "active program" : "active programs"} />
           <StatTile
             value={summary.overdue}
             label={summary.overdue === 1 ? "task overdue" : "tasks overdue"}
@@ -69,7 +69,7 @@ export function ProjectGrid({ showSummary, emptyText }: { showSummary: boolean; 
 
       <div className="toolbar">
         <label className="search-field">
-          <span className="visually-hidden">Search launches</span>
+          <span className="visually-hidden">Search programs</span>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
             <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.8" />
             <path d="m11 11 3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -77,7 +77,7 @@ export function ProjectGrid({ showSummary, emptyText }: { showSummary: boolean; 
           <input
             type="search"
             className="input"
-            placeholder="Search launches"
+            placeholder="Search programs"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && setSearch("")}
@@ -123,7 +123,7 @@ export function ProjectGrid({ showSummary, emptyText }: { showSummary: boolean; 
       {projects.length === 0 ? (
         <Card>
           {search.trim() ? (
-            <EmptyState title={`No launches match "${search.trim()}"`}>
+            <EmptyState title={`No programs match "${search.trim()}"`}>
               Check the spelling, or{" "}
               <button type="button" className="link-button" onClick={() => setSearch("")}>
                 clear the search
@@ -131,7 +131,7 @@ export function ProjectGrid({ showSummary, emptyText }: { showSummary: boolean; 
               .
             </EmptyState>
           ) : (
-            <EmptyState title="No launches here">{type || region ? "Try All types or All regions." : emptyText}</EmptyState>
+            <EmptyState title="No programs here">{type || region ? "Try All types or All regions." : emptyText}</EmptyState>
           )}
         </Card>
       ) : (

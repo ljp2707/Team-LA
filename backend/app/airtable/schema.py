@@ -100,6 +100,9 @@ class Site:
     PARTNER_CONTACT_PHONE = "Partner Contact Phone"  # added by migrate_airtable
     SHIPPING_ADDRESS = "Shipping Address"  # added by migrate_airtable
     LAST_HEAD_COACH = "Last Head Coach"  # added by migrate_airtable
+    # For the My Tasks filters. Typed by hand in Airtable; blank until someone fills them.
+    CITY = "City"  # added by migrate_airtable
+    STATE = "State"  # added by migrate_airtable, for example "WA"
 
 
 SITE_TYPES = ["City pool", "YMCA pool", "Community pool", "School pool", "Other"]

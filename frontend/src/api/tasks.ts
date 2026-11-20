@@ -1,8 +1,16 @@
 import { get, query, send, upload } from "./client";
 import type { MyReminder, MyTasks, Note, ReminderPanel, TaskDetail, TaskRow, TaskStatus } from "./types";
 
-export const myTasks = (params: { filter?: string; project?: string } = {}) =>
-  get<MyTasks>(`/api/tasks/mine${query(params)}`);
+export const myTasks = (
+  params: {
+    filter?: string;
+    project?: string;
+    state?: string;
+    city?: string;
+    program_type?: string;
+    sort?: string;
+  } = {},
+) => get<MyTasks>(`/api/tasks/mine${query(params)}`);
 
 export const getTask = (id: string) => get<TaskDetail>(`/api/tasks/${id}`);
 
@@ -13,6 +21,14 @@ export const updateTask = (
   id: string,
   body: { due_date?: string; name?: string; depends_on?: string[] },
 ) => send<TaskRow>("PATCH", `/api/tasks/${id}`, body);
+
+/** Admins only. Deletes the task for good; tasks waiting on it stop waiting. */
+export const deleteTask = (id: string) =>
+  send<{ deleted: boolean; no_longer_waiting: string[] }>("DELETE", `/api/tasks/${id}`);
+
+/** Admins only. Emails everyone on the task a reminder now. Once a day per person. */
+export const nudgeTask = (id: string, message: string) =>
+  send<{ sent: string[]; skipped: string[]; message: string }>("POST", `/api/tasks/${id}/nudge`, { message });
 
 /** Sets everyone on the task. An empty list leaves it with nobody. */
 export const assignTask = (id: string, userIds: string[]) =>

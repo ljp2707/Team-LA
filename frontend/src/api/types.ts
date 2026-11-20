@@ -130,6 +130,8 @@ export interface ProjectDetail extends ProjectCard {
   partner: { name: string; email: string; phone: string };
   shipping_address: string;
   drive_folder: string;
+  /** Open tasks past their due date, most overdue first. They are not repeated in groups. */
+  overdue_tasks: TaskRow[];
   groups: { phase: string; tasks: TaskRow[] }[];
   links: LinkItem[];
   history: HistoryEntry[];
@@ -186,6 +188,12 @@ export interface TaskDetail extends TaskRow {
   /** Their calendar sync is on and already includes this task. */
   in_calendar_feed: boolean;
   can_admin: boolean;
+  /** Admins only, and only while the program is not closed. */
+  can_delete: boolean;
+  /** Admins only: the task is open, the program is not closed, and someone active is on it. */
+  can_nudge: boolean;
+  /** The newest nudge, for "Last nudged by Ada, Nov 4". Hidden from partners. */
+  last_nudge: { by: string; date_text: string } | null;
   can_set_reminder: boolean;
   can_share_notes: boolean;
   back: { label: string; to: string };
@@ -203,9 +211,17 @@ export interface MyTasks {
   };
   counts: { overdue: number; this_week: number; open: number };
   projects: { id: string; name: string }[];
+  /** Choices from the person's own tasks. Empty lists mean the filter is hidden. */
+  filters: {
+    states: string[];
+    cities: { value: string; label: string }[];
+    program_types: string[];
+  };
   do_this_first: { id: string; name: string; reason: string } | null;
   can_edit: boolean;
 }
+
+export type MyTasksSort = "due" | "program" | "location";
 
 export interface MyReminder {
   date: string;

@@ -46,7 +46,7 @@ def test_subjects_match_the_spec():
         "3 new tasks for you at Rainier Beach"
     )
     assert templates.assignment([line("Design flyer")], "C")[0] == "New task for you: Design flyer"
-    assert templates.welcome("M", "m@example.org")[0] == "You've been added to NMU Launches"
+    assert templates.welcome("M", "m@example.org")[0] == "You've been added to NMU Programs"
     assert templates.weekly_digest("Nov 3", "T", [], [])[0] == "Your NMU tasks for the week of Nov 3"
 
 
@@ -88,7 +88,7 @@ def test_sends_a_base64url_message_from_nmu_launches(live, monkeypatch):
     assert gmail.send_email("a@example.org", "Hello", "text", "<p>html</p>") == "msg1"
     raw = calls[1][1]["json"]["raw"]
     message = email.message_from_bytes(base64.urlsafe_b64decode(raw))
-    assert message["From"] == "NMU Launches <nmu@example.org>"
+    assert message["From"] == "NMU Programs <nmu@example.org>"
     assert message.is_multipart()
     # The access token is cached.
     gmail.send_email("b@example.org", "Again", "t", "<p>h</p>")
@@ -137,7 +137,7 @@ def test_every_email_says_how_to_stop_it_and_who_sent_it(settings):
 def test_messages_carry_a_list_unsubscribe_header(settings):
     settings(CONTACT_EMAIL="launches@example.org", GMAIL_SENDER="sender@example.org")
     message = gmail.build_message("a@example.org", "Hi", "text", "<p>html</p>")
-    assert message["List-Unsubscribe"] == "<mailto:launches@example.org?subject=Stop%20NMU%20Launches%20emails>"
+    assert message["List-Unsubscribe"] == "<mailto:launches@example.org?subject=Stop%20NMU%20Programs%20emails>"
 
 
 def test_about_is_public(client, settings):

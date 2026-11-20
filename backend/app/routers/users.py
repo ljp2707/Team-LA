@@ -170,7 +170,7 @@ def person_work(user_id: str, user: CurrentUser = Depends(require_admin)):
 def add_person(body: UserIn, background: BackgroundTasks, user: CurrentUser = Depends(require_admin)):
     world = World()
     if any(u.email.lower() == body.email for u in world.users.values()):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Someone with that email is already in NMU Launches")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Someone with that email is already in NMU Programs")
     role_ids = [r for r in body.role_ids if r in world.roles]
     created = client.create_record(
         Users.TABLE,
