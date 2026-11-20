@@ -19,19 +19,19 @@ it.
 | F2 | `/docs`, `/redoc` and `/openapi.json` are public in production | Medium | Fixed in `3ae3248` |
 | F3 | Calendar feed tokens (and OAuth codes) are written to the access log | Medium | Fixed in `39baf62` |
 | F4 | `DEV_ALLOW_VIEW_SWITCH=true` is not refused in production | Medium | Fixed in `3ae3248` |
-| F5 | No rate limiting on any endpoint | Medium | Open |
+| F5 | No rate limiting on any endpoint | Medium | Fixed in `7d83c4c` |
 | F6 | Upload bodies have no size limit and are parsed before sign-in is checked | Medium | Fixed in `39baf62` |
 | F7 | URLs typed directly into Airtable are rendered as links without a scheme check | Medium | Fixed in `39baf62` |
-| F8 | `GET /auth/logout` can be triggered from any website | Low | Open |
+| F8 | `GET /auth/logout` can be triggered from any website | Low | Fixed in `7d83c4c` |
 | F9 | CSRF protection relies on SameSite=Lax alone; no Origin check | Low | Closed: not an issue |
-| F10 | Uploaded file content is not checked against its extension | Low | Open |
-| F11 | Staff on a task can share another person's Internal note with partners | Low | Open: decided, author or admin only |
+| F10 | Uploaded file content is not checked against its extension | Low | Fixed in `7d83c4c` |
+| F11 | Staff on a task can share another person's Internal note with partners | Low | Fixed in `7d83c4c` |
 | F12 | `ENV` defaults to `development`, so production protections fail open if it is missing | Low | Fixed in `3ae3248` |
-| F13 | Recipient email addresses are written to logs | Low | Open |
-| F14 | Proxy headers and allowed hosts are not configured for Railway | Low | Open |
-| F15 | Sessions cannot be revoked server-side; logout only clears the browser cookie | Low | Open |
-| F16 | Note lookup skips the project check when a note has no launch | Low | Open |
-| F17 | `npm audit`: 2 moderate advisories in react-router | Low | Open |
+| F13 | Recipient email addresses are written to logs | Low | Fixed in `7d83c4c` |
+| F14 | Proxy headers and allowed hosts are not configured for Railway | Low | Fixed in `7d83c4c` |
+| F15 | Sessions cannot be revoked server-side; logout only clears the browser cookie | Low | Mitigated in `7d83c4c`: idle and 7-day limits |
+| F16 | Note lookup skips the project check when a note has no launch | Low | Fixed in `7d83c4c` |
+| F17 | `npm audit`: 2 moderate advisories in react-router | Low | Fixed in `7d83c4c` |
 | F18 | Dependency and secret scans otherwise clean | Info | No action needed |
 | F19 | Checks that passed: IDOR, partner isolation, role changes, error responses | Info | No action needed |
 
@@ -103,6 +103,8 @@ it.
 
 ### F5. No rate limiting — Medium
 
+**Status: Fixed in commit `7d83c4c`.** In-memory limits in `backend/app/rate_limit.py`; the limits are listed in the README. Tests in `backend/tests/test_security_access.py`.
+
 - **Where:** No limiter anywhere. Most relevant: `/auth/login` and `/auth/callback`
   (`backend/app/routers/auth.py:91,105`), the upload routes (F6), `/calendar/{token}.ics`,
   `/api/public/*`, and every write route.
@@ -154,6 +156,8 @@ it.
 
 ### F8. Logout by GET — Low
 
+**Status: Fixed in commit `7d83c4c`.** `POST /auth/logout` signs out; `GET` only goes home. The sidebar uses a form button. Tests in `backend/tests/test_security_access.py`.
+
 - **Where:** `backend/app/routers/auth.py:132`.
 - **Exploit:** Any website can include `<img src="https://…/auth/logout">`. A top-level
   navigation also carries the Lax cookie. Visitors to that page are signed out. This is a
@@ -184,6 +188,8 @@ it.
 
 ### F10. File content not checked against extension — Low
 
+**Status: Fixed in commit `7d83c4c`.** Signature check in `backend/app/services/links.py` (`_looks_like`). Tests in `backend/tests/test_security_access.py`.
+
 - **Where:** `backend/app/services/links.py:85-99` (`read_upload` checks only the name and the
   size).
 - **Exploit:** A Staff or Partner user uploads an `.exe` renamed to `report.pdf`. Another user
@@ -197,7 +203,7 @@ it.
 
 ### F11. Staff can share someone else's Internal note — Low
 
-**Status: Open. Decided 2026-11-19:** not intended. Only the note's author or an admin may share an Internal note with partners.
+**Status: Fixed in commit `7d83c4c`.** Decided 2026-11-19 that it was not intended: only the note's author or an admin may share an Internal note with partners (`can_share_note` in `backend/app/permissions.py`). Tests in `backend/tests/test_security_access.py`.
 
 - **Where:** `backend/app/routers/links.py:100-109` (`share_note`). It checks
   `can_share_notes` (not a partner, not read-only) and `can_edit_task`, not authorship.
@@ -223,6 +229,8 @@ it.
 
 ### F13. Email addresses in logs — Low
 
+**Status: Fixed in commit `7d83c4c`.** `mask_email` in `backend/app/log_redaction.py`. Tests in `backend/tests/test_security_access.py`.
+
 - **Where:** `backend/app/email/gmail.py:126` and `backend/app/services/reminders.py:396,428`
   (`Dry run email to <address>`), and the cron output labels at
   `backend/app/services/reminders.py:202,286`, printed by `backend/jobs/send_reminders.py:34-43`.
@@ -233,6 +241,8 @@ it.
   Test: capture logs during a dry-run send and assert no address appears.
 
 ### F14. Proxy headers and allowed hosts — Low
+
+**Status: Fixed in commit `7d83c4c`.** Allowed hosts are `APP_URL` and `FRONTEND_URL` hosts, localhost and `healthcheck.railway.app`. Update `APP_URL` and `FRONTEND_URL` if you add a custom domain. Tests in `backend/tests/test_security_access.py`.
 
 - **Where:** `Dockerfile:21`. uvicorn trusts `X-Forwarded-*` only from 127.0.0.1, so behind
   Railway `request.client.host` is Railway's proxy and `request.url.scheme` is `http`. There is
@@ -248,6 +258,8 @@ it.
 
 ### F15. Sessions cannot be revoked — Low
 
+**Status: Mitigated in commit `7d83c4c`.** Sessions now end after `SESSION_IDLE_HOURS` without use (default 24) and 7 days after sign in, however active. Before, the cookie lifetime renewed on every request, so an active session never ended. Logout still cannot cancel a copied cookie on the server; that needs Option A (a session version on the Users row), not done. Tests in `backend/tests/test_security_access.py`.
+
 - **Where:** `backend/app/routers/auth.py:132-135`. The signed cookie lasts 7 days
   (`backend/app/main.py:74`). Logout clears the browser's copy only.
 - **Exploit:** A cookie copied before logout, from a shared computer or malware, keeps working
@@ -258,6 +270,8 @@ it.
 
 ### F16. Note lookup without a launch skips the project check — Low
 
+**Status: Fixed in commit `7d83c4c`.** Tests in `backend/tests/test_security_access.py`.
+
 - **Where:** `backend/app/routers/links.py:71`. `check_project_access` runs only when
   `row.session_id` is set.
 - **Exploit:** All notes are created on tasks today, so every note has a launch. A note row
@@ -267,6 +281,8 @@ it.
   such a note.
 
 ### F17. npm audit: react-router — Low
+
+**Status: Fixed in commit `7d83c4c`.** Upgraded to `react-router-dom` 7.18.6, pinned exactly; no patched 6.x release exists. `npm audit`: 0 vulnerabilities. Checked in a browser that the home page renders and signed-out redirects still work. Checked by `npm audit` and the frontend build; there is no backend test for this one.
 
 - **Result:** `npm audit` reports 2 moderate advisories, both from `react-router` 6.30.x (via
   `react-router-dom`): "Open redirect via backslash in `<Link>` and `useNavigate`" and
@@ -335,7 +351,7 @@ it.
 
 ## Prioritized fix order
 
-Batch 1 (F4, F2, F12) and batch 2 (F3, F6, F1, F7) are done. F9 is closed.
+All three batches are done. F9 is closed. Still open: switching the CSP from report-only to enforce (F1), and server-side session cancelling (F15, Option A). Commits: batch 1 `3ae3248`, batch 2 `39baf62`, batch 3 `7d83c4c`.
 
 1. ~~**F4**~~ (fixed) Refuse `DEV_ALLOW_VIEW_SWITCH` in production. A few lines, and it closes the only
    one-setting path to admin.
