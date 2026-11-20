@@ -952,6 +952,30 @@ maps, editor files and e2e files. Against the old Dockerfile and `.dockerignore`
 
 **Commit.** "Pin base images by digest, health check, and a smaller image (F40)".
 
+### F41. No lint or static security checks on the backend — Low (Fixed)
+
+**Problem.** Nothing checked the Python code for common mistakes or risky patterns. A first
+run of ruff's error, bug (`B`) and Bandit security (`S`) rules found, besides false positives:
+an `assert` guarding a saved template draft (Python removes asserts under `-O`, so the check
+would vanish), six `zip()` calls pairing the rows sent to Airtable with the records it created
+(if the counts ever differed, IDs would be silently linked to the wrong steps or tasks), two
+unused imports and an ambiguous variable name `l`.
+
+**Fix.** `backend/ruff.toml` selects `E4`, `E7`, `E9`, `F`, `B` and `S`. `B008` is off (FastAPI's
+`Depends()`); tests may use asserts and fake secrets. The assert is now an explicit
+`RuntimeError`; the six `zip()` calls use `strict=True`, so a count mismatch fails loudly; the
+three false positives (a field name, a placeholder refused in production, Google's token URL)
+are marked `noqa` with a reason. `ruff` and `pip-audit` are in the dev requirements. The
+frontend was already type-checked with `strict`, `noUnusedLocals` and `noUnusedParameters`;
+ESLint was not added because its TypeScript support does not cover the TypeScript 7 this
+project uses. Semgrep covers the frontend in CI (F42).
+
+**Tests** (`test_lint.py`): ruff reports nothing (so a lint error fails the suite); a draft
+that cannot be read back raises even with `python -O`. Against the old code, the second fails
+with and without `-O`.
+
+**Commit.** "Lint and security rules for the backend (F41)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

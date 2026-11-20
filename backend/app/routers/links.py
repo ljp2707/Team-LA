@@ -27,7 +27,7 @@ def open_file(link_id: str, user: CurrentUser = Depends(current_user)):
     looks up the current one each time.
     """
     world = World()
-    link = next((l for l in world.links if l.id == link_id), None)
+    link = next((row for row in world.links if row.id == link_id), None)
     if link is None or not link.file_url:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "File not found")
     session_id = link.session_id
@@ -43,7 +43,7 @@ def open_file(link_id: str, user: CurrentUser = Depends(current_user)):
 @router.delete("/links/{link_id}")
 def remove_link(link_id: str, user: CurrentUser = Depends(require_can_edit)):
     world = World()
-    link = next((l for l in world.links if l.id == link_id), None)
+    link = next((row for row in world.links if row.id == link_id), None)
     if link is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Link not found")
     session_id = link.session_id

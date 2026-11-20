@@ -28,7 +28,7 @@ from app.log_redaction import mask_email
 
 logger = logging.getLogger(__name__)
 
-TOKEN_URL = "https://oauth2.googleapis.com/token"
+TOKEN_URL = "https://oauth2.googleapis.com/token"  # noqa: S105 (an address, not a secret)
 SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
 FROM_NAME = "NMU Programs"
 TIMEOUT_SECONDS = 20

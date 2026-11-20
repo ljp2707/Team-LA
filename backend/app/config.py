@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLACEHOLDER_SECRET = "replace-with-a-long-random-string"
+PLACEHOLDER_SECRET = "replace-with-a-long-random-string"  # noqa: S105 (refused in production)
 
 
 class Settings(BaseSettings):

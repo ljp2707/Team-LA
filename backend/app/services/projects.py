@@ -23,7 +23,7 @@ from app.airtable.schema import (
 )
 from app.models.project import OneOffIn, ProjectCreateIn, ProjectDetailsIn, ProjectPreviewIn
 from app.models.user import CurrentUser
-from app.services import clock, history, logic
+from app.services import history, logic
 from app.services.records import ProjectRec, live_steps, load_reminders, safe
 from app.services.timeline import (
     OneOff,

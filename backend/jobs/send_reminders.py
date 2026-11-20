@@ -11,7 +11,6 @@ Running it twice on the same day sends nothing new.
 """
 
 import argparse
-import sys
 from datetime import date
 
 from app.config import get_settings

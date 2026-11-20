@@ -160,6 +160,10 @@ On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds d
 
 `docs/data-model.md` explains every table and field the app uses.
 
+## Checks before a commit
+
+From `backend`: `python -m pytest` (includes the access matrix and `ruff check .`, the lint and security rules in `backend/ruff.toml`). From `frontend`: `npm run build` (type check and build) and `npm run test:e2e` (every page in a real browser under the enforced CSP). CI runs all of these plus dependency, secret and code scans on every push and pull request (`.github/workflows/ci.yml`).
+
 ## Updating dependencies
 
 Every dependency is pinned to an exact version, and the Python ones to exact file hashes too, so a build always installs exactly what was tested and a tampered package fails the install (findings F39).

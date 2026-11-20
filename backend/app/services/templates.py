@@ -167,7 +167,8 @@ def save_draft(template_id: str, steps: list[DraftStep], actor_id: str) -> Versi
             typecast=True,
         )
     result = get_draft(template_id)
-    assert result is not None
+    if result is None:  # Not assert: Python skips asserts when run with -O (F41)
+        raise RuntimeError("The draft was saved but could not be read back")
     return result
 
 
@@ -256,7 +257,7 @@ def publish(template_id: str, change_note: str, actor_id: str) -> int:
     client.update_records(Steps.TABLE, updates, typecast=True)
     created = client.create_records(Steps.TABLE, new_rows, typecast=True)
     key_to_id = {s.key: s.key for s in steps if s.key in live_by_id}
-    key_to_id.update({k: rec["id"] for k, rec in zip(new_keys, created)})
+    key_to_id.update({k: rec["id"] for k, rec in zip(new_keys, created, strict=True)})
 
     keys = {s.key for s in steps}
     retired = [s for s in live if s.id not in keys]
@@ -351,7 +352,7 @@ def create_template(name: str, steps: list[DraftStep], actor_id: str, note: str)
         fields[Steps.ADDED_IN_VERSION] = 1
         rows.append(fields)
     created = client.create_records(Steps.TABLE, rows, typecast=True)
-    key_to_id = {s.key: rec["id"] for s, rec in zip(steps, created)}
+    key_to_id = {s.key: rec["id"] for s, rec in zip(steps, created, strict=True)}
     client.update_records(
         Steps.TABLE,
         [
