@@ -1,7 +1,9 @@
 # NMU Launches security findings
 
-Reviewed 2026-11-19. Read-only: no code was changed. Line numbers are for the current working
-tree. See [threat-model.md](threat-model.md) for assets, actors and every entry point.
+Reviewed 2026-11-19 (F1 to F19, read-only; line numbers are for that day's tree). Hardened
+2026-11-20 on branch `production-hardening` (F20 to F42): each finding names its commit and the
+tests that fail without the fix. OWASP ASVS 5.0 Level 2 status is in
+[asvs-checklist.md](asvs-checklist.md). See [threat-model.md](threat-model.md) for assets, actors and every entry point.
 
 Severity: **High** = exploitable now by an outsider or a low-trust user, with serious impact.
 **Medium** = real gap that needs a misconfiguration, an insider, or a second bug, or that is
@@ -15,7 +17,7 @@ it.
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
-| F1 | No Content-Security-Policy or Strict-Transport-Security header | Medium | Partly fixed in `39baf62`: HSTS on, CSP report-only |
+| F1 | No Content-Security-Policy or Strict-Transport-Security header | Medium | Fixed: HSTS in `39baf62`, CSP enforced in `e879382` (F28) |
 | F2 | `/docs`, `/redoc` and `/openapi.json` are public in production | Medium | Fixed in `3ae3248` |
 | F3 | Calendar feed tokens (and OAuth codes) are written to the access log | Medium | Fixed in `39baf62` |
 | F4 | `DEV_ALLOW_VIEW_SWITCH=true` is not refused in production | Medium | Fixed in `3ae3248` |
@@ -29,11 +31,34 @@ it.
 | F12 | `ENV` defaults to `development`, so production protections fail open if it is missing | Low | Fixed in `3ae3248` |
 | F13 | Recipient email addresses are written to logs | Low | Fixed in `7d83c4c` |
 | F14 | Proxy headers and allowed hosts are not configured for Railway | Low | Fixed in `7d83c4c` |
-| F15 | Sessions cannot be revoked server-side; logout only clears the browser cookie | Low | Mitigated in `7d83c4c`: idle and 7-day limits |
+| F15 | Sessions cannot be revoked server-side; logout only clears the browser cookie | Low | Fixed: time limits in `7d83c4c`, revocation in `439fcd0` (F30) |
 | F16 | Note lookup skips the project check when a note has no launch | Low | Fixed in `7d83c4c` |
 | F17 | `npm audit`: 2 moderate advisories in react-router | Low | Fixed in `7d83c4c` |
 | F18 | Dependency and secret scans otherwise clean | Info | No action needed |
 | F19 | Checks that passed: IDOR, partner isolation, role changes, error responses | Info | No action needed |
+| F20 | Nudge has no limit per person across tasks | Medium | Fixed in `70a76a5` |
+| F21 | Two nudges at the same moment can both send | Low | Fixed in `a51e248` |
+| F22 | A failed Delete task can leave a half-done delete | Low | Fixed in `6039454` |
+| F23 | `project` filter on My Tasks has no format or length limit | Info | Fixed in `3a8cf67` |
+| F24 | Checks that passed (Phase 0) | Info | No action needed |
+| F25 | Nowhere to collect CSP violation reports | Low | Fixed in `04322ef` |
+| F26 | CSP could be tighter in production, and nothing stopped it being widened | Low | Fixed in `acc9fba` |
+| F27 | No cross-origin isolation headers, and the Server header names uvicorn | Low | Fixed in `36ecf41` |
+| F28 | The CSP was only reported, never enforced, and nothing tested it in a browser | Medium | Fixed in `e879382` |
+| F29 | The session cookie could be replaced from another subdomain | Low | Fixed in `987b9f4` |
+| F30 | A copied session could not be ended on the server | Medium | Fixed in `439fcd0` |
+| F31 | Changing view kept the same session | Low | Fixed in `1a215ff` |
+| F32 | The domain rule trusted the email alone | Low | Fixed in `e311097` |
+| F33 | Some unsafe production settings were accepted silently | Low | Fixed in `2e10740` |
+| F34 | Admin actions left no trail that could not be changed | Medium | Fixed in `532eaac` |
+| F35 | Admins could not see the audit trail | Low | Fixed in `db322d9` |
+| F36 | Logs were hard to search and security events were not marked | Low | Fixed in `9846754` |
+| F37 | The app's Airtable token could change the base's structure | Medium | Fixed in `84c188b` (new token is a manual step) |
+| F38 | The example settings named a real admin, and stray files were in git | Medium | Fixed in `39df504` |
+| F39 | Dependencies were not locked to exact files | Medium | Fixed in `c0f3dad` |
+| F40 | The image used floating base tags and carried the tests | Low | Fixed in `f687bf0` |
+| F41 | No lint or static security checks on the backend | Low | Fixed in `89e089e` |
+| F42 | No CI, and nothing watched dependencies | Medium | Fixed in `ae29d3b` |
 
 ---
 

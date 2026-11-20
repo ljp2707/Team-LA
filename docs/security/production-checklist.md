@@ -66,11 +66,12 @@ change to accounts or settings. Each line says where to do it. Details are in th
 
 Replace `APP` with the live address.
 
-- [ ] `curl -sI https://APP/` shows `Strict-Transport-Security`, `Content-Security-Policy`
+- [ ] `curl -s -D - -o /dev/null https://APP/` shows `Strict-Transport-Security`, `Content-Security-Policy`
       (not `-Report-Only`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
       `Cross-Origin-Opener-Policy`, and no `Server` header.
 - [ ] `curl -s https://APP/api/health` answers `{"status":"ok"}`.
-- [ ] `curl -s -o /dev/null -w "%{http_code}" https://APP/docs` gives `404`.
+- [ ] `curl -s https://APP/openapi.json | head -c 15` shows `<!doctype html>` (the website's
+      page), not JSON: the API description is off in production.
 - [ ] `curl -s -o /dev/null -w "%{http_code}" https://APP/api/projects` gives `401`.
 - [ ] `curl -s -o /dev/null -w "%{http_code}" -X POST -H "Origin: https://evil.example" https://APP/auth/logout`
       gives `403`.
