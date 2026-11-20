@@ -91,25 +91,38 @@ HSTS_VALUE = "max-age=31536000; includeSubDomains"
 
 # Only what the built app loads: its own scripts, styles, fonts (self-hosted in
 # /fonts) and images. Nothing from other sites, and no other site may frame it.
-# A second line of defence if a bad link or value ever reaches the page (F1).
-CONTENT_SECURITY_POLICY = "; ".join(
-    [
-        "default-src 'self'",
-        "script-src 'self'",
-        "style-src 'self'",
-        "img-src 'self' data:",
-        "font-src 'self'",
-        "connect-src 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "base-uri 'self'",
-        "form-action 'self' https://accounts.google.com",
-        # Where browsers report what the policy blocked (F25). report-uri for browsers
-        # that only know the older way, report-to for the Reporting API.
-        "report-uri /api/security/csp-report",
-        "report-to csp-endpoint",
-    ]
-)
+# A second line of defence if a bad link or value ever reaches the page (F1, F26).
+# No 'unsafe-inline' or 'unsafe-eval' anywhere: the built index.html has no inline
+# scripts or styles, and React sets style props through the DOM, which CSP allows.
+CSP_DIRECTIVES = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self'",
+    # data: for the small arrow image inside drop-downs (app.css). The app shows no
+    # images from Airtable or anywhere else; files open through /api/links, a redirect.
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    # Sign-in posts to Google only through the redirect to accounts.google.com.
+    "form-action 'self' https://accounts.google.com",
+    # Where browsers report what the policy blocked (F25). report-uri for browsers
+    # that only know the older way, report-to for the Reporting API.
+    "report-uri /api/security/csp-report",
+    "report-to csp-endpoint",
+]
+# Production only: on http://localhost it would turn every request into https and break.
+PRODUCTION_ONLY_DIRECTIVES = ["upgrade-insecure-requests"]
+
+
+def content_security_policy(production: bool) -> str:
+    return "; ".join(CSP_DIRECTIVES + (PRODUCTION_ONLY_DIRECTIVES if production else []))
+
+
+# The policy as sent on localhost, for reference and tests.
+CONTENT_SECURITY_POLICY = content_security_policy(production=False)
 # Names the report-to endpoint above. Sent with the policy.
 REPORTING_ENDPOINTS = 'csp-endpoint="/api/security/csp-report"'
 CSP_HEADER_BY_MODE = {
@@ -138,7 +151,7 @@ def add_security_headers(headers: MutableHeaders, path: str, request_id: str) ->
         headers.setdefault("Strict-Transport-Security", HSTS_VALUE)
     csp_header = CSP_HEADER_BY_MODE.get(settings.CSP_MODE)
     if csp_header:
-        headers.setdefault(csp_header, CONTENT_SECURITY_POLICY)
+        headers.setdefault(csp_header, content_security_policy(settings.is_production))
         headers.setdefault("Reporting-Endpoints", REPORTING_ENDPOINTS)
     if keep_out_of_caches(path):
         headers.setdefault("Cache-Control", "no-store")

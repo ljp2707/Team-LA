@@ -501,6 +501,32 @@ absent when CSP is off.
 
 **Commit.** "Collect CSP violation reports (F25)".
 
+### F26. CSP could be tighter in production, and nothing stopped it being widened — Low (Fixed)
+
+**Problem.** The policy was already close to the minimum, and the fonts were already
+self-hosted (Bricolage Grotesque and Figtree, SIL Open Font License 1.1, which allows
+bundling them with the app as long as the license goes with them; both license files are
+in `frontend/public/fonts` and the build copies them out). Two gaps were left: production did
+not send `upgrade-insecure-requests`, and no test pinned the policy, so a later change could
+quietly add a host or `'unsafe-inline'`.
+
+**Fix.** `security.content_security_policy(production)` builds the policy from
+`CSP_DIRECTIVES`, each with a comment saying why it is there, and adds
+`upgrade-insecure-requests` in production only (on `http://localhost` it would break every
+request). Checked against the built app: `dist/index.html` has no inline scripts or styles,
+the only `data:` image is the drop-down arrow, and no page shows images from Airtable or any
+other site (files open through the `/api/links` redirect), so `img-src` needs no other hosts.
+
+**Tests** (`test_csp_policy.py`): the policy is exactly the expected list locally, and that
+list plus `upgrade-insecure-requests` in production; no `'unsafe-inline'`, `'unsafe-eval'`,
+wildcards, `blob:` or Google Fonts hosts, and Google sign-in is the only other site named;
+`index.html` has no inline code and loads nothing from other sites; stylesheets load fonts
+only from `/fonts` and both license files exist; the frontend source never uses `eval`,
+`new Function`, `dangerouslySetInnerHTML` or fetches another site. Without the production
+directive, 2 of these fail.
+
+**Commit.** "Pin the CSP to the minimum and upgrade requests in production (F26)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one
