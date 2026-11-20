@@ -19,7 +19,7 @@ class Users:
     CREATED = "Created"
     ROLES = "Roles"
     SESSION = "Session"
-    ACCESS_LEVEL = "Access Level"  # Admin, Project Lead, Staff, Viewer, Partner
+    ACCESS_LEVEL = "Access Level"  # Admin, Staff, Viewer, Partner
     WORK = "Work"
     SESSION_TEAM = "Session Team"
     ACTIVITY_LOG = "Activity Log"

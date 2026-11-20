@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.airtable.schema import SITE_TYPES
 
-AccessLevel = Literal["Admin", "Project Lead", "Staff", "Viewer", "Partner"]
+AccessLevel = Literal["Admin", "Staff", "Viewer", "Partner"]
 
 
 class UserIn(BaseModel):

@@ -23,21 +23,18 @@ STAFF: View = "staff"
 PARTNER: View = "partner"
 
 # Which view each Access Level starts in.
-# Project Lead is an assumption that is still being decided. To change it, edit
-# this one line, then update the test that documents it in test_permissions.py.
 BASE_VIEW_BY_ACCESS_LEVEL: dict[str, View] = {
     "Admin": ADMIN,
-    "Project Lead": ADMIN,
     "Staff": STAFF,
     "Viewer": STAFF,
     "Partner": PARTNER,
 }
 
-ACCESS_LEVELS = ["Admin", "Project Lead", "Staff", "Viewer", "Partner"]
+ACCESS_LEVELS = ["Admin", "Staff", "Viewer", "Partner"]
 
 # Only these Access Levels may change anything. A blank or unknown Access Level
 # is treated like Viewer, so a typo in Airtable never grants extra access.
-ACCESS_LEVELS_THAT_CAN_EDIT = {"Admin", "Project Lead", "Staff", "Partner"}
+ACCESS_LEVELS_THAT_CAN_EDIT = {"Admin", "Staff", "Partner"}
 
 # Access Levels that count as an admin when checking "at least one Active Admin".
 ADMIN_ACCESS_LEVELS = {"Admin"}
@@ -219,7 +216,6 @@ def can_set_reminder(actor: Actor) -> bool:
 # A plain-English summary of what each Access Level reaches, shown with each person.
 PROGRAM_ACCESS: dict[str, str] = {
     "Admin": "All programs",
-    "Project Lead": "All programs",
     "Staff": "Program Assistants, Operations, Marketing, Grants",
     "Viewer": "Assigned program only",
     "Partner": "Launches they are added to",
@@ -232,7 +228,7 @@ def program_access(access_level: str | None) -> str:
 
 
 def is_admin_level(access_level: str | None) -> bool:
-    """Does this Access Level start in admin view (Admin, and Project Lead for now)?"""
+    """Does this Access Level start in admin view (Admin)?"""
     return base_view(access_level) == ADMIN
 
 

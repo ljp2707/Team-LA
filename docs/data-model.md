@@ -17,7 +17,7 @@ Used by: Sign in, Users and roles, every assignment.
 | Created | When the row was made. |
 | Roles | The roles this person holds. One person can hold several. |
 | Session | Link to the Session table. |
-| Access Level | Admin, Project Lead, Staff, Viewer or Partner. Sets their view and permissions. |
+| Access Level | Admin, Staff, Viewer or Partner. Sets their view and permissions. |
 | Work | Link to the Work table. |
 | Session Team | Link to the Session Team table. |
 | Activity Log | Link to the Activity Log table. |

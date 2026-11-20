@@ -167,7 +167,6 @@ Access levels:
 | Level | What they can do |
 |---|---|
 | Admin | Everything |
-| Project Lead | Same as Admin for now |
 | Staff | Update their own tasks, see every launch |
 | Viewer | See every launch, change nothing |
 | Partner | See and update their own tasks on the launches they are added to |

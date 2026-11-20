@@ -34,7 +34,7 @@ TABLES: dict[str, tuple[str, str]] = {
 FIELDS: dict[tuple[str, str], str] = {
     ("Users", "EMAIL"): "The Google email they sign in with.",
     ("Users", "STATUS"): "Active can sign in. Inactive cannot.",
-    ("Users", "ACCESS_LEVEL"): "Admin, Project Lead, Staff, Viewer or Partner. Sets their view and permissions.",
+    ("Users", "ACCESS_LEVEL"): "Admin, Staff, Viewer or Partner. Sets their view and permissions.",
     ("Users", "ROLES"): "The roles this person holds. One person can hold several.",
     ("Users", "WELCOME_EMAIL_SENT"): "Set when the welcome email goes out, so it is sent once.",
     ("TemplateList", "STATUS"): "Inactive templates are hidden on Start a launch.",

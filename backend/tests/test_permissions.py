@@ -6,7 +6,6 @@ from app import permissions as p
 from app.permissions import ADMIN, STAFF, Actor
 
 ADMIN_ACTOR = Actor("Admin", ADMIN)
-LEAD_ACTOR = Actor("Project Lead", ADMIN)
 STAFF_ACTOR = Actor("Staff", STAFF)
 VIEWER_ACTOR = Actor("Viewer", STAFF)
 ADMIN_IN_STAFF_VIEW = Actor("Admin", STAFF)
@@ -46,10 +45,11 @@ def test_admin_in_staff_view_can_still_update_own_tasks():
     assert p.can_update_own_tasks(ADMIN_IN_STAFF_VIEW)
 
 
-def test_project_lead_is_treated_as_admin_for_now():
-    """Assumption still being decided. See BASE_VIEW_BY_ACCESS_LEVEL."""
-    assert p.base_view("Project Lead") == ADMIN
-    assert p.can_edit_setup(LEAD_ACTOR)
+def test_project_lead_is_no_longer_an_access_level():
+    """Removed. Anyone still set to it in Airtable gets the least access, like Viewer."""
+    assert "Project Lead" not in p.ACCESS_LEVELS
+    assert p.base_view("Project Lead") == STAFF
+    assert not p.can_update_own_tasks(Actor("Project Lead", STAFF))
 
 
 @pytest.mark.parametrize("level", [None, "", "Guest"])

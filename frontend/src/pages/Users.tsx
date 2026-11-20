@@ -154,7 +154,7 @@ export function Users() {
             </table>
           </div>
           <p className="muted small">
-            Viewers can see everything staff can, but cannot change anything. Project Leads work like staff.
+            Viewers can see everything staff can, but cannot change anything.
           </p>
         </Card>
       )}

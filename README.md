@@ -217,17 +217,14 @@ Each person's **Access Level** in the Airtable Users table sets what they can do
 | Access Level | Starts in | Notes |
 |---|---|---|
 | Admin | Admin view | Full access |
-| Project Lead | Admin view | Assumption, still being decided |
 | Staff | Staff view | Can update their own tasks |
 | Viewer | Staff view | Read only |
 | Partner | Partner view | Sees only the launches they are added to, and updates their own tasks. Never sees internal notes or history |
 | Blank or anything else | Staff view | Read only |
 
-Admins and Project Leads can use the switch in the sidebar to see the app exactly as staff do. While in staff view they have staff permissions, on the server as well as on screen.
+Admins can use the switch in the sidebar to see the app exactly as staff do. While in staff view they have staff permissions, on the server as well as on screen.
 
 Changes to someone's Status or Access Level in Airtable apply within about 30 seconds (see **How the app reads Airtable**), with no need to sign in again.
-
-**To change the Project Lead mapping,** edit the `"Project Lead"` line of `BASE_VIEW_BY_ACCESS_LEVEL` in `backend/app/permissions.py`, and update `test_project_lead_is_treated_as_admin_for_now` in `backend/tests/test_permissions.py` to match.
 
 For demos, setting `DEV_ALLOW_VIEW_SWITCH=true` lets **anyone** signed in use admin view, with real admin permissions. It also shows the **What each level can do** table and the **System** box on **Users and roles**, which are hidden otherwise. Keep it `false` in production.
 

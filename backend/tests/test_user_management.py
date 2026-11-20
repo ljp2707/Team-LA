@@ -31,7 +31,7 @@ def test_merged_permission_rules():
     assert p.can_see_directory(staff) and not p.can_see_directory(partner)
     assert p.program_access("Admin") == "All programs"
     assert p.program_access(None) == p.program_access("Viewer")
-    assert p.is_admin_level("Project Lead") and not p.is_admin_level("Staff")
+    assert p.is_admin_level("Admin") and not p.is_admin_level("Project Lead") and not p.is_admin_level("Staff")
 
 
 # --- Users ----------------------------------------------------------------------
@@ -40,9 +40,9 @@ def test_merged_permission_rules():
 def test_people_list_has_program_access_and_filters_by_level(client, sign_in, project):
     sign_in("admin@example.org")
     people = client.get("/api/users?access_level=Staff").json()["people"]
-    assert [x["id"] for x in people] == ["recStaff"]
-    assert people[0]["program_access"].startswith("Program Assistants")
-    assert people[0]["is_admin"] is False
+    assert sorted(x["id"] for x in people) == ["recLead", "recStaff"]
+    assert all(x["program_access"].startswith("Program Assistants") for x in people)
+    assert all(x["is_admin"] is False for x in people)
 
 
 def test_directory_is_for_any_nmu_person_but_not_partners(client, sign_in, project):

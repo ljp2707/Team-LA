@@ -141,7 +141,7 @@ def users():
     """The fake Users table. Tests may change it to simulate edits in Airtable."""
     return [
         person("recAdmin", "Admin@Example.org", "Admin", first="Ada"),
-        person("recLead", "lead@example.org", "Project Lead", first="Lee"),
+        person("recLead", "lead@example.org", "Staff", first="Lee"),
         person("recStaff", "staff@example.org", "Staff", first="Sam"),
         person("recViewer", "viewer@example.org", "Viewer", first="Vi"),
         person("recGone", "gone@example.org", "Admin", status="Inactive"),
