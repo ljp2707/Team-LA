@@ -4,6 +4,7 @@ Staff can open any task, but only change their own. Partners only see tasks in
 projects they are listed on. Viewers change nothing.
 """
 
+import logging
 from datetime import timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -23,6 +24,7 @@ from app.services.timeline import find_cycle
 from app.services.views import World, check_project_access, link_dict, note_dict, task_row
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+logger = logging.getLogger(__name__)
 
 DONE_RECENT_DAYS = 7
 STAFF_STATUSES = {"Not Started", "In Progress", "Blocked", "Done"}
@@ -494,20 +496,35 @@ def delete_task(task_id: str, user: CurrentUser = Depends(require_admin)):
         f"deleted the task {task.name} (due {due}, assigned to {people})",
         task.name,
     )
-    client.update_records(
-        Work.TABLE,
-        [{"id": t.id, "fields": {Work.DEPENDS_ON: [d for d in t.depends_on if d != task.id]}} for t in waiting],
-    )
-    reminders.cancel_custom_for_task(task.id)
-    client.update_records(
-        Links.TABLE,
-        [
-            {"id": link.id, "fields": {Links.WORK: [], Links.SESSION: [project.id]}}
-            for link in world.links
-            if link.work_id == task.id
-        ],
-    )
-    client.delete_records(Work.TABLE, [task.id])
+    # F22: if Airtable fails part way, say so in the history and to the admin, instead of
+    # leaving a "deleted" entry for a task that still exists. Every step below is safe to
+    # run again, so trying the delete again finishes the job.
+    try:
+        client.update_records(
+            Work.TABLE,
+            [{"id": t.id, "fields": {Work.DEPENDS_ON: [d for d in t.depends_on if d != task.id]}} for t in waiting],
+        )
+        reminders.cancel_custom_for_task(task.id)
+        client.update_records(
+            Links.TABLE,
+            [
+                {"id": link.id, "fields": {Links.WORK: [], Links.SESSION: [project.id]}}
+                for link in world.links
+                if link.work_id == task.id
+            ],
+        )
+        client.delete_records(Work.TABLE, [task.id])
+    except Exception as error:  # noqa: BLE001 - any Airtable failure gets the same handling
+        logger.warning("Deleting task %s did not finish: %s", task.id, type(error).__name__)
+        try:
+            history.log_event(
+                project.id, task.id, user.id, "System", f"could not finish deleting the task {task.name}"
+            )
+        except Exception:  # noqa: BLE001 - Airtable is down; the warning above is the record
+            logger.warning("Could not record the unfinished delete of task %s", task.id)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "The task was not fully deleted. Please try again."
+        ) from None
     return {"deleted": True, "no_longer_waiting": [t.name for t in waiting]}
 
 

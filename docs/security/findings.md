@@ -396,21 +396,28 @@ a no-op the test fails (both get 200 and two emails go out).
 
 **Commit.** "Send one nudge at a time so a double click cannot email twice (F21)".
 
-### F22. A failed Delete task can leave a half-done delete — Low (Open)
+### F22. A failed Delete task can leave a half-done delete — Low (Fixed)
 
 **Problem.** Delete writes the history entry, clears dependencies, cancels reminders, moves
 links, and deletes the row last. If Airtable fails part way (an outage, or its rate limit),
 the history says the task was deleted while the task still exists, possibly with its
 dependencies already cleared and its reminders cancelled. The admin sees a generic 500.
 
-**Proposed fix.** Keep the order (history first, as required). If a later step fails, write
-a second history entry saying the delete did not finish, and answer 502 with "The task was
-not fully deleted. Please try again." Every step can safely run again, so a retry finishes
-the job.
+**Fix.** The order stays (history first). The steps after it run inside one `try` in
+`routers/tasks.py`; on any failure the app logs a warning with the task's record ID and the
+error type only, adds a history entry "could not finish deleting the task ...", and answers
+502 "The task was not fully deleted. Please try again." Every step is safe to run again, so
+a retry finishes the job. If Airtable is too broken to write that second entry, the 502 is
+still returned and the log line is the record. The user guide tells admins to click Delete
+task again.
 
-**Tests.** With the final Airtable delete made to fail: the response is 502 with that
-message, both history entries exist, and a retry succeeds and leaves no dependencies or
-scheduled reminders pointing at the task.
+**Tests** (`test_delete_task.py`): with the final Airtable delete failing once, the response
+is 502 with that message, the task still exists, and both history entries exist; trying
+again succeeds and leaves no dependency or scheduled reminder pointing at the task; with
+history writes failing too, the route still answers 502. Without the `try`, 3 of these
+tests fail.
+
+**Commit.** "Report a half-finished task delete and let a retry finish it (F22)".
 
 ### F23. `project` filter on My Tasks has no format or length limit — Info (Open)
 

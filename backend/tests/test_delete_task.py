@@ -147,3 +147,73 @@ def test_skip_still_works_for_admins(client, sign_in, project):
 def test_staff_still_cannot_skip(client, sign_in, project):
     sign_in("staff@example.org")
     assert client.patch("/api/tasks/recT2", json={"status": "Skipped"}).status_code == 403
+
+
+# --- F22: a delete that fails part way says so and can be finished by trying again ---------
+
+
+@pytest.fixture
+def delete_fails_once(monkeypatch, fake):
+    """The final Airtable delete fails the first time, as in an outage, then works."""
+    from app.airtable import client as airtable
+
+    calls = []
+
+    def flaky(name, ids):
+        calls.append(ids)
+        if len(calls) == 1:
+            raise RuntimeError("Airtable is unavailable")
+        return fake.delete_records(name, ids)
+
+    monkeypatch.setattr(airtable, "delete_records", flaky)
+    return calls
+
+
+def _history_texts(fake):
+    return [r["fields"].get(ActivityLog.TEXT, "") for r in fake.rows(ActivityLog.TABLE)]
+
+
+def test_failed_delete_says_so_and_keeps_the_task(client, sign_in, project, delete_fails_once):
+    sign_in("admin@example.org")
+    response = client.delete("/api/tasks/recT2")
+    assert response.status_code == 502
+    assert response.json()["detail"] == "The task was not fully deleted. Please try again."
+    assert "recT2" in _ids(project, Work.TABLE)
+    texts = _history_texts(project)
+    assert any(t.startswith("deleted the task Design flyer") for t in texts)
+    assert "could not finish deleting the task Design flyer" in texts
+
+
+def test_trying_again_finishes_the_delete(client, sign_in, project, delete_fails_once):
+    add_reminder(project, "recRem", "recT2", "recStaff", date(2026, 11, 10))
+    sign_in("admin@example.org")
+    assert client.delete("/api/tasks/recT2").status_code == 502
+    retry = client.delete("/api/tasks/recT2")
+    assert retry.status_code == 200
+    assert "recT2" not in _ids(project, Work.TABLE)
+    assert "recT2" not in project.find(Work.TABLE, "recT3")["fields"].get(Work.DEPENDS_ON, [])
+    assert project.find(Reminders.TABLE, "recRem")["fields"][Reminders.STATUS] == "Cancelled"
+
+
+def test_failed_delete_still_answers_when_history_is_down_too(client, sign_in, project, monkeypatch):
+    from app.airtable import client as airtable
+
+    sign_in("admin@example.org")
+    real_create = airtable.create_records
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("Airtable is unavailable")
+
+    monkeypatch.setattr(airtable, "delete_records", broken)
+    created = []
+
+    def create_once(*args, **kwargs):
+        created.append(1)
+        if len(created) > 1:  # The first history row works; the "could not finish" one fails
+            raise RuntimeError("Airtable is unavailable")
+        return real_create(*args, **kwargs)
+
+    monkeypatch.setattr(airtable, "create_records", create_once)
+    response = client.delete("/api/tasks/recT2")
+    assert response.status_code == 502
+    assert response.json()["detail"] == "The task was not fully deleted. Please try again."
