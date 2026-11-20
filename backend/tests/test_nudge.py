@@ -4,6 +4,9 @@ Standard project: Design flyer (recT2) is open and assigned to Sam (recStaff).
 Today is Wed Nov 4, 2026, 9 AM Pacific.
 """
 
+import threading
+import time
+
 import pytest
 
 from app.airtable.schema import ActivityLog, Reminders, Session, Users, Work
@@ -210,6 +213,35 @@ def test_daily_limit_resets_after_a_day(client, sign_in, project, outbox, advanc
     advance(hours=24, minutes=1)
     sign_in("admin@example.org")
     assert _nudge(client, "recS3").status_code == 200
+
+
+def test_two_nudges_at_the_same_moment_send_one_email(client, sign_in, project, monkeypatch, settings):
+    """F21: a double click or two admins at once must not email the person twice."""
+    settings(REMINDERS_DRY_RUN=False)
+    sent = []
+    first_sending = threading.Event()
+
+    def slow_send(to, subject, text, html):
+        first_sending.set()
+        time.sleep(0.3)  # Long enough for the second request to arrive mid-send
+        sent.append(to)
+
+    monkeypatch.setattr(gmail, "send_email", slow_send)
+    sign_in("admin@example.org")
+    codes = []
+
+    def nudge():
+        codes.append(_nudge(client).status_code)
+
+    first = threading.Thread(target=nudge)
+    first.start()
+    assert first_sending.wait(5)
+    second = threading.Thread(target=nudge)
+    second.start()
+    first.join(10)
+    second.join(10)
+    assert sorted(codes) == [200, 429]
+    assert sent == ["staff@example.org"]
 
 
 def test_admin_hourly_cap(client, sign_in, project, outbox):

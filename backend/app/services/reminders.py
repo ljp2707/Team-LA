@@ -11,6 +11,7 @@ written (or updated) with Sent, Failed or Skipped, so the job is safe to rerun.
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -450,6 +451,13 @@ NUDGE_EVERY_HOURS = 24
 # F20: at most this many nudges reach one person in 24 hours, across every task and every
 # admin, so nobody can be flooded with reminder emails.
 NUDGES_PER_PERSON_PER_DAY = 3
+
+# F21: held from reading who was nudged until the new Reminders rows are written, so two
+# nudges at the same moment (a double click, or two admins) cannot both pass the check and
+# both send. One lock for all nudges keeps the per-person daily limit exact too, and nudges
+# are rare enough that waiting is fine. This only works within one process: the app runs as
+# a single Railway instance. If it is ever scaled out, this needs a shared lock instead.
+NUDGE_LOCK = threading.Lock()
 
 # Why a person cannot be nudged right now.
 SAME_TASK = "same task"

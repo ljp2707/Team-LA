@@ -419,46 +419,48 @@ def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_
     if not people:
         raise HTTPException(status.HTTP_409_CONFLICT, "Nobody active is assigned to this task. Assign someone first.")
 
-    now = clock.now()
-    blocks = reminders.nudge_blocks(safe(load_reminders), task.id, [p.id for p in people], now)
-    to_send = [p for p in people if p.id not in blocks]
-    if not to_send:
-        again = min(b.until for b in blocks.values()).astimezone(clock.tz())
-        when = f"{again.strftime('%I:%M %p').lstrip('0')} on {logic.fmt_date(again.date(), world.today)}"
-        who = people[0].short_name if len(people) == 1 else "Everyone on this task"
-        if all(b.reason == reminders.SAME_TASK for b in blocks.values()):
-            why = f"{who} was already nudged about this task in the last day."
-        elif len(people) == 1:
-            why = f"{who} has already had {reminders.NUDGES_PER_PERSON_PER_DAY} reminders today, the most anyone gets in a day."
-        else:
-            why = "Everyone on this task has already been nudged about it or has had the most reminders anyone gets in a day."
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, f"{why} You can nudge again after {when}.")
-    names = lambda ps: logic.name_list([p.short_name for p in ps], 3)  # noqa: E731
-    skipped = [p for p in people if p.id in blocks]
-    if get_settings().REMINDERS_DRY_RUN:
-        return {
-            "sent": [],
-            "skipped": [p.short_name for p in skipped],
-            "message": "Email is in dry run mode, so nothing was sent.",
-        }
+    # F21: one nudge at a time, from the check until the Reminders rows are written.
+    with reminders.NUDGE_LOCK:
+        now = clock.now()
+        blocks = reminders.nudge_blocks(safe(load_reminders), task.id, [p.id for p in people], now)
+        to_send = [p for p in people if p.id not in blocks]
+        if not to_send:
+            again = min(b.until for b in blocks.values()).astimezone(clock.tz())
+            when = f"{again.strftime('%I:%M %p').lstrip('0')} on {logic.fmt_date(again.date(), world.today)}"
+            who = people[0].short_name if len(people) == 1 else "Everyone on this task"
+            if all(b.reason == reminders.SAME_TASK for b in blocks.values()):
+                why = f"{who} was already nudged about this task in the last day."
+            elif len(people) == 1:
+                why = f"{who} has already had {reminders.NUDGES_PER_PERSON_PER_DAY} reminders today, the most anyone gets in a day."
+            else:
+                why = "Everyone on this task has already been nudged about it or has had the most reminders anyone gets in a day."
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, f"{why} You can nudge again after {when}.")
+        names = lambda ps: logic.name_list([p.short_name for p in ps], 3)  # noqa: E731
+        skipped = [p for p in people if p.id in blocks]
+        if get_settings().REMINDERS_DRY_RUN:
+            return {
+                "sent": [],
+                "skipped": [p.short_name for p in skipped],
+                "message": "Email is in dry run mode, so nothing was sent.",
+            }
 
-    line = TaskLine(
-        name=task.name,
-        site=world.site_name(project),
-        due_text=logic.due_text(task, world.today),
-        url=task_url(task.id),
-    )
-    sent, errors = reminders.send_nudges(line, task.id, to_send, user.name, body.message)
-    if not sent:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"The reminder was not sent. {errors[0]}")
-    # The message itself is not stored or logged: only who nudged whom.
-    history.log_event(project.id, task.id, user.id, history.NUDGE, f"nudged {names(sent)} about {task.name}")
-    message = f"Reminder sent to {names(sent)}."
-    if skipped:
-        message += f" {names(skipped)} {'was' if len(skipped) == 1 else 'were'} skipped, having been nudged enough today."
-    if len(sent) < len(to_send):
-        message += f" It could not be sent to everyone: {errors[0]}"
-    return {"sent": [p.short_name for p in sent], "skipped": [p.short_name for p in skipped], "message": message}
+        line = TaskLine(
+            name=task.name,
+            site=world.site_name(project),
+            due_text=logic.due_text(task, world.today),
+            url=task_url(task.id),
+        )
+        sent, errors = reminders.send_nudges(line, task.id, to_send, user.name, body.message)
+        if not sent:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"The reminder was not sent. {errors[0]}")
+        # The message itself is not stored or logged: only who nudged whom.
+        history.log_event(project.id, task.id, user.id, history.NUDGE, f"nudged {names(sent)} about {task.name}")
+        message = f"Reminder sent to {names(sent)}."
+        if skipped:
+            message += f" {names(skipped)} {'was' if len(skipped) == 1 else 'were'} skipped, having been nudged enough today."
+        if len(sent) < len(to_send):
+            message += f" It could not be sent to everyone: {errors[0]}"
+        return {"sent": [p.short_name for p in sent], "skipped": [p.short_name for p in skipped], "message": message}
 
 
 @router.delete("/{task_id}")

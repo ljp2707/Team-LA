@@ -377,19 +377,24 @@ tests fail.
 
 **Commit.** "Limit nudges to 3 a day per person across tasks (F20)".
 
-### F21. Two nudges at the same moment can both send — Low (Open)
+### F21. Two nudges at the same moment can both send — Low (Fixed)
 
 **Problem.** The route reads Reminders, decides who may be nudged, sends, and only then
 writes the Reminders row. Two requests at the same moment (a double click, or two admins)
 both pass the check before either writes, so the person gets the email twice. FastAPI runs
 these routes on a thread pool, so this can really happen.
 
-**Proposed fix.** A lock held from the check through the write, one per task, in
-`services/reminders.py`. This works because the app runs as one Railway instance; the code
-comment and README will say a shared lock is needed if it is ever scaled to several.
+**Fix.** `reminders.NUDGE_LOCK` is held from reading the Reminders table until the new
+rows are written. It is one lock for all nudges rather than one per task, so the
+per-person daily limit from F20 (which spans tasks) is exact too; nudges are rare, so
+waiting is fine. It works because the app runs as one Railway instance; the code comment
+and README say a shared lock is needed if it is ever scaled out.
 
-**Tests.** Two nudges started together on separate threads send one email and get one 200
-and one 429.
+**Tests** (`test_nudge.py`): two nudges started together on separate threads, with email
+sending slowed down, give one 200 and one 429 and send one email. With the lock replaced by
+a no-op the test fails (both get 200 and two emails go out).
+
+**Commit.** "Send one nudge at a time so a double click cannot email twice (F21)".
 
 ### F22. A failed Delete task can leave a half-done delete — Low (Open)
 

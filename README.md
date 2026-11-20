@@ -222,7 +222,7 @@ The live site needs real Google sign in, because the test login only works on yo
    | Any other change (POST, PUT, PATCH, DELETE under `/api/`) | 60 a minute per person |
    | Calendar feeds and `/api/public/*` | 60 a minute per address |
 
-   The counts live in memory, which is right for one Railway instance. If the app is ever scaled to several instances, each counts separately.
+   The counts live in memory, which is right for one Railway instance. If the app is ever scaled to several instances, each counts separately, and the lock that stops two nudges from sending at once (`reminders.NUDGE_LOCK`) would also need to become a shared one.
 
    **Hosts and proxy.** The app only answers to the host names in `APP_URL`, `FRONTEND_URL` and `ALLOWED_HOSTS`, plus Railway's health check (`healthcheck.railway.app`), and `localhost` outside production. Anything else gets a 400. **If you add a custom domain, update `APP_URL` and `FRONTEND_URL` to it** (or add it to `ALLOWED_HOSTS`), or requests to the new domain are refused. The Dockerfile runs uvicorn with `--proxy-headers --forwarded-allow-ips` set from `FORWARDED_ALLOW_IPS` (`*` if unset), so the app sees each visitor's real address and https through Railway's proxy.
 
