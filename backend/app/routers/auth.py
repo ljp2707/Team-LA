@@ -135,9 +135,10 @@ async def logout(request: Request):
     """Sign out. POST only: the SameSite cookie is never sent with another site's POST,
     so no other website can sign people out (findings F8)."""
     clear_session(request)
-    base = get_settings().FRONTEND_URL.rstrip("/")
-    # 303 so the browser follows with a GET to the home page.
-    return RedirectResponse(f"{base}/", status_code=303)
+    # 303 so the browser follows with a GET to the home page. "/" rather than
+    # FRONTEND_URL: the form is always posted from our own site, and the CSP's
+    # form-action 'self' would block a redirect to any other address.
+    return RedirectResponse("/", status_code=303)
 
 
 @router.get("/logout")

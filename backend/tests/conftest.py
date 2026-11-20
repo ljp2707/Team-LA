@@ -208,7 +208,8 @@ def advance(fixed_clock):
 
 @pytest.fixture
 def client():
-    return TestClient(app, follow_redirects=False)
+    # Like a browser on the frontend: changes must come from our own site (CSRF check).
+    return TestClient(app, follow_redirects=False, headers={"Origin": "http://localhost:5173"})
 
 
 @pytest.fixture

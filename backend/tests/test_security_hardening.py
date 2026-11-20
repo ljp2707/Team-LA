@@ -113,7 +113,7 @@ def test_no_hsts_on_localhost(client):
 
 def test_hsts_in_production(client, settings):
     settings(ENV="production")
-    assert client.get("/api/health").headers["strict-transport-security"] == "max-age=31536000"
+    assert client.get("/api/health").headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
 
 
 def test_csp_is_report_only_by_default(client):

@@ -197,12 +197,18 @@ The live site needs real Google sign in, because the test login only works on yo
 
    An `https` `APP_URL` always runs in production mode, even if `ENV` is missing, so the secret check and the Secure cookie cannot be turned off by accident. In production the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are turned off; they stay on for local development.
 
-   **Security headers and limits.** Every response carries `nosniff`, `X-Frame-Options: DENY`, a Referrer-Policy and a Permissions-Policy. Production also sends `Strict-Transport-Security`, so browsers only ever use https. A Content-Security-Policy is controlled by `CSP_MODE`:
+   **Security headers and limits.** Every response carries `nosniff`, `X-Frame-Options: DENY`, a Referrer-Policy and a Permissions-Policy. Production also sends `Strict-Transport-Security: max-age=31536000; includeSubDomains`, so browsers only ever use https. API and sign-in answers carry `Cache-Control: no-store`, so browsers and proxies keep no copy of people's data (`/api/health` and `/api/public/*` are the exceptions). The headers are on every answer, errors included. A Content-Security-Policy is controlled by `CSP_MODE`:
    - `report-only` (the default) sends it as `Content-Security-Policy-Report-Only`, so browsers only warn in their developer console.
    - `enforce` makes browsers block anything outside the policy.
    - `off` sends nothing.
 
+   The policy allows only the app's own scripts, styles, fonts and images (fonts are self-hosted in `/fonts`, so Google Fonts is not allowed), no inline scripts, and forms that post to the app itself or to Google sign-in. If the app ever loads something from another site, add that site to `CONTENT_SECURITY_POLICY` in `backend/app/security.py`.
+
    To move to `enforce`: open the live site with the browser's developer console open, click through the main pages, and check for "Content-Security-Policy" warnings. If there are none, set `CSP_MODE=enforce` on Railway and redeploy.
+
+   **Changes must come from this site (CSRF).** POST, PUT, PATCH and DELETE on `/api` and `/auth` are refused with a 403 unless the browser's `Origin` header (or `Referer`, if there is no `Origin`) is `APP_URL` or `FRONTEND_URL`. Browsers always send one of these, so this only stops other websites and scripts that send neither. In local development, open the app at the exact `FRONTEND_URL` (`http://localhost:5173`, not `127.0.0.1`), or changes are refused.
+
+   **Errors.** Every response has an `X-Request-ID` header. If something crashes, the person sees "Something went wrong" and that ID, never a stack trace, and the Railway log has the full error under the same ID. Ask for the ID when someone reports a problem.
 
    Request bodies are capped at 6 MB on the two file upload routes and 2 MB everywhere else. Bigger requests get a 413 before anything reads them. The access log replaces calendar feed tokens and Google sign-in codes with `[redacted]`. Dry-run and reminder-job logs show addresses shortened, such as `m***@example.org`.
 
@@ -217,7 +223,7 @@ The live site needs real Google sign in, because the test login only works on yo
 
    The counts live in memory, which is right for one Railway instance. If the app is ever scaled to several instances, each counts separately.
 
-   **Hosts and proxy.** The app only answers to the host names in `APP_URL` and `FRONTEND_URL`, plus `localhost`, `127.0.0.1` and Railway's health check (`healthcheck.railway.app`). Anything else gets a 400. **If you add a custom domain, update `APP_URL` and `FRONTEND_URL` to it**, or requests to the new domain are refused. The Dockerfile runs uvicorn with `--proxy-headers --forwarded-allow-ips='*'`, so the app sees each visitor's real address through Railway's proxy.
+   **Hosts and proxy.** The app only answers to the host names in `APP_URL`, `FRONTEND_URL` and `ALLOWED_HOSTS`, plus Railway's health check (`healthcheck.railway.app`), and `localhost` outside production. Anything else gets a 400. **If you add a custom domain, update `APP_URL` and `FRONTEND_URL` to it** (or add it to `ALLOWED_HOSTS`), or requests to the new domain are refused. The Dockerfile runs uvicorn with `--proxy-headers --forwarded-allow-ips` set from `FORWARDED_ALLOW_IPS` (`*` if unset), so the app sees each visitor's real address and https through Railway's proxy.
 
    **Sessions** end after `SESSION_IDLE_HOURS` (default 24) without use, and 7 days after sign in however active they are. **Sign out** is a POST from the sidebar button. An old `/auth/logout` link only goes to the home page, so no other website can sign people out.
 

@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     # the policy would block, "enforce" blocks it, "off" sends no policy.
     CSP_MODE: Literal["off", "report-only", "enforce"] = "report-only"
 
+    # Extra host names the app answers to, comma separated, such as a custom domain.
+    # The hosts of APP_URL and FRONTEND_URL are always allowed; localhost only outside
+    # production. Requests for any other host get 400.
+    ALLOWED_HOSTS: str = ""
+    # Which proxies uvicorn believes about the visitor's address and https (the
+    # X-Forwarded-For and X-Forwarded-Proto headers). Read by uvicorn from the
+    # environment in the Dockerfile. "*" is right on Railway: its proxy has no fixed
+    # address, and the app can only be reached through it.
+    FORWARDED_ALLOW_IPS: str = "*"
+
     DEV_ALLOW_VIEW_SWITCH: bool = False
     DEV_LOGIN_EMAIL: str = ""
 
@@ -64,8 +74,10 @@ class Settings(BaseSettings):
     def allowed_hosts(self) -> list[str]:
         """Host names the app answers to. Others get 400 (findings F14)."""
         hosts = {urlparse(self.APP_URL).hostname, urlparse(self.FRONTEND_URL).hostname}
-        # Local development and tests, and Railway's deploy health check.
-        hosts |= {"localhost", "127.0.0.1", "testserver", "healthcheck.railway.app"}
+        hosts |= {h.strip().lower() for h in self.ALLOWED_HOSTS.split(",")}
+        hosts.add("healthcheck.railway.app")  # Railway's deploy health check
+        if not self.is_production:
+            hosts |= {"localhost", "127.0.0.1", "testserver"}  # Laptops and pytest
         return sorted(h for h in hosts if h)
 
     @property
