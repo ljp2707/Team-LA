@@ -135,7 +135,7 @@ All email (reminders, the weekly digest, assignment and welcome emails) goes thr
 3. On your computer, with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, run `python -m jobs.authorize_gmail` from `backend`. Sign in as the account that should send the emails (for now avanthi.arun@gmail.com, and later an NMU-owned account), then click through the unverified-app screen (**Advanced**, then **Go to NMU Launches**). This screen appears once, only for the sender, because `gmail.send` is a sensitive scope. Staff signing in never see it.
 4. Put the printed token in `GMAIL_REFRESH_TOKEN`, set `GMAIL_SENDER` to that same address, and set `REMINDERS_DRY_RUN=false`.
 5. Run the app on your computer in developer mode (`DEV_ALLOW_VIEW_SWITCH=true`), go to **Users and roles**, then **System**, then **Send me a test email**. The System box only shows in developer mode, never in production.
-6. When the app is deployed later, set the same variables on **both** Railway services, the web service and the cron service.
+6. When the app is deployed later, set these variables on the Railway web service. The cron service needs only some of them, with its own `SESSION_SECRET` (see **The reminder cron service** below).
 7. To change the sender later, run step 3 again with the new account and replace both variables.
 8. The refresh token stops working if the sender changes their Google password, revokes access, or does not use it for 6 months. The daily job uses it, so the last case should not happen.
 
