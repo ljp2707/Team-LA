@@ -419,17 +419,22 @@ tests fail.
 
 **Commit.** "Report a half-finished task delete and let a retry finish it (F22)".
 
-### F23. `project` filter on My Tasks has no format or length limit — Info (Open)
+### F23. `project` filter on My Tasks has no format or length limit — Info (Fixed)
 
 **Problem.** The new filters are length-capped, but the older `project` parameter is not.
 It is only compared with the caller's own tasks, so it cannot reveal anything, but it is
 the one unvalidated input on the route.
 
-**Proposed fix.** Require the shape of an Airtable record ID (`rec` and 14 letters or
-digits); anything else gets 422. No route checks this shape yet, so this adds one shared
-pattern that later routes can reuse.
+**Fix.** `security.RECORD_ID_PATTERN` (`rec` then 1 to 24 letters or digits) is now the
+pattern for `project` on `GET /api/tasks/mine`; anything else gets 422. Real Airtable IDs
+are `rec` plus exactly 14 characters; the pattern also accepts shorter ones so the readable
+IDs in the tests keep working. It is in `security.py` so other routes can reuse it.
 
-**Tests.** A malformed or very long `project` value gets 422; a valid one still filters.
+**Tests** (`test_my_tasks_filters.py`): quotes, spaces, slashes, newlines, a missing `rec`
+prefix and a 43-character value all get 422; a real-shaped ID gets 200 and a valid one
+still filters. Without the pattern, 7 of these fail.
+
+**Commit.** "Accept only record IDs in the My Tasks project filter (F23)".
 
 ### F24. Checks that passed (Phase 0) — Info
 

@@ -21,6 +21,12 @@ logger = logging.getLogger("app.errors")
 # --- CSRF: refuse changes sent from other websites -----------------------------------
 
 CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+# F23: the shape of an Airtable record ID, for record IDs that arrive as query parameters.
+# Real IDs are "rec" plus exactly 14 letters or digits; shorter ones are accepted so the
+# readable IDs in the tests (such as recProj) still work. What matters is that the value is
+# short and holds only letters and digits.
+RECORD_ID_PATTERN = r"^rec[A-Za-z0-9]{1,24}$"
 CHECKED_PREFIXES = ("/api/", "/auth/")
 CSRF_MESSAGE = "This request came from another website, so it was refused."
 

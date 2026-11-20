@@ -14,6 +14,7 @@ from app.airtable import client
 from app.airtable.schema import Links, Reminders, Work
 from app.auth.deps import current_user, require_admin, require_can_edit
 from app.config import get_settings
+from app.security import RECORD_ID_PATTERN
 from app.email.templates import TaskLine, task_url
 from app.models.task import AssignIn, LinkIn, NoteIn, NudgeIn, ReassignIn, ReminderIn, TaskUpdateIn
 from app.models.user import CurrentUser
@@ -49,7 +50,7 @@ def _require_edit(task: TaskRec, user: CurrentUser) -> None:
 @router.get("/mine")
 def my_tasks(
     filter: str | None = Query(None, pattern="^(week|overdue)$"),
-    project: str | None = None,
+    project: str | None = Query(None, pattern=RECORD_ID_PATTERN),
     state: str | None = Query(None, max_length=50),
     city: str | None = Query(None, max_length=100),
     program_type: str | None = Query(None, max_length=200),

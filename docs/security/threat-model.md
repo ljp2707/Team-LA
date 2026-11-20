@@ -106,7 +106,7 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 
 | Method | Path | Role | Changes data | Notes |
 |---|---|---|---|---|
-| GET | `/api/tasks/mine` | current_user | No | Own tasks on programs the caller can see. Changed 2026-11-20: optional `state` (max 50), `city` (max 100), `program_type` (max 200) and `sort` (`due`, `program` or `location` only) only narrow that list; filter choices come from the caller's own tasks |
+| GET | `/api/tasks/mine` | current_user | No | Own tasks on programs the caller can see. Changed 2026-11-20: `project` must be a record ID (F23); optional `state` (max 50), `city` (max 100), `program_type` (max 200) and `sort` (`due`, `program` or `location` only) only narrow that list; filter choices come from the caller's own tasks |
 | GET | `/api/tasks/{id}` | current_user | No | `_visible_task` (partner program check). Notes filtered by visibility. People list only for admins. Changed 2026-11-20: adds `can_delete` and `can_nudge` (admin view only) and `last_nudge` (hidden from partners) |
 | PATCH | `/api/tasks/{id}` | require_can_edit | Yes | Status: only assignees (or Admin); Skip, due date, name and depends-on: Admin only |
 | POST | `/api/tasks/{id}/nudge` | Admin | Yes; email | Open task, open program, Active assignees only. Once per person per task per day and 3 per person per day across all tasks (both from Reminders); 20 per admin per hour (its own rule, so it does not also count toward the 60 a minute write limit). Message escaped, not stored. See F20 and F21 |
