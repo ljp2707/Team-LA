@@ -24,7 +24,7 @@ time it is used. Admins can also add them by hand in Airtable.
 import argparse
 import sys
 
-from app.airtable.client import get_base, is_configured
+from app.airtable.client import MigrationTokenError, is_configured, migration_base
 from app.airtable.schema import (
     SITE_TYPES,
     ActivityLog,
@@ -236,8 +236,11 @@ def main(argv: list[str] | None = None) -> int:
     if not is_configured():
         print("Airtable is not configured. Set AIRTABLE_TOKEN and AIRTABLE_BASE_ID.")
         return 1
-
-    base = get_base()
+    try:
+        base = migration_base()  # Never the app's own token (findings F37)
+    except MigrationTokenError as error:
+        print(error)
+        return 1
     tables, fields = plan(base)
     if not tables and not fields:
         print("Nothing to add. The base already has every field and table.")

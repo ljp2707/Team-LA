@@ -108,18 +108,17 @@ def test_audit_rows_cannot_be_deleted(fake):
 
 def test_real_client_refuses_too():
     """The guard is in the real client, before any request to Airtable."""
-    from importlib import reload
+    import importlib.util
 
-    import app.airtable.client as real
-
-    fresh = reload(real)  # The real functions, not the test fakes
-    try:
-        with pytest.raises(ValueError, match="append only"):
-            fresh.update_records(AuditLog.TABLE, [{"id": "recA", "fields": {}}])
-        with pytest.raises(ValueError, match="append only"):
-            fresh.delete_records(AuditLog.TABLE, ["recA"])
-    finally:
-        reload(real)
+    # A separate copy of the module with the real functions (the tests patch the shared one).
+    # Not a reload: that would swap the module's classes under every other test.
+    spec = importlib.util.find_spec("app.airtable.client")
+    fresh = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fresh)
+    with pytest.raises(ValueError, match="append only"):
+        fresh.update_records(AuditLog.TABLE, [{"id": "recA", "fields": {}}])
+    with pytest.raises(ValueError, match="append only"):
+        fresh.delete_records(AuditLog.TABLE, ["recA"])
 
 
 def test_erasing_someone_does_not_touch_the_audit_log(client, sign_in, fake):

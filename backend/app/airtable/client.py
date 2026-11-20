@@ -29,6 +29,7 @@ from functools import lru_cache
 from typing import Any
 
 from pyairtable import Api, retry_strategy
+from requests import HTTPError
 
 from app.airtable.schema import (
     ALL_TABLES,
@@ -44,6 +45,7 @@ from app.airtable.schema import (
     field_names,
 )
 from app.config import get_settings
+from app.security_events import security_event
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,60 @@ def get_api() -> Api:
 
 def get_base():
     return get_api().base(get_settings().AIRTABLE_BASE_ID)
+
+
+class MigrationTokenError(Exception):
+    """The schema scripts need their own token (findings F37)."""
+
+
+def migration_base():
+    """The base, opened with AIRTABLE_MIGRATION_TOKEN, for the scripts that read or change
+    its structure (migrate_airtable, dump_schema).
+
+    The app's own AIRTABLE_TOKEN only needs data.records:read and data.records:write, so a
+    leaked app token cannot add, rename or delete fields. Changing the structure needs a
+    second, short-lived token with the schema scopes, made for the job and deleted after.
+    The app's token is refused here even if it happens to have those scopes.
+    """
+    settings = get_settings()
+    token = settings.AIRTABLE_MIGRATION_TOKEN.strip()
+    if not token:
+        raise MigrationTokenError(
+            "Set AIRTABLE_MIGRATION_TOKEN to a separate token with the schema.bases:read and "
+            "schema.bases:write scopes. See README, Updating the Airtable base."
+        )
+    if token == settings.AIRTABLE_TOKEN.strip():
+        raise MigrationTokenError(
+            "AIRTABLE_MIGRATION_TOKEN is the app's own token. Make a separate, short-lived token for this."
+        )
+    return Api(token, retry_strategy=retry_strategy(total=5, backoff_factor=1)).base(settings.AIRTABLE_BASE_ID)
+
+
+def token_can_read_schema() -> bool | None:
+    """Production startup check (findings F37): can the app's token read the base's structure?
+
+    Airtable does not report a personal access token's scopes, so this tries the one harmless
+    schema read. True means the token has more than the app needs; None means it could not tell.
+    """
+    try:
+        get_base().schema(force=True)
+        return True
+    except HTTPError as error:
+        status = getattr(error.response, "status_code", None)
+        return False if status in (401, 403) else None
+    except Exception:  # Network trouble: say nothing rather than guess
+        return None
+
+
+def warn_if_token_too_broad() -> None:
+    if not is_configured():
+        return
+    if token_can_read_schema():
+        security_event(
+            "airtable_token_too_broad",
+            level=logging.WARNING,
+            detail="AIRTABLE_TOKEN can read the base structure. It only needs data.records:read and data.records:write.",
+        )
 
 
 def is_configured() -> bool:

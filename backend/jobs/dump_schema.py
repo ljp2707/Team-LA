@@ -6,7 +6,7 @@ It lists every table and field with its type, the options of each select field a
 the table each link field points to. It reads the schema only, never records.
 """
 
-from app.airtable.client import get_base, is_configured
+from app.airtable.client import MigrationTokenError, is_configured, migration_base
 from app.config import REPO_ROOT
 
 OUTPUT = REPO_ROOT / "docs" / "airtable-schema.md"
@@ -65,7 +65,11 @@ def main() -> int:
     if not is_configured():
         print("Airtable is not configured. Set AIRTABLE_TOKEN and AIRTABLE_BASE_ID.")
         return 1
-    schema = get_base().schema(force=True)
+    try:
+        schema = migration_base().schema(force=True)  # The app's token cannot read the structure (F37)
+    except MigrationTokenError as error:
+        print(error)
+        return 1
     table_names = {t.id: t.name for t in schema.tables}
     lines = [
         "# Airtable schema",

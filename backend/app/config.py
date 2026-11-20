@@ -25,8 +25,11 @@ class Settings(BaseSettings):
     # Sign people out after this many hours without using the app (findings F15).
     SESSION_IDLE_HOURS: int = Field(default=24, ge=1)
 
-    AIRTABLE_TOKEN: str = ""
+    AIRTABLE_TOKEN: str = ""  # Scopes: data.records:read and data.records:write only (F37)
     AIRTABLE_BASE_ID: str = ""
+    # Only for python -m jobs.migrate_airtable and jobs.dump_schema, on a laptop: a separate,
+    # short-lived token with schema.bases:read and schema.bases:write. Never on the server.
+    AIRTABLE_MIGRATION_TOKEN: str = ""
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
@@ -132,6 +135,9 @@ class Settings(BaseSettings):
         """Settings that would quietly weaken a live site (findings F33)."""
         if not self.is_production:
             return
+        # The migration token can change the base's structure; it is for a laptop only (F37).
+        if self.AIRTABLE_MIGRATION_TOKEN.strip():
+            raise ValueError("AIRTABLE_MIGRATION_TOKEN must not be set in production; delete it from the server")
         # Over http the session cookie (Secure, __Host-) and Google sign in would not work,
         # and nothing would be encrypted.
         for name in ("APP_URL", "FRONTEND_URL"):

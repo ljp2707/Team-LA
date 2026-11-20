@@ -832,6 +832,47 @@ events removed, 3 fail; with the request ID not set, 1 fails.
 
 **Commit.** "JSON logs with request IDs and security events (F36)".
 
+## Phase 4: least privilege (2026-11-20)
+
+### F37. The app's Airtable token could change the base's structure — Medium (Fixed)
+
+**Problem.** The README told people to give the app's one Airtable token four scopes,
+including `schema.bases:write`, because the migration script used the same token. Anyone
+holding the production token (from a leaked Railway variable or a log) could add, rename or
+delete fields and tables, which would break the app and could destroy data. The reminder cron
+service was told to copy every variable from the web service, including ones it never uses.
+
+**Fix.**
+- The app's `AIRTABLE_TOKEN` needs only `data.records:read` and `data.records:write`
+  (README, `.env.example`).
+- `client.migration_base()` opens the base with a new `AIRTABLE_MIGRATION_TOKEN`, a separate,
+  short-lived token with the schema scopes. `jobs.migrate_airtable` and `jobs.dump_schema`
+  use only it: without it, or with the app's own token in it, they stop and say why.
+- Production refuses to start with `AIRTABLE_MIGRATION_TOKEN` set: it is for a laptop only.
+- In production, a background check at startup (`client.warn_if_token_too_broad`) tries one
+  harmless read of the base's structure. Airtable does not report a personal token's scopes,
+  so this is the way to tell; if it works, an `airtable_token_too_broad` security event says
+  the token has more than it needs.
+- Gmail: `jobs.authorize_gmail` already asked only for `gmail.send` (a leaked refresh token can
+  send mail but not read the inbox); a test now keeps it that way.
+- The README lists exactly which variables the cron service needs, and gives it its own
+  `SESSION_SECRET`, so a leak from that service cannot forge web sign ins.
+
+**Tests** (`test_least_privilege.py`): both scripts refuse without a migration token and with
+the app's token; `migration_base` uses the migration token; production refuses it and a
+laptop allows it; the startup check reads 403 and 401 as narrow, a successful read as too
+broad, and other errors as unknown; the warning names no token; Gmail asks only to send.
+With the same-token refusal removed, 2 fail.
+
+**Manual steps.**
+1. In Airtable, create a new token for the app with only `data.records:read` and
+   `data.records:write` and the NMU base, from an NMU-owned account. Put it in Railway's
+   `AIRTABLE_TOKEN` (web and cron), redeploy, check the app works, then delete the old
+   four-scope token.
+2. Give the cron service only the variables in the README table, with its own `SESSION_SECRET`.
+
+**Commit.** "Least-privilege Airtable token and a separate migration token (F37)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

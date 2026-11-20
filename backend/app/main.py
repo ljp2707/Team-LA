@@ -12,7 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app import log_redaction, logging_setup
 from app.audit import AuditTrail
-from app.airtable.client import warm_cache, warn_about_schema_problems
+from app.airtable.client import warm_cache, warn_about_schema_problems, warn_if_token_too_broad
 from app.auth.google import callback_url
 from app.auth.session import MAX_SESSION_DAYS
 from app.config import Settings, get_settings
@@ -59,6 +59,8 @@ async def lifespan(_: FastAPI):
         warn_about_schema_problems()
     # In the background, so a slow Airtable never holds up startup (findings F33).
     threading.Thread(target=warn_if_bootstrap_not_needed, daemon=True).start()
+    if settings.is_production:
+        threading.Thread(target=warn_if_token_too_broad, daemon=True).start()  # F37
     warm_cache()  # In the background, so the first sign in does not wait on Airtable
     yield
 

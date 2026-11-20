@@ -85,7 +85,7 @@ This only works on localhost. The app refuses to start if `DEV_LOGIN_EMAIL` is s
 ## Create the Airtable token
 
 1. Go to https://airtable.com/create/tokens and choose **Create token**.
-2. Add these four scopes: `data.records:read`, `data.records:write`, `schema.bases:read`, `schema.bases:write`. The last one is only used by the migration script that adds new fields (see **Updating the Airtable base**).
+2. Add only two scopes: `data.records:read` and `data.records:write`. That is all the app needs. Without the schema scopes, a leaked token cannot add, rename or delete fields or tables (findings F37). In production the app checks at startup and logs an `airtable_token_too_broad` warning if its token can read the base's structure.
 3. Under **Access**, add the NMU base.
 4. Copy the token into `AIRTABLE_TOKEN`.
 
@@ -147,10 +147,14 @@ All email (reminders, the weekly digest, assignment and welcome emails) goes thr
 
 The app needs some fields and tables the original base did not have: the Links, Reminders, Template Versions and Audit Log tables, and fields such as Due Date Override and One-off on tasks, Program Name and Duration on sessions, and Session Version on Users (it lets the app sign someone out on every device; findings F30). A script adds them. It only adds; it never changes or deletes existing fields or rows.
 
-1. Make sure your token has the `schema.bases:write` scope.
-2. From `backend`, run `python -m jobs.migrate_airtable` to see what it would add. Nothing changes yet.
-3. Run `python -m jobs.migrate_airtable --apply` to add them. Running it again prints "Nothing to add".
-4. `python -m jobs.dump_schema` rewrites `docs/airtable-schema.md` from the live base, so you can check the result.
+This script, and `jobs.dump_schema`, need a **separate, short-lived token**, never the app's own (findings F37):
+
+1. At https://airtable.com/create/tokens, create a token named something like "NMU migration, delete after use" with `schema.bases:read` and `schema.bases:write` (add `data.records:read` too), and only the NMU base under **Access**.
+2. Put it in `AIRTABLE_MIGRATION_TOKEN` in your own `.env` on your computer. Never on Railway: production refuses to start if it is set there. The scripts refuse to run without it, and refuse the app's own `AIRTABLE_TOKEN` even if it has the scopes.
+3. From `backend`, run `python -m jobs.migrate_airtable` to see what it would add. Nothing changes yet.
+4. Run `python -m jobs.migrate_airtable --apply` to add them. Running it again prints "Nothing to add".
+5. `python -m jobs.dump_schema` rewrites `docs/airtable-schema.md` from the live base, so you can check the result.
+6. **Delete the migration token** in Airtable and remove it from `.env`.
 
 On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds demo people, sites, templates and programs, all with `@example.org` emails. It refuses to run in production, and refuses to run twice.
 
@@ -248,7 +252,21 @@ After changing a variable in Railway, click **Deploy** if it asks you to apply t
 
 1. In the same Railway project, add a second service from the same GitHub repo.
 2. Under **Settings > Config-as-code**, set the config file path to `/railway.cron.json`. This runs `python -m jobs.send_reminders` on the schedule `0 15 * * *`, and leaves out the web health check.
-3. Copy the variables from the web service.
+3. Give it only the variables it uses (least privilege, findings F37), not a copy of everything:
+
+   | Variable | Value |
+   |---|---|
+   | `ENV` | `production` |
+   | `APP_URL`, `FRONTEND_URL` | The same `https://` addresses as the web app (links in emails) |
+   | `SESSION_SECRET` | **Its own** random value, not the web app's. The job never signs a cookie; the production check just needs one, and a separate value means a leak from this service cannot be used to forge sign ins |
+   | `AIRTABLE_TOKEN`, `AIRTABLE_BASE_ID` | The same as the web app |
+   | `APP_TIMEZONE` | The same as the web app |
+   | `GMAIL_SENDER`, `GMAIL_REFRESH_TOKEN` | The same as the web app |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (or `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`) | The client the refresh token was made with |
+   | `REMINDERS_DRY_RUN` | `true` until the test email works, then `false` |
+   | `ORG_NAME`, `CONTACT_EMAIL`, `ORG_ADDRESS` | The same as the web app (the footer of every email) |
+
+   Leave out `ALLOWED_EMAIL_DOMAIN`, `BOOTSTRAP_ADMIN_EMAILS`, `ALLOWED_HOSTS`, `CSP_MODE`, `FORWARDED_ALLOW_IPS`, `SESSION_IDLE_HOURS`, every `DEV_` variable and `AIRTABLE_MIGRATION_TOKEN`.
 
 Railway schedules in UTC, so `0 15 * * *` is 8 AM Pacific during daylight time and 7 AM in winter. While `REMINDERS_DRY_RUN=true` the job only prints. Set it to `false` once the test email works.
 
