@@ -12,7 +12,7 @@ whom, and where an attacker could get in.
 - **Database:** Airtable, through one personal access token. Reads are cached in memory for
   about 30 seconds (`app/airtable/client.py`).
 - **Sign-in:** Google OAuth (authlib). The Airtable Users table decides who gets in. The session
-  is a signed cookie (`nmu_session`, Starlette `SessionMiddleware`).
+  is a signed cookie (`__Host-nmu_session` in production, `nmu_session` on localhost; Starlette `SessionMiddleware`).
 - **Email:** Gmail API, using a refresh token for one sender account.
 - **Cron:** the same image runs `python -m jobs.send_reminders` on a schedule.
 

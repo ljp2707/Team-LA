@@ -16,7 +16,7 @@ from app.auth.session import MAX_SESSION_DAYS
 from app.config import Settings, get_settings
 from app.rate_limit import RateLimit
 from app.request_limits import RequestSizeLimit
-from app.security import OriginCheck, RequestContext
+from app.security import OriginCheck, RequestContext, RetireOldSessionCookie, session_cookie_options
 from app.routers import (
     admin,
     archive,
@@ -83,11 +83,11 @@ app.add_middleware(OriginCheck)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SESSION_SECRET,
-    session_cookie="nmu_session",
-    max_age=MAX_SESSION_DAYS * 24 * 60 * 60,
-    same_site="lax",
-    https_only=settings.is_production,
+    # __Host-nmu_session in production, nmu_session on localhost (findings F29)
+    **session_cookie_options(settings, max_age=MAX_SESSION_DAYS * 24 * 60 * 60),
 )
+# Deletes the pre-F29 cookie in production. Outside SessionMiddleware, so it sees every answer.
+app.add_middleware(RetireOldSessionCookie)
 # Only answer to our own host names, so a forged Host header cannot reach the app (F14).
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 # Outermost: request IDs, security headers on every answer (errors included), and a

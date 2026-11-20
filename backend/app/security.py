@@ -239,6 +239,60 @@ def parse_csp_reports(body: bytes, content_type: str) -> list[dict[str, str]] | 
     ]
 
 
+# --- The session cookie (F29) -----------------------------------------------------------
+
+# On localhost the cookie cannot be Secure (no https), so it keeps the plain name there.
+LOCAL_SESSION_COOKIE = "nmu_session"
+# In production, browsers only accept a __Host- cookie that is Secure, has Path=/ and no
+# Domain, so no other subdomain (such as another *.up.railway.app app) can set or replace it.
+PRODUCTION_SESSION_COOKIE = "__Host-nmu_session"
+
+
+def session_cookie_name(settings: Settings) -> str:
+    return PRODUCTION_SESSION_COOKIE if settings.is_production else LOCAL_SESSION_COOKIE
+
+
+def session_cookie_options(settings: Settings, max_age: int) -> dict:
+    """How SessionMiddleware sets the cookie: signed, HttpOnly (its default), SameSite=Lax,
+    Path=/ and no Domain (its defaults), and Secure in production."""
+    return {
+        "session_cookie": session_cookie_name(settings),
+        "max_age": max_age,
+        "same_site": "lax",
+        "https_only": settings.is_production,
+        "path": "/",
+    }
+
+
+class RetireOldSessionCookie:
+    """In production, delete the old nmu_session cookie when a browser still sends it.
+
+    After the switch to __Host-nmu_session, the old cookie is no longer read, so everyone
+    signs in once more. Deleting it keeps browsers from sending a dead cookie forever.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not get_settings().is_production:
+            return await self.app(scope, receive, send)
+        cookies = Headers(scope=scope).get("cookie", "")
+        has_old = any(part.strip().startswith(LOCAL_SESSION_COOKIE + "=") for part in cookies.split(";"))
+        if not has_old:
+            return await self.app(scope, receive, send)
+
+        async def send_with_expiry(message):
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message).append(
+                    "set-cookie",
+                    f"{LOCAL_SESSION_COOKIE}=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Lax",
+                )
+            await send(message)
+
+        await self.app(scope, receive, send_with_expiry)
+
+
 # --- Request IDs and unexpected errors ------------------------------------------------
 
 ERROR_MESSAGE = "Something went wrong. If it keeps happening, send this code to the NMU team."

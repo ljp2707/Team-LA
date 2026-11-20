@@ -584,6 +584,35 @@ header check in `test_security_requests.py` now expects the enforced header.
 
 **Commit.** "Test every page under an enforced CSP and enforce it by default (F28)".
 
+### F29. The session cookie could be replaced from another subdomain — Low (Fixed)
+
+**Problem.** The production cookie `nmu_session` was Secure, HttpOnly and SameSite=Lax, but
+a plain name lets a page on a sibling subdomain (any other app on `*.up.railway.app`, or a
+future NMU subdomain) set a cookie with the same name for the parent domain. That can
+force a visitor into a session of the attacker's choosing (session fixation) or knock them
+out.
+
+**Fix.** In production the cookie is `__Host-nmu_session` (`security.session_cookie_name`).
+Browsers only accept a `__Host-` cookie that is Secure, has `Path=/` and no Domain, and only
+from the host itself, so no other subdomain can set it. `security.session_cookie_options`
+gives SessionMiddleware the name, `Path=/`, SameSite=Lax and Secure in production, and
+`main.py` uses it. Localhost keeps `nmu_session` without Secure so http development works.
+The switch signs everyone out once: the old cookie is no longer read, and
+`security.RetireOldSessionCookie` deletes it (`Max-Age=0`) the next time a browser sends it
+in production. The privacy page and threat model name the new cookie.
+
+**Tests** (`test_session_cookie.py`): the production cookie starts with
+`__Host-nmu_session=` and is Secure, HttpOnly, SameSite=Lax, `Path=/` with no Domain; the
+local one is `nmu_session` without Secure; the app still signs in locally; in production a
+request carrying the old cookie gets it deleted, one carrying only the new cookie does not,
+and localhost never deletes it; a validly signed old cookie signs nobody in under the new
+name. The browser test still passes.
+
+**Manual step.** After deploying, everyone signs in again once. Tell staff and partners
+beforehand.
+
+**Commit.** "Use a __Host- session cookie in production (F29)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one
