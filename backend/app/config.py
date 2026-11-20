@@ -36,9 +36,11 @@ class Settings(BaseSettings):
 
     APP_TIMEZONE: str = "America/Los_Angeles"
 
-    # Content-Security-Policy (findings F1): "report-only" makes browsers warn about anything
-    # the policy would block, "enforce" blocks it, "off" sends no policy.
-    CSP_MODE: Literal["off", "report-only", "enforce"] = "report-only"
+    # Content-Security-Policy (findings F1, F28): "enforce" blocks anything outside the
+    # policy, "report-only" only reports it (useful for trying a policy change on the live
+    # site first), "off" sends no policy. Enforced by default since the browser test
+    # (frontend/e2e) showed every page works under it.
+    CSP_MODE: Literal["off", "report-only", "enforce"] = "enforce"
 
     # Extra host names the app answers to, comma separated, such as a custom domain.
     # The hosts of APP_URL and FRONTEND_URL are always allowed; localhost only outside

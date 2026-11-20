@@ -15,3 +15,7 @@ frontend/dist/
 
 # Built frontend, copied here by the Dockerfile
 backend/app/static/
+
+# Playwright browser test output
+frontend/test-results/
+frontend/playwright-report/

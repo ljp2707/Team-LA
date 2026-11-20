@@ -552,6 +552,38 @@ the check works. The browser test (F28) runs every page with these headers on.
 
 **Commit.** "Add cross-origin isolation headers and drop the Server header (F27)".
 
+### F28. The CSP was only reported, never enforced, and nothing tested it in a browser — Medium (Fixed)
+
+**Problem.** `CSP_MODE` defaulted to `report-only`, so browsers only warned and blocked
+nothing: an injected script would still have run. Moving to `enforce` was a manual step
+("click through the live site with the console open"), with nothing to catch a page the
+policy breaks.
+
+**Fix.** A Playwright browser test (`frontend/e2e/csp.spec.ts`, `@playwright/test` pinned
+to 1.64.1 as a dev dependency only; it is the standard tool for this and there is no
+reasonable hand-written alternative) builds the app and runs it with `CSP_MODE=enforce`
+through `backend/tests/e2e_server.py`, which serves the built frontend on the in-memory
+fake Airtable from the backend tests, so real data, Google and Gmail are never touched.
+Three servers run, signed in as an admin, a staff member and a partner through
+`DEV_LOGIN_EMAIL`. The test visits every page each can reach, opens the Nudge and Delete task
+dialogs (reaching the task from Assignments, then a person, as admins do), uses every My
+Tasks filter and sort, checks the choices go into the address and survive a refresh, and
+checks staff do not see the admin buttons. It fails on any CSP violation, console error,
+uncaught error, failed request or HTTP error, checks each page carries the enforced
+header, and checks both self-hosted fonts load. With that passing, `enforce` is now the
+default in `config.py` and `.env.example`; `report-only` stays as an opt-in for trying a
+policy change on the live site.
+
+**Tests.** `npm run test:e2e` (3 tests, all pass). With `font-src 'none'` put into the policy
+the test fails, so it does catch violations. Backend: CSP is enforced by default, the
+setting's default is `enforce`, and `report-only` still works when chosen. The shared
+header check in `test_security_requests.py` now expects the enforced header.
+
+**Manual step.** If Railway has `CSP_MODE=report-only` set, remove it or set it to
+`enforce`, then redeploy.
+
+**Commit.** "Test every page under an enforced CSP and enforce it by default (F28)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one
