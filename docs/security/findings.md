@@ -15,13 +15,13 @@ it.
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
-| F1 | No Content-Security-Policy or Strict-Transport-Security header | Medium | Open |
+| F1 | No Content-Security-Policy or Strict-Transport-Security header | Medium | Partly fixed in `39baf62`: HSTS on, CSP report-only |
 | F2 | `/docs`, `/redoc` and `/openapi.json` are public in production | Medium | Fixed in `3ae3248` |
-| F3 | Calendar feed tokens (and OAuth codes) are written to the access log | Medium | Open |
+| F3 | Calendar feed tokens (and OAuth codes) are written to the access log | Medium | Fixed in `39baf62` |
 | F4 | `DEV_ALLOW_VIEW_SWITCH=true` is not refused in production | Medium | Fixed in `3ae3248` |
 | F5 | No rate limiting on any endpoint | Medium | Open |
-| F6 | Upload bodies have no size limit and are parsed before sign-in is checked | Medium | Open |
-| F7 | URLs typed directly into Airtable are rendered as links without a scheme check | Medium | Open |
+| F6 | Upload bodies have no size limit and are parsed before sign-in is checked | Medium | Fixed in `39baf62` |
+| F7 | URLs typed directly into Airtable are rendered as links without a scheme check | Medium | Fixed in `39baf62` |
 | F8 | `GET /auth/logout` can be triggered from any website | Low | Open |
 | F9 | CSRF protection relies on SameSite=Lax alone; no Origin check | Low | Closed: not an issue |
 | F10 | Uploaded file content is not checked against its extension | Low | Open |
@@ -40,6 +40,8 @@ it.
 ## Findings
 
 ### F1. No Content-Security-Policy or Strict-Transport-Security — Medium
+
+**Status: Partly fixed in commit `39baf62`.** HSTS is sent in production. The CSP is sent as `Content-Security-Policy-Report-Only` while `CSP_MODE=report-only` (the default). It is fully fixed once the live site shows no CSP warnings in the browser console and `CSP_MODE=enforce` is set on Railway. Tests in `backend/tests/test_security_hardening.py`.
 
 - **Where:** `backend/app/main.py:54-60` (`SECURITY_HEADERS`). Verified on the live site: the
   response has `nosniff`, `X-Frame-Options`, `Referrer-Policy` and `Permissions-Policy`, and no
@@ -69,6 +71,8 @@ it.
   localhost. Test: 404 in production mode, 200 in development.
 
 ### F3. Calendar tokens in access logs — Medium
+
+**Status: Fixed in commit `39baf62`.** Tests in `backend/tests/test_security_hardening.py`. Filter in `backend/app/log_redaction.py`. Tokens logged before this fix stay in old Railway logs; see Manual steps.
 
 - **Where:** `Dockerfile:21` runs uvicorn with its default access log, which writes the full
   request path. `/calendar/{token}.ics` (`backend/app/routers/calendar.py:38`) puts the token in
@@ -115,6 +119,8 @@ it.
 
 ### F6. Unlimited upload size, parsed before sign-in — Medium
 
+**Status: Fixed in commit `39baf62`.** Tests in `backend/tests/test_security_hardening.py`. Middleware in `backend/app/request_limits.py`.
+
 - **Where:** `backend/app/routers/tasks.py:477` and `backend/app/routers/projects.py:370` take
   `UploadFile`. FastAPI parses the multipart body (`fastapi/routing.py:455`, version 0.162.0)
   before it runs dependencies such as `current_user` (`:511`). Starlette spools file parts to a
@@ -129,6 +135,8 @@ it.
   gets 413 without reaching the handler, signed out and signed in.
 
 ### F7. Links from Airtable rendered without a scheme check — Medium
+
+**Status: Fixed in commit `39baf62`.** Tests in `backend/tests/test_security_hardening.py`. `safe_link` in `backend/app/services/links.py`, `safeHref` in `frontend/src/lib/safeHref.ts`.
 
 - **Where:** The API only accepts `https://` links (`backend/app/models/task.py:48-51`) and Drive
   folders (`backend/app/models/project.py:36-41`). But values typed directly into Airtable skip
@@ -327,18 +335,18 @@ it.
 
 ## Prioritized fix order
 
-Batch 1 (F4, F2, F12) is done. F9 is closed.
+Batch 1 (F4, F2, F12) and batch 2 (F3, F6, F1, F7) are done. F9 is closed.
 
 1. ~~**F4**~~ (fixed) Refuse `DEV_ALLOW_VIEW_SWITCH` in production. A few lines, and it closes the only
    one-setting path to admin.
 2. ~~**F2**~~ (fixed) Turn off `/docs`, `/redoc` and `/openapi.json` in production. One line.
 3. ~~**F12**~~ (fixed) Treat an `https://` `APP_URL` as production for the secret and cookie checks. A few
    lines; makes F4 and the existing checks hard to switch off by accident.
-4. **F3** Redact calendar tokens and OAuth codes in access logs. Then reset any tokens already
+4. ~~**F3**~~ (fixed) Redact calendar tokens and OAuth codes in access logs. Then reset any tokens already
    logged.
-5. **F6** Request size limit middleware. Stops a signed-out disk-filling attack.
-6. **F1** Add HSTS and CSP. Test the CSP against the built frontend before deploying.
-7. **F7** Return only `https://` URLs from the API, plus a `safeHref` check in the frontend.
+5. ~~**F6**~~ (fixed) Request size limit middleware. Stops a signed-out disk-filling attack.
+6. **F1** (HSTS done; CSP report-only, switch to enforce after checking the console) Add HSTS and CSP. Test the CSP against the built frontend before deploying.
+7. ~~**F7**~~ (fixed) Return only `https://` URLs from the API, plus a `safeHref` check in the frontend.
 8. **F14** then **F5**. Proxy headers first, so the limiter sees real client IPs, then rate
    limits.
 9. **F8**. POST-only logout. (F9 closed.)
