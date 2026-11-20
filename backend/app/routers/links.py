@@ -70,9 +70,7 @@ def _note(world: World, note_id: str, user: CurrentUser):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found")
     if row.session_id:
         check_project_access(user, world.project(row.session_id))
-    elif user.actor.is_partner:
-        # A note with no launch cannot be checked against a partner's launches, so
-        # partners never see it (findings F16).
+    elif not permissions.can_see_note_without_launch(user.actor):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found")
     return row
 

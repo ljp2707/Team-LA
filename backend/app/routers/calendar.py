@@ -67,7 +67,7 @@ def turn_on_or_reset(user: CurrentUser = Depends(require_can_edit)):
 
 
 @router.delete("/api/me/calendar-feed")
-def turn_off(user: CurrentUser = Depends(current_user)):
+def turn_off(user: CurrentUser = Depends(require_can_edit)):
     """Turn the feed off. The link stops working; calendar apps then drop the events."""
     if _token_of(user.id):
         client.update_record(Users.TABLE, user.id, {Users.CALENDAR_FEED_TOKEN: None})

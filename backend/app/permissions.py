@@ -186,6 +186,20 @@ def can_see_history(actor: Actor) -> bool:
     return not actor.is_partner
 
 
+def can_use_admin_pages(actor: Actor) -> bool:
+    """Use admin-only routes. Needs admin view: an Admin in staff view is refused."""
+    return actor.is_admin
+
+
+def can_see_note_without_launch(actor: Actor) -> bool:
+    """See a note that is not on any launch.
+
+    Partners are limited to their own launches, and a note with no launch cannot be
+    checked against those, so they never see one (findings F16).
+    """
+    return not actor.is_partner
+
+
 def can_share_notes(actor: Actor) -> bool:
     """Flip a note between Internal and Shared with partners."""
     return not actor.is_partner and can_update_own_tasks(actor)

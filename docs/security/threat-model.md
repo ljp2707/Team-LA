@@ -62,12 +62,13 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | GET | `/auth/login` | Anyone | Session only | Starts Google OAuth (state and nonce kept in the session). With `DEV_LOGIN_EMAIL` set it signs in without Google; config refuses that outside localhost |
 | GET | `/auth/callback` | Anyone | Session; may create the first Admin row (`BOOTSTRAP_ADMIN_EMAILS`) | Needs `email_verified` and an Active Users row. Clears the session before signing in |
 | GET | `/auth/denied` | Anyone | Session | Returns the refused email stored in the caller's own session |
-| GET | `/auth/logout` | Anyone | Session | **GET, so it can be triggered from another site** (findings F8) |
+| POST | `/auth/logout` | Anyone | Session | Signs out. POST only (findings F8) |
+| GET | `/auth/logout` | Anyone | No | Old links: goes home without signing out |
 | GET | `/api/health` | Anyone | No | Railway health check |
 | GET | `/api/public/season-stats` | Anyone | No | Three counts for the home page, cached for 5 minutes |
 | GET | `/api/public/about` | Anyone | No | Org name, contact email, address, app URL |
 | GET | `/calendar/{token}.ics` | Anyone holding the token | No | Token is 32 random bytes, checked with a regex and then `hmac.compare_digest`. Unknown token → 404 |
-| GET | `/docs`, `/redoc`, `/openapi.json`, `/docs/oauth2-redirect` | Anyone | No | FastAPI defaults. **Reachable in production** (F2) |
+| GET | `/docs`, `/redoc`, `/openapi.json`, `/docs/oauth2-redirect` | Anyone, local development only | No | Turned off in production (F2) |
 | GET | `/{path}` | Anyone | No | Static frontend; path is resolved and must stay inside `static/` |
 
 ### 4.2 The signed-in user
@@ -78,7 +79,7 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | POST | `/api/me/view` | current_user | Session | `can_choose_view`: partners stay partner; admin view needs Admin or `DEV_ALLOW_VIEW_SWITCH` (F4) |
 | GET | `/api/me/calendar-feed` | current_user | No | Returns the caller's own feed URL |
 | POST | `/api/me/calendar-feed` | require_can_edit | Yes (own Users row token) | New random token; the old link stops working |
-| DELETE | `/api/me/calendar-feed` | current_user | Yes (own Users row) | |
+| DELETE | `/api/me/calendar-feed` | require_can_edit | Yes (own Users row) | Viewers were allowed until the access matrix test found it |
 | GET | `/api/users/directory` | current_user, not Partner | No | Names, levels and statuses of everyone |
 
 ### 4.3 Projects (launches)
@@ -117,7 +118,7 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | GET | `/api/links/{id}/file` | current_user | No | Project access check, then 302 to Airtable's CDN |
 | DELETE | `/api/links/{id}` | require_can_edit | Yes | Task link: assignee or Admin. Launch link: Admin |
 | DELETE | `/api/notes/{id}` | require_can_edit | Yes | Admin any; author within 15 minutes |
-| PATCH | `/api/notes/{id}` | require_can_edit | Yes (Internal ↔ Shared) | Not partners; must be able to edit the task (F11) |
+| PATCH | `/api/notes/{id}` | require_can_edit | Yes (Internal ↔ Shared) | Not partners; the note's author or an Admin, who can also edit the task (F11) |
 | GET | `/api/reminders/mine` | current_user | No | |
 | DELETE | `/api/reminders/{id}` | require_can_edit | Yes | Only the caller's own custom reminders |
 
@@ -149,6 +150,8 @@ All of these use `require_admin`. Every one except the GETs changes data.
 | Cron `jobs.send_reminders` | Railway schedule | Same secrets as the web app. Prints recipient emails to its log (F13) |
 | `jobs.authorize_gmail`, `jobs.migrate_airtable`, `jobs.seed_demo`, `jobs.dump_schema` | A developer's laptop | Need the real secrets in `.env` |
 | Direct edits in Airtable | Anyone with base access | Not controlled by the app. Values typed there are rendered by the app (F7) |
+
+**Checked automatically.** `backend/tests/test_access_matrix.py` has one row per route above, with the expected status for Admin, Admin in staff view, Staff, Viewer, a legacy "Project Lead" level, Partner and signed out. It fails if a route is added without a row, so a new route cannot ship without a permission decision.
 
 ## 5. Threats by entry point (STRIDE)
 

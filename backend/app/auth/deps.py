@@ -59,7 +59,7 @@ def current_user(request: Request) -> CurrentUser:
 
 def require_admin(user: CurrentUser = Depends(current_user)) -> CurrentUser:
     """Allow only someone currently in admin view."""
-    if user.view != permissions.ADMIN:
+    if not permissions.can_use_admin_pages(user.actor):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin view required")
     return user
 
@@ -72,7 +72,7 @@ def require_can_edit(user: CurrentUser = Depends(current_user)) -> CurrentUser:
 
 
 def require_internal(user: CurrentUser = Depends(current_user)) -> CurrentUser:
-    """Allow NMU staff and admins, but not partners."""
-    if user.view == permissions.PARTNER:
+    """Allow NMU staff and admins, but not partners. Used for launch history."""
+    if not permissions.can_see_history(user.actor):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not available to partners")
     return user
