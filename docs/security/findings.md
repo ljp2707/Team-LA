@@ -928,6 +928,30 @@ imports the app, and contains no pytest or Google OAuth library.
 
 **Commit.** "Hash-locked Python dependencies and exact npm pins (F39)".
 
+### F40. The image used floating base tags and carried the tests — Low (Fixed)
+
+**Problem.** `FROM node:22-slim` and `FROM python:3.12-slim` could point at a different image
+on every build. The final image contained `backend/tests` (including the e2e server that
+patches Airtable and signs people in), `pytest.ini` and the dev requirement files. It had no
+health check of its own.
+
+**Fix.** Both base images are pinned by SHA-256 digest (with the tag kept for reading;
+Dependabot proposes new digests, F42). `.dockerignore` now also leaves out the tests, dev
+requirements, `.in` files, source maps, `.DS_Store`, `.claude`, `.github` and the Playwright
+files. A `HEALTHCHECK` calls `/api/health` with a Host header production accepts. The image
+sets `PYTHONDONTWRITEBYTECODE` and `PYTHONUNBUFFERED`. It already ran as a non-root user, had
+no compilers (slim base, final stage only) and no source maps (Vite's default).
+
+**Verified.** Built the image; `/app` holds only `app`, `jobs` and `requirements.txt`; no
+`.map` files; the user is `appuser`; run with `ENV=production` it reports **healthy** and
+writes JSON log lines.
+
+**Tests** (`test_docker_image.py`): both `FROM` lines have a digest; non-root user, health
+check and no server header; the ignore list covers secrets, tests, dev requirements, source
+maps, editor files and e2e files. Against the old Dockerfile and `.dockerignore`, all 3 fail.
+
+**Commit.** "Pin base images by digest, health check, and a smaller image (F40)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one

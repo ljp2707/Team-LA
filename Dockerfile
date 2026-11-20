@@ -1,13 +1,19 @@
+# Base images are pinned by digest, not just tag, so a rebuild always starts from the
+# exact image that was tested; Dependabot proposes new digests (findings F40).
+
 # Stage 1: build the frontend
-FROM node:22-slim AS frontend
+FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS frontend
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: the Python app, which also serves the built frontend
-FROM python:3.12-slim
+# Stage 2: the Python app, which also serves the built frontend.
+# The slim image has no compilers; only the app, its locked packages and the built
+# frontend go in. Tests, dev requirements and source maps stay out (.dockerignore).
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY backend/requirements.txt ./
 # Every package, including the ones they depend on, must match a hash in the lock file,
@@ -18,6 +24,10 @@ COPY --from=frontend /frontend/dist ./app/static
 
 RUN useradd --create-home appuser
 USER appuser
+
+# Docker and most hosts restart a container whose health check fails. Railway uses its own
+# check on /api/health (railway.json). The Host header is one production answers to (F14).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3     CMD ["python", "-c", "import os, urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:%s/api/health' % os.environ.get('PORT', '8000'), headers={'Host': 'healthcheck.railway.app'}), timeout=4)"]
 
 # Railway sets PORT. The cron service replaces this command (see railway.cron.json).
 # Railway's edge is the only way in, so trust its X-Forwarded-For and -Proto headers:
