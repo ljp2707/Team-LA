@@ -256,9 +256,9 @@ it.
   `TrustedHostMiddleware(allowed_hosts=[host of APP_URL, "localhost", "127.0.0.1",
   "testserver"])`. Test: a request with `Host: evil.example` gets 400 in production mode.
 
-### F15. Sessions cannot be revoked — Low
+### F15. Sessions cannot be revoked — Low (Fixed by F30)
 
-**Status: Mitigated in commit `7d83c4c`.** Sessions now end after `SESSION_IDLE_HOURS` without use (default 24) and 7 days after sign in, however active. Before, the cookie lifetime renewed on every request, so an active session never ended. Logout still cannot cancel a copied cookie on the server; that needs Option A (a session version on the Users row), not done. Tests in `backend/tests/test_security_access.py`.
+**Status: Mitigated in commit `7d83c4c`.** Sessions now end after `SESSION_IDLE_HOURS` without use (default 24) and 7 days after sign in, however active. Before, the cookie lifetime renewed on every request, so an active session never ended. Logout still cannot cancel a copied cookie on the server; that needs Option A (a session version on the Users row), not done. Tests in `backend/tests/test_security_access.py`. **Update 2026-11-20:** Option A is now done; see F30.
 
 - **Where:** `backend/app/routers/auth.py:132-135`. The signed cookie lasts 7 days
   (`backend/app/main.py:74`). Logout clears the browser's copy only.
@@ -612,6 +612,47 @@ name. The browser test still passes.
 beforehand.
 
 **Commit.** "Use a __Host- session cookie in production (F29)".
+
+## Phase 2: sessions and accounts (2026-11-20)
+
+### F30. A copied session could not be ended on the server — Medium (Fixed)
+
+**Problem.** F15, option A. The session is a signed cookie, so signing out only cleared the
+browser's copy. A cookie copied from a shared computer, a lost laptop or malware kept working
+for up to 7 days. Admins had no way to end someone's sessions short of deactivating them,
+and a change of access level or roles did not end sessions opened under the old ones.
+
+**Fix.** A **Session Version** number on each Users row (blank counts as 0, so nobody was
+signed out by the upgrade). Sign-in copies it into the cookie; `current_user` compares the two
+on every request through the existing cached Users lookup, before the cookie is refreshed, and
+answers 401 if the row's number is higher. All rules are in `app/auth/revocation.py`. The number
+goes up when:
+
+- the person clicks **Sign out of all devices** (new `POST /auth/logout-everywhere`, POST only,
+  Origin-checked; only a still-valid session can use it, so an ended copy cannot keep signing
+  its owner out);
+- an admin clicks **Sign out everywhere** in the person's Edit dialog (new
+  `POST /api/users/{id}/sign-out-everywhere`, admin only via `permissions.can_sign_out_others`,
+  written to the history);
+- an admin deactivates them, removes their access, changes their access level, removes a role
+  from them, or erases their personal details. Adding a role or renaming does not sign them out.
+
+The Users cache is updated on write, so it takes effect on the next request on this instance.
+
+**Airtable.** New field **Users > Session Version** (Number, no decimals), added by
+`python -m jobs.migrate_airtable --apply` (it only adds). Added to the shared test/production
+base on 2026-11-20. The app writes it; nobody should edit it by hand.
+
+**Tests** (`test_session_revocation.py`, access matrix rows): signing out of all devices ends a
+second device's session and raises the number; signing in again works; other people stay signed
+in; an ended cookie cannot raise it again; a signed-out visitor writes nothing; GET and a foreign
+Origin are refused; an admin's sign-out ends the person's session, not the admin's, and is in
+the history; staff, viewers and partners get 403; unknown person 404; a new access level or a
+removed role ends sessions; an added role or a rename does not; deactivating, removing access
+and erasing raise the number; a blank number keeps existing sessions working; a number set in
+Airtable ends older cookies; unit tests for the rules. With the check disabled, 7 fail.
+
+**Commit.** "Sign people out everywhere with a Session Version (F30)".
 
 ## Manual steps outside the code
 

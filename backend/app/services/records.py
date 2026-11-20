@@ -77,6 +77,7 @@ class UserRec:
     role_ids: list[str] = field(default_factory=list)
     welcome_sent: str | None = None
     calendar_token: str = ""  # The secret in their calendar feed link, if it is on
+    session_version: int = 0  # F30: raised to sign them out everywhere
 
     @property
     def name(self) -> str:
@@ -106,6 +107,7 @@ def load_users() -> list[UserRec]:
                 role_ids=list(f.get(Users.ROLES, []) or []),
                 welcome_sent=f.get(Users.WELCOME_EMAIL_SENT),
                 calendar_token=f.get(Users.CALENDAR_FEED_TOKEN, "") or "",
+                session_version=int(f.get(Users.SESSION_VERSION) or 0),
             )
         )
     return out

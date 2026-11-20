@@ -9,6 +9,7 @@ from fastapi import Depends, HTTPException, Request, status
 from requests import RequestException
 
 from app import permissions
+from app.auth import revocation
 from app.auth.session import (
     clear_session,
     get_session_user,
@@ -27,7 +28,8 @@ def current_user(request: Request) -> CurrentUser:
 
     The cookie is only trusted for who the person is. Their Status and Access Level
     are checked against Airtable (cached 30 seconds), so deactivating someone or
-    changing their access takes effect right away, not when they next sign in.
+    changing their access takes effect right away, not when they next sign in. Their
+    Session Version is checked too, so "sign out everywhere" ends this cookie (F30).
     """
     session_user = get_session_user(request)
     if session_user is None:
@@ -45,6 +47,11 @@ def current_user(request: Request) -> CurrentUser:
         ) from error
 
     if fresh is None:
+        clear_session(request)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
+    # F30: signed out everywhere since this cookie was issued. Checked before the cookie
+    # is refreshed below, which would otherwise copy in the new number.
+    if revocation.is_revoked(session_user.session_version, fresh.session_version):
         clear_session(request)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
 

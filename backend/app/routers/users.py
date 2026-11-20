@@ -17,6 +17,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app import permissions
 from app.airtable import client
 from app.airtable.schema import ACTIVE, INACTIVE, Roles, SessionTeam, Users, Work
+from app.auth import revocation
 from app.auth.deps import current_user, require_admin
 from app.models.people import HandOffIn, RoleIn, RoleUpdateIn, UserIn, UserUpdateIn
 from app.models.user import CurrentUser
@@ -213,6 +214,17 @@ def update_person(user_id: str, body: UserUpdateIn, user: CurrentUser = Depends(
         fields[Users.STATUS] = body.status
         if body.status != ACTIVE:
             fields[Users.CALENDAR_FEED_TOKEN] = None  # Their calendar feed link stops working
+    # F30: losing access, a different access level or a role ends their current sessions,
+    # so no open browser keeps powers they no longer have.
+    if revocation.change_ends_sessions(
+        target.status,
+        fields.get(Users.STATUS),
+        target.access_level,
+        fields.get(Users.ACCESS_LEVEL),
+        target.role_ids,
+        fields.get(Users.ROLES),
+    ):
+        fields.update(revocation.next_version_fields(target.session_version))
     if fields:
         client.update_record(Users.TABLE, user_id, fields, typecast=True)
         what = []
@@ -251,10 +263,31 @@ def remove_access(user_id: str, user: CurrentUser = Depends(require_admin)):
         )
     check_admin_rules(list(world.users.values()), target, UserUpdateIn(status=INACTIVE), user.id)
     client.update_record(
-        Users.TABLE, user_id, {Users.STATUS: INACTIVE, Users.CALENDAR_FEED_TOKEN: None}, typecast=True
+        Users.TABLE,
+        user_id,
+        # F30: and end every session they have
+        {Users.STATUS: INACTIVE, Users.CALENDAR_FEED_TOKEN: None, **revocation.next_version_fields(target.session_version)},
+        typecast=True,
     )
     history.log_event(None, None, user.id, "System", f"removed {target.name}'s access")
     return None
+
+
+@router.post("/{user_id}/sign-out-everywhere")
+def sign_person_out_everywhere(user_id: str, user: CurrentUser = Depends(require_admin)):
+    """Admin only: end every session this person has, on every device (F30).
+
+    For a lost laptop or phone, or a session someone else may have. They can sign in
+    again with Google straight away.
+    """
+    if not permissions.can_sign_out_others(user.actor):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can sign people out")
+    target = World().users.get(user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Person not found")
+    revocation.sign_out_everywhere(target.id, target.session_version)
+    history.log_event(None, None, user.id, "System", f"signed {target.name} out on every device")
+    return {"signed_out": True}
 
 
 @router.post("/hand-off")
@@ -489,6 +522,7 @@ def erase_person(user_id: str, user: CurrentUser = Depends(require_admin)):
             Users.EMAIL: f"removed-{target.id.lower()}@example.invalid",
             Users.ROLES: [],
             Users.CALENDAR_FEED_TOKEN: None,
+            **revocation.next_version_fields(target.session_version),  # F30
         },
         typecast=True,
     )

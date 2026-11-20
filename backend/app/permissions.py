@@ -166,6 +166,11 @@ def can_edit_task_details(actor: Actor) -> bool:
     return actor.is_admin
 
 
+def can_sign_out_others(actor: Actor) -> bool:
+    """End every session another person has, for example after a lost laptop (F30)."""
+    return actor.is_admin
+
+
 def can_nudge(actor: Actor) -> bool:
     """Email a task's people a reminder right now, on top of the automatic ones."""
     return actor.is_admin

@@ -145,7 +145,7 @@ All email (reminders, the weekly digest, assignment and welcome emails) goes thr
 
 ## Updating the Airtable base
 
-The app needs some fields and tables the original base did not have: the Links, Reminders and Template Versions tables, and fields such as Due Date Override and One-off on tasks and Program Name and Duration on sessions. A script adds them. It only adds; it never changes or deletes existing fields or rows.
+The app needs some fields and tables the original base did not have: the Links, Reminders and Template Versions tables, and fields such as Due Date Override and One-off on tasks, Program Name and Duration on sessions, and Session Version on Users (it lets the app sign someone out on every device; findings F30). A script adds them. It only adds; it never changes or deletes existing fields or rows.
 
 1. Make sure your token has the `schema.bases:write` scope.
 2. From `backend`, run `python -m jobs.migrate_airtable` to see what it would add. Nothing changes yet.

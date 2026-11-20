@@ -23,6 +23,7 @@ Used by: Sign in, Users and roles, every assignment.
 | Activity Log | Link to the Activity Log table. |
 | Welcome Email Sent *(added)* | Set when the welcome email goes out, so it is sent once. |
 | Calendar Feed Token *(added)* | The secret in this person's calendar feed link. Blank means their feed is off. Treat it like a password. |
+| Session Version *(added)* | Raised by one to sign this person out on every device. The app changes it; do not edit it by hand. Blank means 0. |
 
 ## Template List
 

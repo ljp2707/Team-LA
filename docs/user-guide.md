@@ -10,6 +10,8 @@ The **Privacy** and **Terms** links at the bottom of the menu, and on the home p
 
 Go to the NMU Programs address and click **Sign in with Google**. Use the Google account your admin added. There is no password to set.
 
+To sign out, click **Sign out** at the bottom of the menu. If you used a shared computer or lost a laptop or phone, click **Sign out of all devices** instead (from any device where you are still signed in): every session you have ends, and you sign in again with Google.
+
 If you see "You do not have access yet", the account you used is not on the list. The page shows which email it tried. Click **Use a different account** to pick another one, or ask an admin to add you.
 
 ### My Tasks
@@ -167,7 +169,8 @@ Lists every active person, busiest first, with how many open tasks they have. Cl
 
 - Click a person's name (or **Edit**) to change their name, access level and roles.
 - **Add a person** with their Google email, access level and roles. They get a welcome email and can sign in straight away.
-- **Edit** changes someone's name, access level and roles, or deactivates them so they can no longer sign in. You cannot remove your own admin access, and the last admin cannot be removed.
+- **Edit** changes someone's name, access level and roles, or deactivates them so they can no longer sign in. You cannot remove your own admin access, and the last admin cannot be removed. Changing someone's access level, taking a role away or deactivating them also signs them out everywhere, so they sign in again with their new access.
+- **Sign out everywhere** (in **Edit**) ends every session that person has, on every device. Use it if they lose a laptop or phone or think someone else used their account. They can sign in again straight away.
 - **Manage roles** adds, renames and deactivates roles. A role that tasks or teams use cannot be deleted, only made inactive.
 - **Hand off tasks** moves all of one person's open tasks to someone else, for example when they go on leave. Anyone else on those tasks stays on them.
 - **Remove personal details** appears on a deactivated person. Use it when someone asks for their information to be deleted. Their name and email become "Former team member" everywhere, and it cannot be undone. The admin runbook has the full steps. It shows the tasks first. Leave **Also put them on those program teams** ticked so future reminders go to the new person too.

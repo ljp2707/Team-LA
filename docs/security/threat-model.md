@@ -63,6 +63,7 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | GET | `/auth/callback` | Anyone | Session; may create the first Admin row (`BOOTSTRAP_ADMIN_EMAILS`) | Needs `email_verified` and an Active Users row. Clears the session before signing in |
 | GET | `/auth/denied` | Anyone | Session | Returns the refused email stored in the caller's own session |
 | POST | `/auth/logout` | Anyone | Session | Signs out. POST only (findings F8) |
+| POST | `/auth/logout-everywhere` | Anyone (acts only on a valid session) | Yes (Users > Session Version) | F30. Ends every session of the signed-in person. POST only, Origin-checked |
 | GET | `/auth/logout` | Anyone | No | Old links: goes home without signing out |
 | GET | `/api/health` | Anyone | No | Railway health check |
 | GET | `/api/public/season-stats` | Anyone | No | Three counts for the home page, cached for 5 minutes |
@@ -140,6 +141,7 @@ All of these use `require_admin`. Every one except the GETs changes data.
 | PATCH, DELETE | `/api/users/{id}` (self-demotion, self-deactivation and zero-admin all refused) |
 | GET | `/api/users/{id}/work` |
 | POST | `/api/users/hand-off`, `/api/users/{id}/erase` (sends welcome email on POST `/api/users`) |
+| POST | `/api/users/{id}/sign-out-everywhere` (F30: raises their Session Version; also raised by deactivate, access level change, role removal and erase) |
 | GET, POST | `/api/roles`; PATCH `/api/roles/{id}` |
 | GET | `/api/archive`, `/api/archive/{id}` |
 | GET, POST | `/api/sites`; GET `/api/sites/{id}`; GET `/api/instructors` |

@@ -8,7 +8,7 @@ BOOTSTRAP_ADMIN_EMAILS, which creates a first Admin row when none exists yet.
 import logging
 
 from authlib.integrations.base_client import OAuthError
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from requests import RequestException
@@ -16,6 +16,8 @@ from requests import RequestException
 from app import permissions
 from app.airtable import client
 from app.airtable.schema import ACTIVE, Users
+from app.auth import revocation
+from app.auth.deps import current_user
 from app.auth.google import callback_url, email_allowed, oauth
 from app.auth.session import clear_session, set_session_user, set_stored_view, start_session_clock
 from app.config import get_settings
@@ -138,6 +140,24 @@ async def logout(request: Request):
     # 303 so the browser follows with a GET to the home page. "/" rather than
     # FRONTEND_URL: the form is always posted from our own site, and the CSP's
     # form-action 'self' would block a redirect to any other address.
+    return RedirectResponse("/", status_code=303)
+
+
+@router.post("/logout-everywhere")
+def logout_everywhere(request: Request):
+    """Sign out on this device and every other one (F30). POST only, like /logout.
+
+    Only a session that is still valid can do this, so an old copied cookie cannot be
+    used to keep signing its owner out.
+    """
+    try:
+        user = current_user(request)
+    except HTTPException:
+        user = None
+    if user is not None:
+        revocation.sign_out_everywhere(user.id, user.session_version)
+        logger.info("Signed out everywhere: %s", user.id)
+    clear_session(request)
     return RedirectResponse("/", status_code=303)
 
 

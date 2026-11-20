@@ -117,6 +117,12 @@ export function Sidebar({ menuOpen, onToggleMenu }: { menuOpen: boolean; onToggl
               Sign out
             </button>
           </form>
+          {/* Ends every session this person has, for example on a lost phone (findings F30). */}
+          <form method="post" action="/auth/logout-everywhere" className="sign-out-form">
+            <button type="submit" className="sign-out sign-out--small">
+              Sign out of all devices
+            </button>
+          </form>
           <nav className="sidebar-legal" aria-label="Policies">
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
