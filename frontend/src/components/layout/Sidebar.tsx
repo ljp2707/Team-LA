@@ -17,6 +17,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/my-tasks", label: "My Tasks", badge: true },
   { to: "/templates", label: "Templates" },
+  { to: "/assignments", label: "Assignments" },
   { to: "/users", label: "Users and roles" },
   { to: "/archive", label: "Archive" },
 ];

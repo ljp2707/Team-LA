@@ -153,8 +153,13 @@ A template is the list of tasks for one kind of launch, with when each is due an
 - **Delete** removes a template, with its tasks and version history, for good. It only works if no launch, running or archived, was ever made from it. Otherwise, make it inactive instead.
 - **From past launches** appears once a template has three finished launches. It shows tasks that are often late, often skipped, or often added by hand. **Add to this template** puts an often-added task into the draft.
 
+### Assignments
+
+Lists every active person, busiest first, with how many open tasks they have. Click a name to see the active launches they are on and their open tasks on each.
+
 ### Users and roles
 
+- Click a person's name (or **Edit**) to change their name, access level and roles.
 - **Add a person** with their Google email, access level and roles. They get a welcome email and can sign in straight away.
 - **Edit** changes someone's name, access level and roles, or deactivates them so they can no longer sign in. You cannot remove your own admin access, and the last admin cannot be removed.
 - **Manage roles** adds, renames and deactivates roles. A role that tasks or teams use cannot be deleted, only made inactive.

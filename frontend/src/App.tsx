@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { RequireAdmin } from "./auth/RequireAdmin";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./components/layout/AppShell";
@@ -16,6 +16,13 @@ import { Projects } from "./pages/Projects";
 import { TaskDetail } from "./pages/TaskDetail";
 import { Templates } from "./pages/Templates";
 import { Users } from "./pages/Users";
+import { Assignments } from "./pages/Assignments";
+
+/** Old links to a person's work page moved from /users/:id to /assignments/:id. */
+function OldPersonLink() {
+  const { id = "" } = useParams();
+  return <Navigate to={`/assignments/${id}`} replace />;
+}
 
 export function App() {
   return (
@@ -36,7 +43,9 @@ export function App() {
             <Route path="/projects/new" element={<NewProject />} />
             <Route path="/templates" element={<Templates />} />
             <Route path="/users" element={<Users />} />
-            <Route path="/users/:id" element={<PersonDetail />} />
+            <Route path="/users/:id" element={<OldPersonLink />} />
+            <Route path="/assignments" element={<Assignments />} />
+            <Route path="/assignments/:id" element={<PersonDetail />} />
             <Route path="/archive" element={<Archive />} />
           </Route>
 

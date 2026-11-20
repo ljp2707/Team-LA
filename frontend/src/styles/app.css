@@ -787,7 +787,18 @@ input.select {
   overflow-wrap: anywhere;
 }
 
-a.row-title:hover {
+button.row-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+a.row-title:hover,
+button.row-title:hover {
   color: var(--color-primary);
   text-decoration: underline;
 }
@@ -1515,6 +1526,10 @@ a.row-title:hover {
   padding: var(--space-3) var(--space-2);
   border-radius: var(--radius-input);
   transition: background-color 0.15s ease;
+}
+
+.people-list--work li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .people-list li:hover {

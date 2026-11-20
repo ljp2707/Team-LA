@@ -47,7 +47,7 @@ export function PersonDetail() {
   return (
     <div className="page">
       <PageHeader
-        back={{ to: "/users", label: "Users and roles" }}
+        back={{ to: "/assignments", label: "Assignments" }}
         title={person.name}
         description={
           <span className="person-summary">

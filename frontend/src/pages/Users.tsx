@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import type { HandOffPreview, PeopleList, Person, RoleRow } from "../api/types";
 import {
   addPerson,
@@ -72,9 +71,9 @@ export function Users() {
                     <Avatar name={person.name} />
                     <div className="row-main">
                       <span>
-                        <Link to={`/users/${person.id}`} className="row-title" aria-label={`See ${person.name}'s launches and tasks`}>
+                        <button type="button" className="row-title" onClick={() => setOpen({ edit: person })}>
                           {person.name}
-                        </Link>
+                        </button>
                         {!person.active && (
                           <>
                             {" "}
