@@ -12,7 +12,7 @@ Not part of the app: it lives in tests/ and is not copied into the Docker image.
 
 import argparse
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -26,7 +26,7 @@ import uvicorn  # noqa: E402
 
 from app import main  # noqa: E402
 from app.airtable import client as airtable  # noqa: E402
-from app.airtable.schema import Roles, Session, Site, Users, Work  # noqa: E402
+from app.airtable.schema import AuditLog, Roles, Session, Site, Users, Work  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from tests.builders import add_project, add_site, add_task, standard_project  # noqa: E402
 
@@ -56,6 +56,10 @@ def seeded_base() -> FakeAirtable:
     add_site(fake, "recSiteOld", "Kent Pool")
     add_project(fake, "recOld", "Kent Swim Safely 2025", start=date(2025, 6, 1), site="recSiteOld", status="Complete")
     add_task(fake, "recOld1", "Order caps", date(2025, 5, 20), project="recOld", status="Done", assigned="recStaff")
+    # One admin action for the Audit page
+    fake.add(AuditLog.TABLE, {AuditLog.ACTION: "PATCH /api/users/{user_id}", AuditLog.ACTOR: "recAdmin",
+                              AuditLog.WHEN: datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                              AuditLog.TARGET: "user_id=recStaff", AuditLog.STATUS: 200, AuditLog.REQUEST_ID: "e2e"})
     return fake
 
 

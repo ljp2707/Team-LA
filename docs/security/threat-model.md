@@ -144,6 +144,7 @@ All of these use `require_admin`. Every one except the GETs changes data.
 | POST | `/api/users/{id}/sign-out-everywhere` (F30: raises their Session Version; also raised by deactivate, access level change, role removal and erase) |
 | GET, POST | `/api/roles`; PATCH `/api/roles/{id}` |
 | GET | `/api/archive`, `/api/archive/{id}` |
+| GET | `/api/audit` (F35: read only; no route changes or deletes audit rows) |
 | GET, POST | `/api/sites`; GET `/api/sites/{id}`; GET `/api/instructors` |
 | GET | `/api/health/airtable`, `/api/health/auth` |
 | POST | `/api/admin/test-email` (to the caller only) |

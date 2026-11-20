@@ -23,6 +23,7 @@ from app.routers.auth import warn_if_bootstrap_not_needed
 from app.routers import (
     admin,
     archive,
+    audit_log,
     auth,
     calendar,
     health,
@@ -117,6 +118,7 @@ for module in (
     admin,
     calendar,
     security_reports,
+    audit_log,
 ):
     app.include_router(module.router)
 app.include_router(users.roles_router)

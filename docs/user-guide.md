@@ -148,6 +148,10 @@ A task name that starts with `=`, `+`, `-` or `@` is saved with an apostrophe in
 
 **Archive** lists every closed program with how many tasks were finished on time. Search by site name or pick a date range. Click a program to see its numbers and each task's planned and actual dates. **Start a new program from this** opens Start a program with that program's tasks.
 
+### The audit trail
+
+**Audit** lists every change made with admin access, newest first: when, which admin, what they did (for example "Changed a person" or "Deleted a task") and which person, program or task it was about. Pick an admin or a period to narrow it. Nobody can edit or delete these entries, not even admins, so it is the place to check who changed someone's access or deleted something. Hover over an entry to see its technical name and request number, which help when reporting a problem.
+
 ### Templates
 
 A template is the list of tasks for one kind of program, with when each is due and which role does it.

@@ -75,6 +75,7 @@ test("admin: every page, the Nudge and Delete task dialogs, and the My Tasks fil
     "/assignments",
     "/assignments/recStaff",
     "/archive",
+    "/audit",
     "/privacy",
     "/terms",
     "/not-authorized",
@@ -83,6 +84,10 @@ test("admin: every page, the Nudge and Delete task dialogs, and the My Tasks fil
     await visit(page, base, path);
   }
   await expectFontsLoaded(page);
+
+  // The Audit page shows the seeded admin action in plain words
+  await visit(page, base, "/audit");
+  await expect(page.getByRole("cell", { name: "Changed a person" })).toBeVisible();
 
   // Assignments, a person, then their task: where the Nudge button lives
   await visit(page, base, "/assignments/recStaff");

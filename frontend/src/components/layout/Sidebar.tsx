@@ -20,6 +20,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/assignments", label: "Assignments" },
   { to: "/users", label: "Users and roles" },
   { to: "/archive", label: "Archive" },
+  { to: "/audit", label: "Audit" },
 ];
 
 const STAFF_NAV: NavItem[] = [

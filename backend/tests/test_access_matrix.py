@@ -204,6 +204,7 @@ ROWS: list[Row] = [
     Row("POST", "/api/users/hand-off", admin_only(200),
         json={"from_user": "recStaff", "to_user": "recLead", "preview": True}),
     Row("POST", "/api/users/{user_id}/erase", admin_only(200), url="/api/users/recGone/erase"),
+    Row("GET", "/api/audit", admin_only(200)),
     Row("POST", "/api/users/{user_id}/sign-out-everywhere", admin_only(200), url="/api/users/recStaff/sign-out-everywhere"),
     Row("GET", "/api/roles", admin_only(200)),
     Row("POST", "/api/roles", admin_only(201), json={"name": "Coach"}),

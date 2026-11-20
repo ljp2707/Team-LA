@@ -773,6 +773,28 @@ by the real client; erasure does not touch the table. With the write removed, 32
 
 **Commit.** "Append-only audit trail of admin actions (F34)".
 
+### F35. Admins could not see the audit trail — Low (Fixed)
+
+**Problem.** The Audit Log is only useful if someone reads it, and NMU admins should not need
+Airtable access to do so (fewer base editors also protects the trail, see F34).
+
+**Fix.** A read-only **Audit** page for admins (`/audit`, in the admin menu), backed by
+`GET /api/audit` (`routers/audit_log.py`, admin only). Newest first, the last 30 days by
+default, filterable by admin and period (7 days to everything), at most 500 entries with a
+note when there are more. Names are looked up when the page is read, so audit rows keep only
+IDs and an erased person shows as "Former team member". Actions show in plain words
+(`audit.ACTION_LABELS`), with the route and request ID on hover. The filters are validated
+(`actor` must be a record ID, `days` 1 to 3660). There is no route that changes or deletes
+audit rows: any other method on `/api/audit` is 405. Reading the page is not itself audited.
+
+**Tests** (`test_audit_page.py`, the access matrix and the browser test): newest first with
+names; task and program names, and IDs kept for deleted records; the period and admin
+filters; bad filters 422; erased people shown as "Former team member"; rows without a valid
+time skipped; the 500 cut-off flagged; POST, PUT, PATCH and DELETE are 405; reading writes
+nothing; admin only (matrix); the page loads under the enforced CSP and shows a seeded entry.
+
+**Commit.** "Read-only Audit page for admins (F35)".
+
 ## Manual steps outside the code
 
 1. **Airtable:** make sure the production token is a personal access token scoped to this one
