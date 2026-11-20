@@ -173,4 +173,11 @@ def test_non_https_drive_folder_is_not_returned(client, sign_in, project):
     sign_in("admin@example.org")
     body = client.get("/api/projects/recProj").json()
     assert body["drive_folder"] is None
-    assert body["edit"]["drive_folder"] is None
+    assert body["edit"]["drive_folder"] == ""
+
+
+def test_launch_without_drive_folder_gives_the_edit_form_text(client, sign_in, project):
+    """The edit form calls .trim() on it: null blanked the whole launch page."""
+    project.find(Session.TABLE, "recProj")["fields"].pop(Session.DRIVE_FOLDER, None)
+    sign_in("admin@example.org")
+    assert client.get("/api/projects/recProj").json()["edit"]["drive_folder"] == ""

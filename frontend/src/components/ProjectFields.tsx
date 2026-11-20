@@ -137,11 +137,12 @@ export function ProjectFields({ value, onChange, siteTypes, instructors, partner
 /** Checks the form before it goes to the server, with the same rules the server uses. */
 export function checkDetails(value: DetailsDraft): Partial<Record<keyof DetailsDraft, string>> {
   const errors: Partial<Record<keyof DetailsDraft, string>> = {};
-  const drive = value.drive_folder.trim();
+  // `?? ""` so a launch with no Drive folder (or no partner email) cannot crash the page.
+  const drive = (value.drive_folder ?? "").trim();
   if (drive && !drive.startsWith("https://drive.google.com/")) {
     errors.drive_folder = "Use a Google Drive link that starts with https://drive.google.com/";
   }
-  const email = value.partner_email.trim();
+  const email = (value.partner_email ?? "").trim();
   if (email && (!email.includes("@") || email.includes(" "))) {
     errors.partner_email = "That email does not look right.";
   }

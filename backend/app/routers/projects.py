@@ -160,7 +160,8 @@ def _project_detail(world: World, project_id: str, user: CurrentUser) -> dict:
             "partner_email": project.partner_email,
             "partner_phone": project.partner_phone,
             "shipping_address": project.shipping_address,
-            "drive_folder": safe_link(project.drive_folder),
+            # The edit form is a text box, so send "" (not null) when there is no safe link.
+            "drive_folder": safe_link(project.drive_folder) or "",
             "partner_ids": project.partner_ids,
         }
         if is_admin
