@@ -13,27 +13,27 @@ it.
 
 ## Summary
 
-| # | Finding | Severity |
-|---|---|---|
-| F1 | No Content-Security-Policy or Strict-Transport-Security header | Medium |
-| F2 | `/docs`, `/redoc` and `/openapi.json` are public in production | Medium |
-| F3 | Calendar feed tokens (and OAuth codes) are written to the access log | Medium |
-| F4 | `DEV_ALLOW_VIEW_SWITCH=true` is not refused in production | Medium |
-| F5 | No rate limiting on any endpoint | Medium |
-| F6 | Upload bodies have no size limit and are parsed before sign-in is checked | Medium |
-| F7 | URLs typed directly into Airtable are rendered as links without a scheme check | Medium |
-| F8 | `GET /auth/logout` can be triggered from any website | Low |
-| F9 | CSRF protection relies on SameSite=Lax alone; no Origin check | Low |
-| F10 | Uploaded file content is not checked against its extension | Low |
-| F11 | Staff on a task can share another person's Internal note with partners | Low |
-| F12 | `ENV` defaults to `development`, so production protections fail open if it is missing | Low |
-| F13 | Recipient email addresses are written to logs | Low |
-| F14 | Proxy headers and allowed hosts are not configured for Railway | Low |
-| F15 | Sessions cannot be revoked server-side; logout only clears the browser cookie | Low |
-| F16 | Note lookup skips the project check when a note has no launch | Low |
-| F17 | `npm audit`: 2 moderate advisories in react-router | Low |
-| F18 | Dependency and secret scans otherwise clean | Info |
-| F19 | Checks that passed: IDOR, partner isolation, role changes, error responses | Info |
+| # | Finding | Severity | Status |
+|---|---|---|---|
+| F1 | No Content-Security-Policy or Strict-Transport-Security header | Medium | Open |
+| F2 | `/docs`, `/redoc` and `/openapi.json` are public in production | Medium | Fixed in `3ae3248` |
+| F3 | Calendar feed tokens (and OAuth codes) are written to the access log | Medium | Open |
+| F4 | `DEV_ALLOW_VIEW_SWITCH=true` is not refused in production | Medium | Fixed in `3ae3248` |
+| F5 | No rate limiting on any endpoint | Medium | Open |
+| F6 | Upload bodies have no size limit and are parsed before sign-in is checked | Medium | Open |
+| F7 | URLs typed directly into Airtable are rendered as links without a scheme check | Medium | Open |
+| F8 | `GET /auth/logout` can be triggered from any website | Low | Open |
+| F9 | CSRF protection relies on SameSite=Lax alone; no Origin check | Low | Closed: not an issue |
+| F10 | Uploaded file content is not checked against its extension | Low | Open |
+| F11 | Staff on a task can share another person's Internal note with partners | Low | Open: decided, author or admin only |
+| F12 | `ENV` defaults to `development`, so production protections fail open if it is missing | Low | Fixed in `3ae3248` |
+| F13 | Recipient email addresses are written to logs | Low | Open |
+| F14 | Proxy headers and allowed hosts are not configured for Railway | Low | Open |
+| F15 | Sessions cannot be revoked server-side; logout only clears the browser cookie | Low | Open |
+| F16 | Note lookup skips the project check when a note has no launch | Low | Open |
+| F17 | `npm audit`: 2 moderate advisories in react-router | Low | Open |
+| F18 | Dependency and secret scans otherwise clean | Info | No action needed |
+| F19 | Checks that passed: IDOR, partner isolation, role changes, error responses | Info | No action needed |
 
 ---
 
@@ -58,6 +58,8 @@ it.
 
 ### F2. API docs public in production — Medium
 
+**Status: Fixed in commit `3ae3248`.** Tests in `backend/tests/test_security_settings.py`.
+
 - **Where:** `backend/app/main.py:52` (`FastAPI(...)` uses the default `docs_url`,
   `redoc_url` and `openapi_url`). Live: `/docs`, `/redoc` and `/openapi.json` all answer 200.
 - **Exploit:** A signed-out visitor gets a full map of every route, parameter and model,
@@ -81,6 +83,8 @@ it.
   feed URL produces a log record without the token.
 
 ### F4. `DEV_ALLOW_VIEW_SWITCH` allowed in production — Medium
+
+**Status: Fixed in commit `3ae3248`.** Tests in `backend/tests/test_security_settings.py`.
 
 - **Where:** `backend/app/config.py:35` (setting) and `:78-92` (the production validator checks
   `SESSION_SECRET` and `DEV_LOGIN_EMAIL`, not this). Used by `can_choose_view`,
@@ -153,6 +157,8 @@ it.
 
 ### F9. CSRF relies on SameSite=Lax alone — Low
 
+**Status: Closed, not an issue.** Confirmed by the project owner that `up.railway.app` is on the Public Suffix List, so other Railway apps are cross-site and the Lax cookie is never sent with their requests. Kept below for the record.
+
 - **Where:** `backend/app/main.py:70-77` (session cookie). No Origin or Referer check on writes.
 - **Exploit:** Today a cross-site attacker cannot send the cookie on a POST, PATCH or DELETE,
   because of Lax. JSON routes also need `Content-Type: application/json`: FastAPI's strict
@@ -183,6 +189,8 @@ it.
 
 ### F11. Staff can share someone else's Internal note — Low
 
+**Status: Open. Decided 2026-11-19:** not intended. Only the note's author or an admin may share an Internal note with partners.
+
 - **Where:** `backend/app/routers/links.py:100-109` (`share_note`). It checks
   `can_share_notes` (not a partner, not read-only) and `can_edit_task`, not authorship.
 - **Exploit:** A Staff member assigned to a task flips an Admin's Internal note on that task to
@@ -192,6 +200,8 @@ it.
   Test: Staff on the task gets 403 on another person's note.
 
 ### F12. `ENV` fails open — Low
+
+**Status: Fixed in commit `3ae3248`.** Tests in `backend/tests/test_security_settings.py`.
 
 - **Where:** `backend/app/config.py:19` (`ENV: str = "development"`). `is_production` drives the
   Secure cookie flag (`backend/app/main.py:76`) and the `SESSION_SECRET` check.
@@ -317,10 +327,12 @@ it.
 
 ## Prioritized fix order
 
-1. **F4** Refuse `DEV_ALLOW_VIEW_SWITCH` in production. A few lines, and it closes the only
+Batch 1 (F4, F2, F12) is done. F9 is closed.
+
+1. ~~**F4**~~ (fixed) Refuse `DEV_ALLOW_VIEW_SWITCH` in production. A few lines, and it closes the only
    one-setting path to admin.
-2. **F2** Turn off `/docs`, `/redoc` and `/openapi.json` in production. One line.
-3. **F12** Treat an `https://` `APP_URL` as production for the secret and cookie checks. A few
+2. ~~**F2**~~ (fixed) Turn off `/docs`, `/redoc` and `/openapi.json` in production. One line.
+3. ~~**F12**~~ (fixed) Treat an `https://` `APP_URL` as production for the secret and cookie checks. A few
    lines; makes F4 and the existing checks hard to switch off by accident.
 4. **F3** Redact calendar tokens and OAuth codes in access logs. Then reset any tokens already
    logged.
@@ -329,8 +341,8 @@ it.
 7. **F7** Return only `https://` URLs from the API, plus a `safeHref` check in the frontend.
 8. **F14** then **F5**. Proxy headers first, so the limiter sees real client IPs, then rate
    limits.
-9. **F9** and **F8**. Origin check on writes, and POST-only logout.
+9. **F8**. POST-only logout. (F9 closed.)
 10. **F13** Mask emails in logs.
 11. **F10** Check file signatures against extensions.
-12. **F11**, **F15**, **F16**, **F17**. Product decision, session revocation, small fix, and
-    dependency upgrade.
+12. **F11**, **F15**, **F16**, **F17**. Author-or-admin note sharing, session revocation, small
+    fix, and the react-router upgrade.
