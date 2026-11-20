@@ -17,7 +17,7 @@ When an owner leaves, move the account first. A token or Gmail authorization tie
 
 ## Settings (environment variables)
 
-On a laptop these live in the `.env` file in the top folder. On Railway they live under each service's **Variables**. Both Railway services (the website and the reminder job) need the same values.
+On a laptop these live in the `.env` file in the top folder. On Railway they live under each service's **Variables**. The reminder job needs only some of them, with its own `SESSION_SECRET`; the README's cron section lists them. Every secret, and how to rotate it, is in `docs/security/secrets-runbook.md`.
 
 | Variable | What it is | Notes |
 |---|---|---|
@@ -26,7 +26,8 @@ On a laptop these live in the `.env` file in the top folder. On Railway they liv
 | `FRONTEND_URL` | The website's address | Same as `APP_URL` in production |
 | `SESSION_SECRET` | Signs the sign-in cookie | A random string of 32+ characters. Changing it signs everyone out. |
 | `APP_TIMEZONE` | Time zone for dates and the daily job | `America/Los_Angeles` |
-| `AIRTABLE_TOKEN` | Airtable personal access token | Scopes: `data.records:read`, `data.records:write`, `schema.bases:read`, `schema.bases:write` |
+| `AIRTABLE_TOKEN` | Airtable personal access token | Scopes: `data.records:read` and `data.records:write` only |
+| `AIRTABLE_MIGRATION_TOKEN` | Only on a laptop, while changing the base's structure | Never on Railway; production refuses to start with it |
 | `AIRTABLE_BASE_ID` | The base, starting with `app` | |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | The Google sign in client | From Google Auth Platform > Clients |
 | `ALLOWED_EMAIL_DOMAIN` | Limit sign in to one email domain | Leave blank. The Users table decides who gets in. |
@@ -61,7 +62,7 @@ In production, an admin who is signed in can open `/api/health/airtable` on the 
 
 Do this when the person who made the token leaves, or if the token may have leaked.
 
-1. Sign in to Airtable as the NMU-owned account. Go to https://airtable.com/create/tokens and create a new token with the four scopes above and access to the NMU base.
+1. Sign in to Airtable as the NMU-owned account. Go to https://airtable.com/create/tokens and create a new token with only `data.records:read` and `data.records:write` and access to the NMU base.
 2. Put it in `AIRTABLE_TOKEN` on both Railway services and redeploy.
 3. Signed in as an admin, open `/api/health/airtable` on the app's address and check that `connected` is `true`.
 4. Delete the old token in Airtable.
