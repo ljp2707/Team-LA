@@ -59,6 +59,7 @@ it.
 | F40 | The image used floating base tags and carried the tests | Low | Fixed in `f687bf0` |
 | F41 | No lint or static security checks on the backend | Low | Fixed in `89e089e` |
 | F42 | No CI, and nothing watched dependencies | Medium | Fixed in `ae29d3b` |
+| F43 | Dependabot's first update PRs could not pass CI | Low | Fixed on branch `ci-dependabot-fixes` |
 
 ---
 
@@ -1055,6 +1056,38 @@ action on a tag and one checkout keeping credentials, 2 fail.
    scanning and push protection.
 
 **Commit.** "CI with tests, browser test and security scans; Dependabot (F42)".
+
+### F43. Dependabot's first update PRs could not pass CI — Low (Fixed)
+
+**Problem.** Right after F42 was merged, Dependabot opened four update PRs, and three failed CI:
+- **Python packages:** Dependabot rewrites `requirements.txt` with its own tool, which drops
+  the per-platform markers. `uvloop` then installs everywhere and `pip install` fails on
+  Windows. `test_dependency_pins` caught the rewrite.
+- **npm:** the group mixed a major update (`react-dom` 19) with `react` still on 18, so
+  `npm ci` refused the mismatch.
+- **Docker:** Python 3.12 to 3.15, a new version whose image still had HIGH issues. Trivy
+  blocked it.
+
+Nothing broken reached `main`; CI did its job. But PRs that can never pass teach people to
+ignore CI.
+
+**Fix.**
+- Dependabot proposes only minor and patch updates (Docker: digests only, same Python and Node
+  versions). Major upgrades need code changes, so a person does them on purpose.
+- Python packages are no longer in Dependabot. CI now also runs every Monday, so pip-audit,
+  npm audit and Trivy fail on a newly published vulnerability even when nothing was pushed.
+  GitHub's Dependabot alerts still cover the Python packages.
+- The safe updates from those PRs are applied with the right tools: fastapi 0.162.7,
+  pydantic-settings 2.16.3, pyairtable 3.5.1, authlib 1.9.5, pytest-cov 7.1.0 (relocked with
+  uv), vite 8.3.8, @vitejs/plugin-react 6.3.0, @playwright/test 1.65.1.
+
+**Tests** (`test_ci_workflow.py`): Dependabot never proposes major updates (fails if any
+ecosystem lacks the rule); pip is not in Dependabot and the weekly schedule is in the workflow.
+
+**Manual step.** After merging, close Dependabot PRs #3 to #6 if Dependabot has not closed
+them itself.
+
+**Commit.** "Dependabot: minor and patch only, no pip; weekly CI; apply safe updates (F43)".
 
 ## Manual steps outside the code
 

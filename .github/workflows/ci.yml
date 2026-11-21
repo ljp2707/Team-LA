@@ -14,6 +14,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly, so a newly published vulnerability in an unchanged package or image still fails CI
+  schedule:
+    - cron: "0 14 * * 1"
 
 permissions:
   contents: read

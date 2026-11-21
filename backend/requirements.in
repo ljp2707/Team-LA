@@ -1,10 +1,10 @@
 # What the app needs to run, pinned exactly. The Docker image installs only these.
 # After changing this file, regenerate the hash-locked requirements.txt (README, "Updating dependencies").
-fastapi==0.162.0
+fastapi==0.162.7
 uvicorn[standard]==0.54.0
-pydantic-settings==2.16.2
-pyairtable==3.5.0.post1
-authlib==1.9.1
+pydantic-settings==2.16.3
+pyairtable==3.5.1
+authlib==1.9.5
 httpx==0.28.1
 # Reads file uploads (multipart forms) on tasks and launches
 python-multipart==0.0.33

@@ -1,25 +1,26 @@
-# Dependabot opens a pull request when a dependency has an update (findings F42).
-# CI must pass before merging. Security updates arrive as soon as they are published;
-# routine updates come weekly, grouped, after a 7-day wait so a bad release has time to be
-# caught first.
+# Dependabot opens a pull request when a dependency has an update (findings F42, F43).
+# CI must pass before merging. Updates come weekly, grouped, after a 7-day wait so a bad
+# release has time to be caught first.
+#
+# Only minor and patch updates are proposed. Major updates (React 18 to 19, Node 24 to 26,
+# Python 3.12 to 3.15) need code changes and testing, so a person does them on purpose.
+#
+# Python packages are not here: Dependabot rewrites requirements.txt without the per-platform
+# markers, and the result does not install on Windows. Instead, CI runs pip-audit every week
+# (the schedule in ci.yml) and fails if a locked package has a known vulnerability; update it
+# with uv as in the README, "Updating dependencies". GitHub's Dependabot alerts still cover
+# the Python packages too.
 version: 2
 updates:
-  - package-ecosystem: pip
-    directory: /backend
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      python:
-        patterns: ["*"]
-
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       npm:
         patterns: ["*"]
@@ -30,14 +31,21 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       actions:
         patterns: ["*"]
 
-  # Proposes new digests for the pinned base images in the Dockerfile
+  # New digests for the pinned base images in the Dockerfile (security fixes in the same
+  # Python and Node versions). Version changes are left to a person.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
