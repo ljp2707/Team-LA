@@ -59,6 +59,18 @@ function select(page: Page, label: string) {
   return page.locator("label.inline-select", { hasText: label }).locator("select");
 }
 
+/**
+ * Pick a My Tasks filter or sort and wait for the tasks it loads. Each choice fetches
+ * /api/tasks/mine again; moving on before that finishes cancels it (net::ERR_ABORTED), which
+ * the failed-request check rightly reports. waitForLoadState("networkidle") does not help
+ * here: once the page has loaded it returns at once.
+ */
+async function choose(page: Page, label: string, value: string) {
+  const loaded = page.waitForResponse((r) => r.url().includes("/api/tasks/mine"));
+  await select(page, label).selectOption(value);
+  await loaded;
+}
+
 test("admin: every page, the Nudge and Delete task dialogs, and the My Tasks filters", async ({ page }) => {
   const base = `http://127.0.0.1:${PEOPLE.admin.port}`;
   const problems = await watch(page);
@@ -114,8 +126,8 @@ test("admin: every page, the Nudge and Delete task dialogs, and the My Tasks fil
 
   // My Tasks with every filter and sort; the choices go into the address
   await visit(page, base, "/my-tasks");
-  await select(page, "Sort by").selectOption("program");
-  await select(page, "Sort by").selectOption("location");
+  await choose(page, "Sort by", "program");
+  await choose(page, "Sort by", "location");
   await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL(/sort=location/);
   await visit(page, base, "/my-tasks?show=overdue&sort=due");
@@ -134,10 +146,10 @@ test("staff: their pages and the My Tasks filters", async ({ page }) => {
   await expectFontsLoaded(page);
 
   await visit(page, base, "/my-tasks");
-  await select(page, "State").selectOption("WA");
-  await select(page, "City").selectOption("Seattle");
-  await select(page, "Program type").selectOption("Swim Safely");
-  await select(page, "Sort by").selectOption("location");
+  await choose(page, "State", "WA");
+  await choose(page, "City", "Seattle");
+  await choose(page, "Program type", "Swim Safely");
+  await choose(page, "Sort by", "location");
   await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL(/state=WA/);
   await expect(page).toHaveURL(/city=Seattle/);
