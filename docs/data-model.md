@@ -23,6 +23,7 @@ Used by: Sign in, Users and roles, every assignment.
 | Activity Log | Link to the Activity Log table. |
 | Welcome Email Sent *(added)* | Set when the welcome email goes out, so it is sent once. |
 | Calendar Feed Token *(added)* | The secret in this person's calendar feed link. Blank means their feed is off. Treat it like a password. |
+| Session Version *(added)* | Raised by one to sign this person out on every device. The app changes it; do not edit it by hand. Blank means 0. |
 
 ## Template List
 
@@ -268,6 +269,21 @@ Used by: Reminders panel, the daily job.
 | Error | Read and written by the app. |
 | Created By | Link to the Users table. |
 | Note | Read and written by the app. |
+
+## Audit Log
+
+One row per admin action, for the audit trail (findings F34). Append only: the app never edits or deletes rows, and nobody should by hand. Holds record IDs only, never names or emails.
+
+Used by: Audit page; written after every successful admin change.
+
+| Field | What it is for |
+|---|---|
+| Action | The method and route, such as PATCH /api/users/{user_id}. The Audit page shows it in plain words. |
+| When | When it happened (UTC). |
+| Actor ID | The admin's Users record ID. |
+| Target | The record IDs in the address, such as user_id=rec123. |
+| Status Code | The HTTP status the app answered with. |
+| Request ID | Matches the X-Request-ID header and the server log lines for the same request. |
 
 ## Template Versions
 

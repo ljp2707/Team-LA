@@ -20,6 +20,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/assignments", label: "Assignments" },
   { to: "/users", label: "Users and roles" },
   { to: "/archive", label: "Archive" },
+  { to: "/audit", label: "Audit" },
 ];
 
 const STAFF_NAV: NavItem[] = [
@@ -115,6 +116,12 @@ export function Sidebar({ menuOpen, onToggleMenu }: { menuOpen: boolean; onToggl
           <form method="post" action="/auth/logout" className="sign-out-form">
             <button type="submit" className="sign-out">
               Sign out
+            </button>
+          </form>
+          {/* Ends every session this person has, for example on a lost phone (findings F30). */}
+          <form method="post" action="/auth/logout-everywhere" className="sign-out-form">
+            <button type="submit" className="sign-out sign-out--small">
+              Sign out of all devices
             </button>
           </form>
           <nav className="sidebar-legal" aria-label="Policies">

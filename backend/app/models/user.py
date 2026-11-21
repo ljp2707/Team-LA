@@ -18,6 +18,9 @@ class SessionUser(BaseModel):
     last_name: str = ""
     access_level: str | None = None
     roles: list[str] = []
+    # F30: the person's Session Version when they signed in. A higher number on their
+    # Users row means they were signed out everywhere since, so this cookie is refused.
+    session_version: int = 0
 
 
 class CurrentUser(SessionUser):
@@ -57,6 +60,7 @@ def _to_session_user(record: dict[str, Any]) -> SessionUser:
         last_name=fields.get(Users.LAST_NAME, ""),
         access_level=fields.get(Users.ACCESS_LEVEL),
         roles=_role_names(fields.get(Users.ROLES, [])),
+        session_version=int(fields.get(Users.SESSION_VERSION) or 0),
     )
 
 

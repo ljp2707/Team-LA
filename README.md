@@ -41,7 +41,7 @@ You need [Python 3.12](https://www.python.org/downloads/) and [Node.js 22](https
    python -m venv .venv
    .venv\Scripts\activate          (Windows)
    source .venv/bin/activate       (Mac)
-   pip install -r requirements.txt
+   pip install --require-hashes -r requirements-dev.txt
    uvicorn app.main:app --reload --port 8000
    ```
 
@@ -85,7 +85,7 @@ This only works on localhost. The app refuses to start if `DEV_LOGIN_EMAIL` is s
 ## Create the Airtable token
 
 1. Go to https://airtable.com/create/tokens and choose **Create token**.
-2. Add these four scopes: `data.records:read`, `data.records:write`, `schema.bases:read`, `schema.bases:write`. The last one is only used by the migration script that adds new fields (see **Updating the Airtable base**).
+2. Add only two scopes: `data.records:read` and `data.records:write`. That is all the app needs. Without the schema scopes, a leaked token cannot add, rename or delete fields or tables (findings F37). In production the app checks at startup and logs an `airtable_token_too_broad` warning if its token can read the base's structure.
 3. Under **Access**, add the NMU base.
 4. Copy the token into `AIRTABLE_TOKEN`.
 
@@ -112,7 +112,7 @@ Google now calls this part of the console **Google Auth Platform**.
    - `http://localhost:8765/` for the one-time Gmail authorization in **Set up email**, where the trailing slash is required
 6. Copy the client ID and the secret right away, because the secret is only shown in full once. Put them in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 7. **Audience**, then **Publish app**, to set the status to **In production**. Sign in only uses basic scopes, so no verification is needed. In Testing mode only listed test users can sign in. Publishing also stops the Gmail refresh token from expiring every 7 days.
-8. Leave `ALLOWED_EMAIL_DOMAIN` blank. Any Google account can try to sign in, and the Airtable Users table decides who gets in.
+8. Leave `ALLOWED_EMAIL_DOMAIN` blank. Any Google account can try to sign in, and the Airtable Users table decides who gets in. Partners use their own Google accounts, so a domain would lock them out. If you ever do set it (for example `nomoreunder.org`), only accounts that NMU's Google Workspace manages can sign in: the email must end in that domain **and** Google must say the account belongs to that Workspace (its `hd` claim), so a personal Google account made with a work address is refused (findings F32).
 
 When the backend starts, it prints the redirect URI it uses, for example `Google sign in redirect URI: http://localhost:8000/auth/callback`. That exact address must be on the client. In developer mode, admins can also see it on **Users and roles > System**.
 
@@ -135,7 +135,7 @@ All email (reminders, the weekly digest, assignment and welcome emails) goes thr
 3. On your computer, with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`, run `python -m jobs.authorize_gmail` from `backend`. Sign in as the account that should send the emails (for now avanthi.arun@gmail.com, and later an NMU-owned account), then click through the unverified-app screen (**Advanced**, then **Go to NMU Launches**). This screen appears once, only for the sender, because `gmail.send` is a sensitive scope. Staff signing in never see it.
 4. Put the printed token in `GMAIL_REFRESH_TOKEN`, set `GMAIL_SENDER` to that same address, and set `REMINDERS_DRY_RUN=false`.
 5. Run the app on your computer in developer mode (`DEV_ALLOW_VIEW_SWITCH=true`), go to **Users and roles**, then **System**, then **Send me a test email**. The System box only shows in developer mode, never in production.
-6. When the app is deployed later, set the same variables on **both** Railway services, the web service and the cron service.
+6. When the app is deployed later, set these variables on the Railway web service. The cron service needs only some of them, with its own `SESSION_SECRET` (see **The reminder cron service** below).
 7. To change the sender later, run step 3 again with the new account and replace both variables.
 8. The refresh token stops working if the sender changes their Google password, revokes access, or does not use it for 6 months. The daily job uses it, so the last case should not happen.
 
@@ -145,16 +145,40 @@ All email (reminders, the weekly digest, assignment and welcome emails) goes thr
 
 ## Updating the Airtable base
 
-The app needs some fields and tables the original base did not have: the Links, Reminders and Template Versions tables, and fields such as Due Date Override and One-off on tasks and Program Name and Duration on sessions. A script adds them. It only adds; it never changes or deletes existing fields or rows.
+The app needs some fields and tables the original base did not have: the Links, Reminders, Template Versions and Audit Log tables, and fields such as Due Date Override and One-off on tasks, Program Name and Duration on sessions, and Session Version on Users (it lets the app sign someone out on every device; findings F30). A script adds them. It only adds; it never changes or deletes existing fields or rows.
 
-1. Make sure your token has the `schema.bases:write` scope.
-2. From `backend`, run `python -m jobs.migrate_airtable` to see what it would add. Nothing changes yet.
-3. Run `python -m jobs.migrate_airtable --apply` to add them. Running it again prints "Nothing to add".
-4. `python -m jobs.dump_schema` rewrites `docs/airtable-schema.md` from the live base, so you can check the result.
+This script, and `jobs.dump_schema`, need a **separate, short-lived token**, never the app's own (findings F37):
+
+1. At https://airtable.com/create/tokens, create a token named something like "NMU migration, delete after use" with `schema.bases:read` and `schema.bases:write` (add `data.records:read` too), and only the NMU base under **Access**.
+2. Put it in `AIRTABLE_MIGRATION_TOKEN` in your own `.env` on your computer. Never on Railway: production refuses to start if it is set there. The scripts refuse to run without it, and refuse the app's own `AIRTABLE_TOKEN` even if it has the scopes.
+3. From `backend`, run `python -m jobs.migrate_airtable` to see what it would add. Nothing changes yet.
+4. Run `python -m jobs.migrate_airtable --apply` to add them. Running it again prints "Nothing to add".
+5. `python -m jobs.dump_schema` rewrites `docs/airtable-schema.md` from the live base, so you can check the result.
+6. **Delete the migration token** in Airtable and remove it from `.env`.
 
 On a test base only, `python -m jobs.seed_demo --yes-this-is-a-test-base` adds demo people, sites, templates and programs, all with `@example.org` emails. It refuses to run in production, and refuses to run twice.
 
 `docs/data-model.md` explains every table and field the app uses.
+
+## Checks before a commit
+
+From `backend`: `python -m pytest` (includes the access matrix and `ruff check .`, the lint and security rules in `backend/ruff.toml`). From `frontend`: `npm run build` (type check and build) and `npm run test:e2e` (every page in a real browser under the enforced CSP). CI runs all of these plus dependency, secret and code scans on every push and pull request (`.github/workflows/ci.yml`).
+
+## Updating dependencies
+
+Every dependency is pinned to an exact version, and the Python ones to exact file hashes too, so a build always installs exactly what was tested and a tampered package fails the install (findings F39).
+
+- **Python.** Edit the exact version in `backend/requirements.in` (what the app needs to run) or `backend/requirements-dev.in` (tests and tools). Then, from `backend`, regenerate both locks with [uv](https://docs.astral.sh/uv/):
+
+  ```
+  uv pip compile requirements.in --universal --generate-hashes --python-version 3.12 --no-header -o requirements.txt
+  uv pip compile requirements-dev.in --universal --generate-hashes --python-version 3.12 --no-header -o requirements-dev.txt
+  pip install --require-hashes -r requirements-dev.txt
+  ```
+
+  `--universal` makes one lock that works on Windows, Mac and Linux. Never edit the `.txt` files by hand. The Docker image installs only `requirements.txt`, so test tools never reach the server.
+- **Frontend.** `npm install some-package@1.2.3` saves the exact version (`frontend/.npmrc` has `save-exact=true`). Commit `package.json` and `package-lock.json` together; the Docker build and CI use `npm ci`, which installs exactly the lock file.
+- Dependabot opens a pull request when an update is out (`.github/dependabot.yml`). CI must pass before merging.
 
 ## How the app reads Airtable
 
@@ -195,16 +219,18 @@ The live site needs real Google sign in, because the test login only works on yo
    - `DEV_ALLOW_VIEW_SWITCH=false`. The app refuses to start with it `true` in production.
    - `DEV_LOGIN_EMAIL`: leave this out or blank
 
-   An `https` `APP_URL` always runs in production mode, even if `ENV` is missing, so the secret check and the Secure cookie cannot be turned off by accident. In production the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are turned off; they stay on for local development.
+   An `https` `APP_URL` always runs in production mode, even if `ENV` is missing, so the secret check and the Secure cookie cannot be turned off by accident. In production the session cookie is called `__Host-nmu_session`: browsers only accept that name on a Secure cookie with `Path=/` and no Domain, so no other site on a shared domain such as `up.railway.app` can set or replace it. On localhost it stays `nmu_session`. **The first deploy with this change signs everyone out once**; the old `nmu_session` cookie is deleted the next time a browser sends it. In production the interactive API docs (`/docs`, `/redoc`, `/openapi.json`) are turned off; they stay on for local development.
 
-   **Security headers and limits.** Every response carries `nosniff`, `X-Frame-Options: DENY`, a Referrer-Policy and a Permissions-Policy. Production also sends `Strict-Transport-Security: max-age=31536000; includeSubDomains`, so browsers only ever use https. API and sign-in answers carry `Cache-Control: no-store`, so browsers and proxies keep no copy of people's data (`/api/health` and `/api/public/*` are the exceptions). The headers are on every answer, errors included. A Content-Security-Policy is controlled by `CSP_MODE`:
-   - `report-only` (the default) sends it as `Content-Security-Policy-Report-Only`, so browsers only warn in their developer console.
-   - `enforce` makes browsers block anything outside the policy.
+   **Security headers and limits.** Every response carries `nosniff`, `X-Frame-Options: DENY`, a Referrer-Policy, a Permissions-Policy, `Cross-Origin-Opener-Policy: same-origin` (other sites' windows cannot reach into ours), `Cross-Origin-Resource-Policy: same-origin` (other sites cannot load our answers or files into their pages) and `X-Permitted-Cross-Domain-Policies: none`. The Dockerfile starts uvicorn with `--no-server-header`, so answers do not name the web server or its version (Railway's own proxy may still add a `server: railway-edge` header, which says nothing about the app). Production also sends `Strict-Transport-Security: max-age=31536000; includeSubDomains`, so browsers only ever use https. API and sign-in answers carry `Cache-Control: no-store`, so browsers and proxies keep no copy of people's data (`/api/health` and `/api/public/*` are the exceptions). The headers are on every answer, errors included. A Content-Security-Policy is controlled by `CSP_MODE`:
+   - `enforce` (the default) makes browsers block anything outside the policy.
+   - `report-only` sends it as `Content-Security-Policy-Report-Only`, so browsers only report what it would block. Use it briefly to try a policy change on the live site, then go back to `enforce`.
    - `off` sends nothing.
 
-   The policy allows only the app's own scripts, styles, fonts and images (fonts are self-hosted in `/fonts`, so Google Fonts is not allowed), no inline scripts, and forms that post to the app itself or to Google sign-in. If the app ever loads something from another site, add that site to `CONTENT_SECURITY_POLICY` in `backend/app/security.py`.
+   The policy allows only the app's own scripts, styles, fonts and images (plus `data:` images for the drop-down arrow), no inline scripts or styles and no `eval`, nothing from any other site, and forms that post to the app itself or to Google sign-in. Production adds `upgrade-insecure-requests`. Fonts (Bricolage Grotesque and Figtree) are self-hosted in `/fonts` under the SIL Open Font License 1.1, whose text ships next to them, so pages never contact Google Fonts. If the app ever has to load something from another site, add that site to `CSP_DIRECTIVES` in `backend/app/security.py` and update `backend/tests/test_csp_policy.py`, which fails on any change to the policy.
 
-   To move to `enforce`: open the live site with the browser's developer console open, click through the main pages, and check for "Content-Security-Policy" warnings. If there are none, set `CSP_MODE=enforce` on Railway and redeploy.
+   **CSP reports.** The policy tells browsers to report anything it blocks (or, in report-only mode, would block) to `POST /api/security/csp-report`. Each report becomes one Railway log line such as `CSP violation: directive=script-src-elem blocked=https://evil.example page=/tasks/recT2`: the rule, only the site or kind of thing blocked, and only the page path. Nothing else from the report is kept, so no names, emails, query strings or code samples reach the log. The endpoint accepts both report formats browsers use, takes up to 64 KB and 20 reports per request, and is limited to 30 requests a minute per address. It is the one change route without the Origin check below, because browsers send reports on their own and it changes nothing.
+
+   **Browser test.** `cd frontend && npm run test:e2e` builds the app and opens every page in Chromium as an admin, a staff member and a partner, with the policy enforced, including the Nudge and Delete task dialogs and the My Tasks filters. It fails on any CSP violation, console error, uncaught error or failed request, and checks the self-hosted fonts load. It uses the fake Airtable from the backend tests (`backend/tests/e2e_server.py`), so it never touches real data. The first time, run `npx playwright install chromium`. Run it after any frontend change that loads something new.
 
    **Changes must come from this site (CSRF).** POST, PUT, PATCH and DELETE on `/api` and `/auth` are refused with a 403 unless the browser's `Origin` header (or `Referer`, if there is no `Origin`) is `APP_URL` or `FRONTEND_URL`. Browsers always send one of these, so this only stops other websites and scripts that send neither. In local development, open the app at the exact `FRONTEND_URL` (`http://localhost:5173`, not `127.0.0.1`), or changes are refused.
 
@@ -218,11 +244,12 @@ The live site needs real Google sign in, because the test login only works on yo
    |---|---|
    | Sign in (`/auth/login`, `/auth/callback`) | 10 a minute per address |
    | File uploads | 20 an hour per person |
-   | Nudges (`POST /api/tasks/{id}/nudge`) | 20 an hour per admin, and once a day per person per task (that one is read from the Reminders table, so it survives a restart) |
+   | Nudges (`POST /api/tasks/{id}/nudge`) | 20 an hour per admin. Each person gets at most one nudge per task a day and 3 nudges a day in total, from all admins (these two are read from the Reminders table, so they survive a restart) |
    | Any other change (POST, PUT, PATCH, DELETE under `/api/`) | 60 a minute per person |
    | Calendar feeds and `/api/public/*` | 60 a minute per address |
+   | CSP reports (`POST /api/security/csp-report`) | 30 a minute per address |
 
-   The counts live in memory, which is right for one Railway instance. If the app is ever scaled to several instances, each counts separately.
+   The counts live in memory, which is right for one Railway instance. If the app is ever scaled to several instances, each counts separately, and the lock that stops two nudges from sending at once (`reminders.NUDGE_LOCK`) would also need to become a shared one.
 
    **Hosts and proxy.** The app only answers to the host names in `APP_URL`, `FRONTEND_URL` and `ALLOWED_HOSTS`, plus Railway's health check (`healthcheck.railway.app`), and `localhost` outside production. Anything else gets a 400. **If you add a custom domain, update `APP_URL` and `FRONTEND_URL` to it** (or add it to `ALLOWED_HOSTS`), or requests to the new domain are refused. The Dockerfile runs uvicorn with `--proxy-headers --forwarded-allow-ips` set from `FORWARDED_ALLOW_IPS` (`*` if unset), so the app sees each visitor's real address and https through Railway's proxy.
 
@@ -231,10 +258,12 @@ The live site needs real Google sign in, because the test login only works on yo
    **Uploads** must match their extension: a file named `.pdf` has to start like a PDF, a `.png` like a PNG, and so on. Text and CSV files must not contain binary data.
 
    **Notes:** only a note's author or an admin can switch an Internal note to Shared with partners.
-   - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email
+   - `BOOTSTRAP_ADMIN_EMAILS`: the first admin's Google email. **Remove it once that admin has signed in**; the app logs a warning at every start while it is set and an Active Admin exists.
    - `CONTACT_EMAIL` and `ORG_ADDRESS`: NMU's contact inbox and mailing address, shown on the Privacy page and in every email
 3. Under **Settings > Networking**, choose **Generate Domain**.
 4. Set both `APP_URL` and `FRONTEND_URL` to that domain, starting with `https://`.
+
+   **Production refuses to start** (findings F33) if `APP_URL` or `FRONTEND_URL` is not `https://`, if `REMINDERS_DRY_RUN=false` but `GMAIL_SENDER`, `GMAIL_REFRESH_TOKEN` or a Google client ID and secret is missing, if `CSP_MODE` is not `enforce`, `report-only` or `off`, or if a `BOOTSTRAP_ADMIN_EMAILS` address is outside `ALLOWED_EMAIL_DOMAIN`. The deploy log names the setting to fix.
 5. Add `https://YOUR-APP-DOMAIN/auth/callback` to the Google OAuth client's redirect URIs.
 
 After changing a variable in Railway, click **Deploy** if it asks you to apply the change, so the app picks up the new value.
@@ -243,9 +272,25 @@ After changing a variable in Railway, click **Deploy** if it asks you to apply t
 
 1. In the same Railway project, add a second service from the same GitHub repo.
 2. Under **Settings > Config-as-code**, set the config file path to `/railway.cron.json`. This runs `python -m jobs.send_reminders` on the schedule `0 15 * * *`, and leaves out the web health check.
-3. Copy the variables from the web service.
+3. Give it only the variables it uses (least privilege, findings F37), not a copy of everything:
+
+   | Variable | Value |
+   |---|---|
+   | `ENV` | `production` |
+   | `APP_URL`, `FRONTEND_URL` | The same `https://` addresses as the web app (links in emails) |
+   | `SESSION_SECRET` | **Its own** random value, not the web app's. The job never signs a cookie; the production check just needs one, and a separate value means a leak from this service cannot be used to forge sign ins |
+   | `AIRTABLE_TOKEN`, `AIRTABLE_BASE_ID` | The same as the web app |
+   | `APP_TIMEZONE` | The same as the web app |
+   | `GMAIL_SENDER`, `GMAIL_REFRESH_TOKEN` | The same as the web app |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (or `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`) | The client the refresh token was made with |
+   | `REMINDERS_DRY_RUN` | `true` until the test email works, then `false` |
+   | `ORG_NAME`, `CONTACT_EMAIL`, `ORG_ADDRESS` | The same as the web app (the footer of every email) |
+
+   Leave out `ALLOWED_EMAIL_DOMAIN`, `BOOTSTRAP_ADMIN_EMAILS`, `ALLOWED_HOSTS`, `CSP_MODE`, `FORWARDED_ALLOW_IPS`, `SESSION_IDLE_HOURS`, every `DEV_` variable and `AIRTABLE_MIGRATION_TOKEN`.
 
 Railway schedules in UTC, so `0 15 * * *` is 8 AM Pacific during daylight time and 7 AM in winter. While `REMINDERS_DRY_RUN=true` the job only prints. Set it to `false` once the test email works.
+
+**Logs and monitoring.** In production the app writes one JSON object per log line, each with the request's ID, and marks security events (refused sign ins, 403s, rate limits, revoked sessions, CSP reports, admin actions) with an `event` field. `docs/security/monitoring.md` lists every event, what it means and which alerts to set up in Railway. Locally the lines stay plain text.
 
 ## Roles and the view switch
 

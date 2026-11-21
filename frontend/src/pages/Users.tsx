@@ -6,6 +6,7 @@ import {
   airtableHealth,
   authHealth,
   erasePerson,
+  signOutEverywhere,
   handOff,
   listPeople,
   listRoles,
@@ -347,6 +348,23 @@ function PersonDialog({
     }
   }
 
+  async function signOut() {
+    if (!person) return;
+    const ok = window.confirm(
+      `Sign ${person.first_name} out on every device? Use this for a lost laptop or phone. They can sign in again with Google.`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await signOutEverywhere(person.id);
+      onSaved(`${person.first_name} is signed out on every device.`);
+    } catch (caught) {
+      setError(errorText(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function erase() {
     if (!person) return;
     const ok = window.confirm(
@@ -384,6 +402,11 @@ function PersonDialog({
           {person && !isSelf && (
             <Button variant={person.active ? "danger" : "outline"} className="push-left" disabled={busy} onClick={() => void setActive(!person.active)}>
               {person.active ? "Deactivate" : "Reactivate"}
+            </Button>
+          )}
+          {person && !isSelf && person.active && (
+            <Button variant="outline" disabled={busy} onClick={() => void signOut()}>
+              Sign out everywhere
             </Button>
           )}
           {person && !isSelf && !person.active && person.first_name !== "Former" && (

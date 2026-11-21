@@ -6,6 +6,8 @@ from pydantic import ValidationError
 from app.config import PLACEHOLDER_SECRET, Settings
 
 STRONG_SECRET = "s" * 40
+# Production needs https addresses (findings F33).
+HTTPS = dict(APP_URL="https://launches.example.org", FRONTEND_URL="https://launches.example.org")
 
 
 def make(**values) -> Settings:
@@ -21,7 +23,7 @@ def test_localhost_default_is_not_production():
 
 
 def test_https_app_url_counts_as_production_even_without_env():
-    assert make(APP_URL="https://launches.example.org", SESSION_SECRET=STRONG_SECRET).is_production
+    assert make(APP_URL="https://launches.example.org", FRONTEND_URL="https://launches.example.org", SESSION_SECRET=STRONG_SECRET).is_production
 
 
 def test_https_app_url_refuses_the_placeholder_secret():
@@ -52,7 +54,7 @@ def test_view_switch_still_works_on_localhost():
 
 
 def test_production_starts_with_the_view_switch_off():
-    assert make(ENV="production", SESSION_SECRET=STRONG_SECRET).is_production
+    assert make(ENV="production", SESSION_SECRET=STRONG_SECRET, **HTTPS).is_production
 
 
 # --- F2: no API docs in production ------------------------------------------------
@@ -61,7 +63,7 @@ def test_production_starts_with_the_view_switch_off():
 def test_api_docs_are_off_in_production():
     from app.main import api_docs_urls
 
-    urls = api_docs_urls(make(ENV="production", SESSION_SECRET=STRONG_SECRET))
+    urls = api_docs_urls(make(ENV="production", SESSION_SECRET=STRONG_SECRET, **HTTPS))
     assert urls == {"docs_url": None, "redoc_url": None, "openapi_url": None}
 
 

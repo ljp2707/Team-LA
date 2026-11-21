@@ -102,6 +102,7 @@ class FakeAirtable:
         return created
 
     def update_records(self, name, updates, typecast=False):
+        airtable._refuse_append_only_changes(name)
         airtable._refuse_automation_fields(name, [u["fields"] for u in updates])
         out = []
         for update in updates:
@@ -129,6 +130,7 @@ class FakeAirtable:
         return stored
 
     def delete_records(self, name, ids):
+        airtable._refuse_append_only_changes(name)
         self.tables[name] = [r for r in self.rows(name) if r["id"] not in ids]
         self.writes += [("delete", name, i, {}) for i in ids]
 

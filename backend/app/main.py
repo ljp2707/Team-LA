@@ -1,6 +1,7 @@
 """The FastAPI app: middleware, API routes, and the built frontend."""
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,17 +10,20 @@ from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app import log_redaction
-from app.airtable.client import warm_cache, warn_about_schema_problems
+from app import log_redaction, logging_setup
+from app.audit import AuditTrail
+from app.airtable.client import warm_cache, warn_about_schema_problems, warn_if_token_too_broad
 from app.auth.google import callback_url
 from app.auth.session import MAX_SESSION_DAYS
 from app.config import Settings, get_settings
 from app.rate_limit import RateLimit
 from app.request_limits import RequestSizeLimit
-from app.security import OriginCheck, RequestContext
+from app.security import OriginCheck, RequestContext, RetireOldSessionCookie, session_cookie_options
+from app.routers.auth import warn_if_bootstrap_not_needed
 from app.routers import (
     admin,
     archive,
+    audit_log,
     auth,
     calendar,
     health,
@@ -28,13 +32,15 @@ from app.routers import (
     projects,
     public,
     reminders,
+    security_reports,
     sites,
     tasks,
     templates,
     users,
 )
 
-logging.basicConfig(level=logging.INFO)
+# One JSON object per line in production, plain text on a laptop (findings F36)
+logging_setup.install(json_lines=get_settings().is_production)
 logger = logging.getLogger("app")
 log_redaction.install()  # Calendar tokens and sign-in codes never reach the logs (findings F3)
 
@@ -51,6 +57,10 @@ async def lifespan(_: FastAPI):
     )
     if not settings.is_production:
         warn_about_schema_problems()
+    # In the background, so a slow Airtable never holds up startup (findings F33).
+    threading.Thread(target=warn_if_bootstrap_not_needed, daemon=True).start()
+    if settings.is_production:
+        threading.Thread(target=warn_if_token_too_broad, daemon=True).start()  # F37
     warm_cache()  # In the background, so the first sign in does not wait on Airtable
     yield
 
@@ -78,15 +88,17 @@ app.add_middleware(RateLimit)
 # Refuses changes sent from other websites (CSRF). Outside RateLimit, so a forged
 # request is refused before it counts against the person it targets.
 app.add_middleware(OriginCheck)
+# One Audit Log row per successful admin change (findings F34)
+app.add_middleware(AuditTrail)
 
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SESSION_SECRET,
-    session_cookie="nmu_session",
-    max_age=MAX_SESSION_DAYS * 24 * 60 * 60,
-    same_site="lax",
-    https_only=settings.is_production,
+    # __Host-nmu_session in production, nmu_session on localhost (findings F29)
+    **session_cookie_options(settings, max_age=MAX_SESSION_DAYS * 24 * 60 * 60),
 )
+# Deletes the pre-F29 cookie in production. Outside SessionMiddleware, so it sees every answer.
+app.add_middleware(RetireOldSessionCookie)
 # Only answer to our own host names, so a forged Host header cannot reach the app (F14).
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 # Outermost: request IDs, security headers on every answer (errors included), and a
@@ -108,6 +120,8 @@ for module in (
     sites,
     admin,
     calendar,
+    security_reports,
+    audit_log,
 ):
     app.include_router(module.router)
 app.include_router(users.roles_router)

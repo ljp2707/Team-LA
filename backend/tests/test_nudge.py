@@ -4,12 +4,16 @@ Standard project: Design flyer (recT2) is open and assigned to Sam (recStaff).
 Today is Wed Nov 4, 2026, 9 AM Pacific.
 """
 
+import threading
+import time
+
 import pytest
 
 from app.airtable.schema import ActivityLog, Reminders, Session, Users, Work
 from app.email import gmail
 from app.rate_limit import NUDGES_PER_HOUR
 from tests.builders import add_task, standard_project
+from tests.conftest import person
 
 
 @pytest.fixture
@@ -132,9 +136,119 @@ def test_limit_is_per_task(client, sign_in, project, outbox):
     assert _nudge(client, "recT3").status_code == 200
 
 
+def _sent_nudge(fake, task_id, person_id, sent_at):
+    """A nudge another admin already sent, as the Reminders table records it."""
+    fake.add(
+        Reminders.TABLE,
+        {
+            Reminders.NAME: "Nudge",
+            Reminders.KIND: "Nudge",
+            Reminders.STATUS: "Sent",
+            Reminders.SENT_AT: sent_at,
+            Reminders.WORK: [task_id],
+            Reminders.RECIPIENT: [person_id],
+        },
+    )
+
+
+def _sams_tasks(fake, count):
+    for n in range(count):
+        add_task(fake, f"recS{n}", f"Sam task {n}", None, assigned="recStaff")
+
+
+# F20: nobody gets more than 3 nudges a day, whatever the task and whoever sends them.
+
+
+def test_fourth_nudge_to_one_person_in_a_day_is_refused(client, sign_in, project, outbox):
+    _sams_tasks(project, 4)
+    sign_in("admin@example.org")
+    for n in range(3):
+        assert _nudge(client, f"recS{n}").status_code == 200
+    refused = _nudge(client, "recS3")
+    assert refused.status_code == 429
+    assert refused.json()["detail"] == (
+        "Sam has already had 3 reminders today, the most anyone gets in a day. You can nudge again after 9:00 AM on Nov 5."
+    )
+    assert len(outbox) == 3
+
+
+def test_daily_limit_counts_nudges_from_every_admin(client, sign_in, project, outbox):
+    _sams_tasks(project, 3)
+    _sent_nudge(project, "recT3", "recStaff", "2026-11-04T15:00:00Z")  # 7 AM Pacific, from another admin
+    _sent_nudge(project, "recT4", "recStaff", "2026-11-04T16:00:00Z")
+    sign_in("admin@example.org")
+    assert _nudge(client, "recS0").status_code == 200
+    refused = _nudge(client, "recS1")
+    assert refused.status_code == 429
+    assert "after 7:00 AM on Nov 5" in refused.json()["detail"]  # when the oldest one is a day old
+
+
+def test_daily_limit_ignores_old_and_failed_nudges(client, sign_in, project, outbox):
+    _sams_tasks(project, 1)
+    for hour in (1, 2, 3):
+        _sent_nudge(project, "recT3", "recStaff", f"2026-11-03T0{hour}:00:00Z")  # over a day ago
+    project.add(Reminders.TABLE, {Reminders.KIND: "Nudge", Reminders.STATUS: "Failed", Reminders.WORK: ["recT4"],
+                                  Reminders.RECIPIENT: ["recStaff"], Reminders.SENT_AT: "2026-11-04T16:00:00Z"})
+    sign_in("admin@example.org")
+    assert _nudge(client, "recS0").status_code == 200
+
+
+def test_person_at_the_limit_is_skipped_but_others_on_the_task_are_nudged(client, sign_in, project, outbox, fake):
+    for task in ("recT3", "recT4", "recT5"):
+        _sent_nudge(fake, task, "recStaff", "2026-11-04T16:00:00Z")
+    fake.find(Work.TABLE, "recT2")["fields"][Work.ASSIGNED_TO] = ["recStaff", "recAdmin"]
+    sign_in("admin@example.org")
+    response = _nudge(client)
+    assert response.status_code == 200
+    assert response.json()["sent"] == ["Ada"] and response.json()["skipped"] == ["Sam"]
+    assert [to for to, *_ in outbox] == ["Admin@Example.org"]
+
+
+def test_daily_limit_resets_after_a_day(client, sign_in, project, outbox, advance):
+    _sams_tasks(project, 4)
+    sign_in("admin@example.org")
+    for n in range(3):
+        assert _nudge(client, f"recS{n}").status_code == 200
+    assert _nudge(client, "recS3").status_code == 429
+    advance(hours=24, minutes=1)
+    sign_in("admin@example.org")
+    assert _nudge(client, "recS3").status_code == 200
+
+
+def test_two_nudges_at_the_same_moment_send_one_email(client, sign_in, project, monkeypatch, settings):
+    """F21: a double click or two admins at once must not email the person twice."""
+    settings(REMINDERS_DRY_RUN=False)
+    sent = []
+    first_sending = threading.Event()
+
+    def slow_send(to, subject, text, html):
+        first_sending.set()
+        time.sleep(0.3)  # Long enough for the second request to arrive mid-send
+        sent.append(to)
+
+    monkeypatch.setattr(gmail, "send_email", slow_send)
+    sign_in("admin@example.org")
+    codes = []
+
+    def nudge():
+        codes.append(_nudge(client).status_code)
+
+    first = threading.Thread(target=nudge)
+    first.start()
+    assert first_sending.wait(5)
+    second = threading.Thread(target=nudge)
+    second.start()
+    first.join(10)
+    second.join(10)
+    assert sorted(codes) == [200, 429]
+    assert sent == ["staff@example.org"]
+
+
 def test_admin_hourly_cap(client, sign_in, project, outbox):
+    # A different person on each task, so only the admin's own hourly cap can stop it.
     for n in range(NUDGES_PER_HOUR):
-        add_task(project, f"recN{n}", f"Task {n}", None, assigned="recStaff")
+        project.add(Users.TABLE, person(f"recP{n}", f"p{n}@example.org", "Staff", first=f"P{n}")["fields"], f"recP{n}")
+        add_task(project, f"recN{n}", f"Task {n}", None, assigned=f"recP{n}")
     sign_in("admin@example.org")
     for n in range(NUDGES_PER_HOUR):
         assert _nudge(client, f"recN{n}").status_code == 200

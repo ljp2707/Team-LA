@@ -1,0 +1,13 @@
+# Everything for development and CI: the app's own requirements plus tests and tools.
+# Never installed in the Docker image.
+-r requirements.in
+pytest==9.2.0
+pytest-cov==7.0.0
+# Only used by python -m jobs.authorize_gmail, run once on a laptop
+google-auth-oauthlib==1.5.0
+# Lint (ruff.toml) and known-vulnerability checks, run in CI
+ruff==0.17.6
+pip-audit==2.10.1
+# Check the GitHub Actions workflows for mistakes and security problems (CI)
+zizmor==1.32.0
+actionlint-py==1.7.12.25

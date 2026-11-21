@@ -3,6 +3,7 @@ import { RequireAdmin } from "./auth/RequireAdmin";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./components/layout/AppShell";
 import { Archive } from "./pages/Archive";
+import { Audit } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
 import { Home } from "./pages/Home";
 import { PrivacyPolicy, Terms } from "./pages/Legal";
@@ -47,6 +48,7 @@ export function App() {
             <Route path="/assignments" element={<Assignments />} />
             <Route path="/assignments/:id" element={<PersonDetail />} />
             <Route path="/archive" element={<Archive />} />
+            <Route path="/audit" element={<Audit />} />
           </Route>
 
           <Route path="/projects/:id" element={<ProjectDetail />} />

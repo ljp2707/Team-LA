@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLACEHOLDER_SECRET = "replace-with-a-long-random-string"
+PLACEHOLDER_SECRET = "replace-with-a-long-random-string"  # noqa: S105 (refused in production)
 
 
 class Settings(BaseSettings):
@@ -25,8 +25,11 @@ class Settings(BaseSettings):
     # Sign people out after this many hours without using the app (findings F15).
     SESSION_IDLE_HOURS: int = Field(default=24, ge=1)
 
-    AIRTABLE_TOKEN: str = ""
+    AIRTABLE_TOKEN: str = ""  # Scopes: data.records:read and data.records:write only (F37)
     AIRTABLE_BASE_ID: str = ""
+    # Only for python -m jobs.migrate_airtable and jobs.dump_schema, on a laptop: a separate,
+    # short-lived token with schema.bases:read and schema.bases:write. Never on the server.
+    AIRTABLE_MIGRATION_TOKEN: str = ""
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
@@ -36,9 +39,11 @@ class Settings(BaseSettings):
 
     APP_TIMEZONE: str = "America/Los_Angeles"
 
-    # Content-Security-Policy (findings F1): "report-only" makes browsers warn about anything
-    # the policy would block, "enforce" blocks it, "off" sends no policy.
-    CSP_MODE: Literal["off", "report-only", "enforce"] = "report-only"
+    # Content-Security-Policy (findings F1, F28): "enforce" blocks anything outside the
+    # policy, "report-only" only reports it (useful for trying a policy change on the live
+    # site first), "off" sends no policy. Enforced by default since the browser test
+    # (frontend/e2e) showed every page works under it.
+    CSP_MODE: Literal["off", "report-only", "enforce"] = "enforce"
 
     # Extra host names the app answers to, comma separated, such as a custom domain.
     # The hosts of APP_URL and FRONTEND_URL are always allowed; localhost only outside
@@ -122,7 +127,45 @@ class Settings(BaseSettings):
         # It lets any signed-in person use admin view with admin permissions (findings F4).
         if self.DEV_ALLOW_VIEW_SWITCH and self.is_production:
             raise ValueError("DEV_ALLOW_VIEW_SWITCH must be false in production")
+        self._refuse_unsafe_production_settings()
+        self._refuse_bootstrap_outside_domain()
         return self
+
+    def _refuse_unsafe_production_settings(self) -> None:
+        """Settings that would quietly weaken a live site (findings F33)."""
+        if not self.is_production:
+            return
+        # The migration token can change the base's structure; it is for a laptop only (F37).
+        if self.AIRTABLE_MIGRATION_TOKEN.strip():
+            raise ValueError("AIRTABLE_MIGRATION_TOKEN must not be set in production; delete it from the server")
+        # Over http the session cookie (Secure, __Host-) and Google sign in would not work,
+        # and nothing would be encrypted.
+        for name in ("APP_URL", "FRONTEND_URL"):
+            if not getattr(self, name).strip().lower().startswith("https://"):
+                raise ValueError(f"{name} must start with https:// in production")
+        # Real email on, but nothing to send it with: every reminder would fail.
+        if not self.REMINDERS_DRY_RUN:
+            missing = [
+                name
+                for name, value in (
+                    ("GMAIL_SENDER", self.GMAIL_SENDER),
+                    ("GMAIL_REFRESH_TOKEN", self.GMAIL_REFRESH_TOKEN),
+                    ("GMAIL_CLIENT_ID or GOOGLE_CLIENT_ID", self.gmail_client_id),
+                    ("GMAIL_CLIENT_SECRET or GOOGLE_CLIENT_SECRET", self.gmail_client_secret),
+                )
+                if not value.strip()
+            ]
+            if missing:
+                raise ValueError(
+                    "REMINDERS_DRY_RUN=false needs these settings in production: " + ", ".join(missing)
+                )
+
+    def _refuse_bootstrap_outside_domain(self) -> None:
+        """A bootstrap admin who could never sign in is a typo, or an address that should not
+        be there (findings F33)."""
+        domain = self.ALLOWED_EMAIL_DOMAIN.strip().lower()
+        if domain and any(not email.endswith(f"@{domain}") for email in self.bootstrap_admins):
+            raise ValueError("Every BOOTSTRAP_ADMIN_EMAILS address must be in ALLOWED_EMAIL_DOMAIN")
 
 
 @lru_cache

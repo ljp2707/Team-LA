@@ -11,6 +11,7 @@ written (or updated) with Sent, Failed or Skipped, so the job is safe to rerun.
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -447,19 +448,47 @@ NUDGE = "Nudge"
 # One nudge per person per task in this many hours. Counted from the Reminders table, so
 # it survives a redeploy (the in-memory rate limiter does not).
 NUDGE_EVERY_HOURS = 24
+# F20: at most this many nudges reach one person in 24 hours, across every task and every
+# admin, so nobody can be flooded with reminder emails.
+NUDGES_PER_PERSON_PER_DAY = 3
+
+# F21: held from reading who was nudged until the new Reminders rows are written, so two
+# nudges at the same moment (a double click, or two admins) cannot both pass the check and
+# both send. One lock for all nudges keeps the per-person daily limit exact too, and nudges
+# are rare enough that waiting is fine. This only works within one process: the app runs as
+# a single Railway instance. If it is ever scaled out, this needs a shared lock instead.
+NUDGE_LOCK = threading.Lock()
+
+# Why a person cannot be nudged right now.
+SAME_TASK = "same task"
+DAILY_LIMIT = "daily limit"
 
 
-def recent_nudges(rows: list[ReminderRec], task_id: str, now: datetime) -> dict[str, datetime]:
-    """Who was nudged about this task in the last 24 hours, and when (latest first wins)."""
-    since = now - timedelta(hours=NUDGE_EVERY_HOURS)
-    out: dict[str, datetime] = {}
+@dataclass
+class NudgeBlock:
+    reason: str  # SAME_TASK or DAILY_LIMIT
+    until: datetime  # when they can be nudged again
+
+
+def nudge_blocks(rows: list[ReminderRec], task_id: str, person_ids: list[str], now: datetime) -> dict[str, NudgeBlock]:
+    """Which of these people cannot be nudged about this task now, why, and until when."""
+    window = timedelta(hours=NUDGE_EVERY_HOURS)
+    since = now - window
+    sent_to: dict[str, list[tuple[datetime, str | None]]] = defaultdict(list)
     for r in rows:
         sent = clock.parse_datetime(r.sent_at)
-        if r.kind != NUDGE or r.status != SENT or r.work_id != task_id or not r.recipient_id or not sent:
-            continue
-        if sent >= since and sent > out.get(r.recipient_id, since):
-            out[r.recipient_id] = sent
-    return out
+        if r.kind == NUDGE and r.status == SENT and r.recipient_id in person_ids and sent and sent >= since:
+            sent_to[r.recipient_id].append((sent, r.work_id))
+    blocks: dict[str, NudgeBlock] = {}
+    for person_id, nudges in sent_to.items():
+        this_task = [at for at, work_id in nudges if work_id == task_id]
+        if this_task:
+            blocks[person_id] = NudgeBlock(SAME_TASK, max(this_task) + window)
+        elif len(nudges) >= NUDGES_PER_PERSON_PER_DAY:
+            # They can get another once enough of the last day's nudges are over 24 hours old.
+            times = sorted(at for at, _ in nudges)
+            blocks[person_id] = NudgeBlock(DAILY_LIMIT, times[len(times) - NUDGES_PER_PERSON_PER_DAY] + window)
+    return blocks
 
 
 def send_nudges(line: TaskLine, task_id: str, people: list[UserRec], sent_by: str, message: str) -> tuple[list[UserRec], list[str]]:

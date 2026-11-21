@@ -8,3 +8,17 @@ docs
 **/node_modules
 frontend/dist
 backend/app/static
+# Never in the image (findings F40): tests, dev tools, secrets, editor and OS files
+backend/tests
+backend/pytest.ini
+backend/requirements-dev.*
+backend/requirements*.in
+backend/.env
+**/*.map
+**/.DS_Store
+.claude
+.github
+frontend/e2e
+frontend/test-results
+frontend/playwright-report
+frontend/playwright.config.ts

@@ -13,12 +13,16 @@ MB = 1024 * 1024
 UPLOAD_LIMIT_BYTES = 6 * MB
 # Everything else. The largest real request, a 200-step template draft, is about 1.1 MB.
 DEFAULT_LIMIT_BYTES = 2 * MB
+# CSP violation reports (F25): a page sends a few small ones, so anything bigger is junk.
+CSP_REPORT_LIMIT_BYTES = 64 * 1024
 
 
 def limit_for(method: str, path: str) -> int:
     """The most bytes this request may send."""
     if method == "POST" and path.endswith("/files"):
         return UPLOAD_LIMIT_BYTES
+    if path == "/api/security/csp-report":
+        return CSP_REPORT_LIMIT_BYTES
     return DEFAULT_LIMIT_BYTES
 
 

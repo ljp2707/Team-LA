@@ -21,7 +21,19 @@ def callback_url() -> str:
     return f"{get_settings().APP_URL.rstrip('/')}/auth/callback"
 
 
-def email_allowed(email: str) -> bool:
-    """Check the email against ALLOWED_EMAIL_DOMAIN, if that is set."""
-    domain = get_settings().ALLOWED_EMAIL_DOMAIN.strip().lower()
-    return not domain or email.lower().endswith(f"@{domain}")
+def allowed_domain() -> str:
+    return get_settings().ALLOWED_EMAIL_DOMAIN.strip().lower()
+
+
+def email_allowed(email: str, hosted_domain: str | None) -> bool:
+    """Check the account against ALLOWED_EMAIL_DOMAIN, if that is set.
+
+    Both must match: the email's domain, and Google's "hd" (hosted domain) claim (findings
+    F32). Google only sends "hd" for accounts that the organisation's Google Workspace
+    manages. Without that check, a personal Google account made with a work address (for
+    example by a former employee before their mailbox closed) would also get in.
+    """
+    domain = allowed_domain()
+    if not domain:
+        return True
+    return email.strip().lower().endswith(f"@{domain}") and (hosted_domain or "").strip().lower() == domain

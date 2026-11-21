@@ -25,7 +25,9 @@ class Users:
     ACTIVITY_LOG = "Activity Log"
     WELCOME_EMAIL_SENT = "Welcome Email Sent"  # added by migrate_airtable
     # The secret in this person's calendar feed link. Blank means the feed is off.
-    CALENDAR_FEED_TOKEN = "Calendar Feed Token"  # added by migrate_airtable
+    CALENDAR_FEED_TOKEN = "Calendar Feed Token"  # noqa: S105 (a field name) added by migrate_airtable
+    # F30: raised by one to sign this person out everywhere. Blank counts as 0.
+    SESSION_VERSION = "Session Version"  # added by migrate_airtable
 
 
 ACTIVE = "Active"
@@ -278,6 +280,23 @@ class Reminders:
     NOTE = "Note"
 
 
+class AuditLog:
+    """One row per admin action (findings F34). Added by migrate_airtable.
+
+    Append only: the app never edits or deletes these rows (client.APPEND_ONLY_TABLES).
+    Holds record IDs, never names, emails or what was typed, so erasing a person's
+    details never needs to change it.
+    """
+
+    TABLE = "Audit Log"
+    ACTION = "Action"  # Primary field, such as "PATCH /api/users/{user_id}"
+    WHEN = "When"
+    ACTOR = "Actor ID"  # The admin's Users record ID
+    TARGET = "Target"  # The record IDs in the address, such as "user_id=rec123"
+    STATUS = "Status Code"
+    REQUEST_ID = "Request ID"  # Matches the X-Request-ID header and the server log
+
+
 class TemplateVersions:
     """One row per template version. Added by migrate_airtable."""
 
@@ -307,6 +326,7 @@ ALL_TABLES = [
     Links,
     Reminders,
     TemplateVersions,
+    AuditLog,
 ]
 
 

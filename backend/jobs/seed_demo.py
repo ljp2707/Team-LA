@@ -352,7 +352,7 @@ def main(argv: list[str] | None = None) -> int:
         typecast=True,
     )
     sessions = {
-        site: rec["id"] for (site, *_), rec in zip(launches, session_recs)
+        site: rec["id"] for (site, *_), rec in zip(launches, session_recs, strict=True)
     }
 
     # Session Team: one row per role, plus Mary sharing Program Assistant at Kent.
@@ -425,8 +425,8 @@ def main(argv: list[str] | None = None) -> int:
                     fields[Work.COMPLETED_BY] = [p.user_id]
             rows.append(fields)
         recs = client.create_records(Work.TABLE, rows, typecast=True)
-        key_to_id = {p.key: rec["id"] for p, rec in zip(planned, recs)}
-        for p, rec in zip(planned, recs):
+        key_to_id = {p.key: rec["id"] for p, rec in zip(planned, recs, strict=True)}
+        for p, rec in zip(planned, recs, strict=True):
             task_ids[(site, p.name)] = rec["id"]
         client.update_records(
             Work.TABLE,

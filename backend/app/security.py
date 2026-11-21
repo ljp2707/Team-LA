@@ -5,7 +5,9 @@ Both classes are plain ASGI middleware (not @app.middleware), so they also see t
 responses made by other middleware and by crashes, and add their headers to those too.
 """
 
+import json
 import logging
+import re
 import uuid
 from urllib.parse import urlparse
 
@@ -14,6 +16,8 @@ from starlette.responses import JSONResponse
 
 from app.config import Settings, get_settings
 from app.log_redaction import redact_path
+from app.logging_setup import request_id_var
+from app.security_events import security_event
 
 logger = logging.getLogger("app.errors")
 
@@ -21,8 +25,17 @@ logger = logging.getLogger("app.errors")
 # --- CSRF: refuse changes sent from other websites -----------------------------------
 
 CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+# F23: the shape of an Airtable record ID, for record IDs that arrive as query parameters.
+# Real IDs are "rec" plus exactly 14 letters or digits; shorter ones are accepted so the
+# readable IDs in the tests (such as recProj) still work. What matters is that the value is
+# short and holds only letters and digits.
+RECORD_ID_PATTERN = r"^rec[A-Za-z0-9]{1,24}$"
 CHECKED_PREFIXES = ("/api/", "/auth/")
 CSRF_MESSAGE = "This request came from another website, so it was refused."
+# Browsers send CSP reports on their own, sometimes with no Origin header, and the route
+# changes nothing, so a forged one can do no harm. It has its own rate and size limits.
+ORIGIN_CHECK_EXEMPT = frozenset({"/api/security/csp-report"})
 
 
 def origin_of(url: str | None) -> str | None:
@@ -55,6 +68,7 @@ class OriginCheck:
             scope["type"] == "http"
             and scope["method"] in CHANGING_METHODS
             and scope["path"].startswith(CHECKED_PREFIXES)
+            and scope["path"] not in ORIGIN_CHECK_EXEMPT
         ):
             headers = Headers(scope=scope)
             origin = origin_of(headers.get("origin")) or origin_of(headers.get("referer"))
@@ -71,6 +85,14 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",  # No other site can show the app inside a frame
     "Referrer-Policy": "strict-origin-when-cross-origin",  # Links out do not leak task URLs
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",  # The app never needs these
+    # F27: a page from another site that opens ours in a new window cannot reach into it
+    # (and the reverse). Sign-in uses full-page redirects, not popups, so nothing breaks.
+    "Cross-Origin-Opener-Policy": "same-origin",
+    # F27: other sites cannot load our responses (API answers, files, images) into their
+    # pages. Google Calendar reads the feed from its servers, which this does not affect.
+    "Cross-Origin-Resource-Policy": "same-origin",
+    # F27: old Flash and PDF readers may not load cross-site policy files from this host.
+    "X-Permitted-Cross-Domain-Policies": "none",
 }
 
 # Browsers only ever use https for this site once they have seen it (production only:
@@ -79,21 +101,40 @@ HSTS_VALUE = "max-age=31536000; includeSubDomains"
 
 # Only what the built app loads: its own scripts, styles, fonts (self-hosted in
 # /fonts) and images. Nothing from other sites, and no other site may frame it.
-# A second line of defence if a bad link or value ever reaches the page (F1).
-CONTENT_SECURITY_POLICY = "; ".join(
-    [
-        "default-src 'self'",
-        "script-src 'self'",
-        "style-src 'self'",
-        "img-src 'self' data:",
-        "font-src 'self'",
-        "connect-src 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "base-uri 'self'",
-        "form-action 'self' https://accounts.google.com",
-    ]
-)
+# A second line of defence if a bad link or value ever reaches the page (F1, F26).
+# No 'unsafe-inline' or 'unsafe-eval' anywhere: the built index.html has no inline
+# scripts or styles, and React sets style props through the DOM, which CSP allows.
+CSP_DIRECTIVES = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self'",
+    # data: for the small arrow image inside drop-downs (app.css). The app shows no
+    # images from Airtable or anywhere else; files open through /api/links, a redirect.
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    # Sign-in posts to Google only through the redirect to accounts.google.com.
+    "form-action 'self' https://accounts.google.com",
+    # Where browsers report what the policy blocked (F25). report-uri for browsers
+    # that only know the older way, report-to for the Reporting API.
+    "report-uri /api/security/csp-report",
+    "report-to csp-endpoint",
+]
+# Production only: on http://localhost it would turn every request into https and break.
+PRODUCTION_ONLY_DIRECTIVES = ["upgrade-insecure-requests"]
+
+
+def content_security_policy(production: bool) -> str:
+    return "; ".join(CSP_DIRECTIVES + (PRODUCTION_ONLY_DIRECTIVES if production else []))
+
+
+# The policy as sent on localhost, for reference and tests.
+CONTENT_SECURITY_POLICY = content_security_policy(production=False)
+# Names the report-to endpoint above. Sent with the policy.
+REPORTING_ENDPOINTS = 'csp-endpoint="/api/security/csp-report"'
 CSP_HEADER_BY_MODE = {
     "report-only": "Content-Security-Policy-Report-Only",  # Browsers warn, nothing is blocked
     "enforce": "Content-Security-Policy",
@@ -120,14 +161,172 @@ def add_security_headers(headers: MutableHeaders, path: str, request_id: str) ->
         headers.setdefault("Strict-Transport-Security", HSTS_VALUE)
     csp_header = CSP_HEADER_BY_MODE.get(settings.CSP_MODE)
     if csp_header:
-        headers.setdefault(csp_header, CONTENT_SECURITY_POLICY)
+        headers.setdefault(csp_header, content_security_policy(settings.is_production))
+        headers.setdefault("Reporting-Endpoints", REPORTING_ENDPOINTS)
     if keep_out_of_caches(path):
         headers.setdefault("Cache-Control", "no-store")
+
+
+# --- CSP violation reports (F25) -------------------------------------------------------
+
+# Browsers POST here when the Content-Security-Policy blocks (or, in report-only mode,
+# would block) something. Reports carry no personal data we want, so only three cleaned
+# values are kept: which rule, what kind of thing or which site was blocked, and the path
+# of the page. Never the query string, the full blocked URL, the sample of blocked code,
+# or anything else in the report.
+CSP_REPORT_PATH = "/api/security/csp-report"
+CSP_REPORT_GROUP = "csp-endpoint"  # The name report-to uses for the endpoint below
+CSP_REPORTS_PER_REQUEST = 20  # More than this in one request is ignored, not logged
+CSP_REPORT_TYPES = ("application/csp-report", "application/reports+json", "application/json")
+
+_DIRECTIVE = re.compile(r"^[a-z-]{1,40}$")
+_KEYWORD = re.compile(r"^[a-z-]{1,30}$")  # inline, eval, data, blob, wasm-eval and so on
+
+
+def _clean_directive(value) -> str:
+    """'style-src-elem' stays; anything that is not a plain directive name becomes 'unknown'."""
+    value = str(value or "").strip().lower().split(" ")[0]
+    return value if _DIRECTIVE.match(value) else "unknown"
+
+
+def _clean_blocked(value) -> str:
+    """Only the site (https://evil.example) for a URL, or the keyword (inline, eval)."""
+    value = str(value or "").strip()
+    site = origin_of(value)
+    if site:
+        return site
+    keyword = value.lower().rstrip(":")
+    return keyword if _KEYWORD.match(keyword) else "other"
+
+
+def _clean_page(value) -> str:
+    """Only the path of the page (no query string or fragment), with tokens redacted."""
+    path = urlparse(str(value or "")).path or "/"
+    path = "".join(ch for ch in path if ch.isprintable())[:200]
+    return redact_path(path)
+
+
+def parse_csp_reports(body: bytes, content_type: str) -> list[dict[str, str]] | None:
+    """The cleaned reports in a request, or None if it is not a CSP report at all.
+
+    Accepts both formats browsers use: the older report-uri one, {"csp-report": {...}}
+    with kebab-case keys, and the Reporting API one, a list of {"type": "csp-violation",
+    "body": {...}} with camelCase keys.
+    """
+    if content_type.split(";")[0].strip().lower() not in CSP_REPORT_TYPES:
+        return None
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return None
+    if isinstance(data, dict) and isinstance(data.get("csp-report"), dict):
+        report = data["csp-report"]
+        raw = [
+            (
+                report.get("effective-directive") or report.get("violated-directive"),
+                report.get("blocked-uri"),
+                report.get("document-uri"),
+            )
+        ]
+    elif isinstance(data, list):
+        raw = [
+            (r["body"].get("effectiveDirective"), r["body"].get("blockedURL"), r["body"].get("documentURL"))
+            for r in data[:CSP_REPORTS_PER_REQUEST]
+            if isinstance(r, dict) and r.get("type") == "csp-violation" and isinstance(r.get("body"), dict)
+        ]
+    else:
+        return None
+    return [
+        {"directive": _clean_directive(d), "blocked": _clean_blocked(b), "page": _clean_page(p)} for d, b, p in raw
+    ]
+
+
+# --- The session cookie (F29) -----------------------------------------------------------
+
+# On localhost the cookie cannot be Secure (no https), so it keeps the plain name there.
+LOCAL_SESSION_COOKIE = "nmu_session"
+# In production, browsers only accept a __Host- cookie that is Secure, has Path=/ and no
+# Domain, so no other subdomain (such as another *.up.railway.app app) can set or replace it.
+PRODUCTION_SESSION_COOKIE = "__Host-nmu_session"
+
+
+def session_cookie_name(settings: Settings) -> str:
+    return PRODUCTION_SESSION_COOKIE if settings.is_production else LOCAL_SESSION_COOKIE
+
+
+def session_cookie_options(settings: Settings, max_age: int) -> dict:
+    """How SessionMiddleware sets the cookie: signed, HttpOnly (its default), SameSite=Lax,
+    Path=/ and no Domain (its defaults), and Secure in production."""
+    return {
+        "session_cookie": session_cookie_name(settings),
+        "max_age": max_age,
+        "same_site": "lax",
+        "https_only": settings.is_production,
+        "path": "/",
+    }
+
+
+class RetireOldSessionCookie:
+    """In production, delete the old nmu_session cookie when a browser still sends it.
+
+    After the switch to __Host-nmu_session, the old cookie is no longer read, so everyone
+    signs in once more. Deleting it keeps browsers from sending a dead cookie forever.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not get_settings().is_production:
+            return await self.app(scope, receive, send)
+        cookies = Headers(scope=scope).get("cookie", "")
+        has_old = any(part.strip().startswith(LOCAL_SESSION_COOKIE + "=") for part in cookies.split(";"))
+        if not has_old:
+            return await self.app(scope, receive, send)
+
+        async def send_with_expiry(message):
+            if message["type"] == "http.response.start":
+                MutableHeaders(scope=message).append(
+                    "set-cookie",
+                    f"{LOCAL_SESSION_COOKIE}=; Max-Age=0; Path=/; Secure; HttpOnly; SameSite=Lax",
+                )
+            await send(message)
+
+        await self.app(scope, receive, send_with_expiry)
 
 
 # --- Request IDs and unexpected errors ------------------------------------------------
 
 ERROR_MESSAGE = "Something went wrong. If it keeps happening, send this code to the NMU team."
+
+
+# Answers worth a security event (findings F36). 401 is left out: every signed-out visit
+# to the home page asks /api/me and gets one, so it would drown out everything else.
+REFUSAL_EVENTS = {
+    403: "access_denied",  # Wrong role, wrong program, or a request from another site
+    413: "request_too_large",
+    429: "rate_limited",
+}
+
+
+def _route_of(scope) -> str:
+    """The route as declared ("/api/users/{user_id}") when known, else the redacted path."""
+    route = scope.get("route")
+    return getattr(route, "path", None) or redact_path(scope["path"])
+
+
+def report_refusal(scope, status: int) -> None:
+    event = REFUSAL_EVENTS.get(status)
+    if event:
+        security_event(
+            event,
+            level=logging.WARNING,
+            status=status,
+            method=scope["method"],
+            route=_route_of(scope),
+            user=scope.get("state", {}).get("user_id"),
+            client=(scope.get("client") or ("", 0))[0],
+        )
 
 
 class RequestContext:
@@ -149,17 +348,22 @@ class RequestContext:
         # Made here rather than taken from the request, so nobody can choose their own.
         request_id = uuid.uuid4().hex
         scope.setdefault("state", {})["request_id"] = request_id
+        # Every log line written during this request carries its ID (findings F36).
+        id_token = request_id_var.set(request_id)
         response_started = False
+        status = 0
 
         async def send_with_headers(message):
-            nonlocal response_started
+            nonlocal response_started, status
             if message["type"] == "http.response.start":
                 response_started = True
+                status = message["status"]
                 add_security_headers(MutableHeaders(scope=message), scope["path"], request_id)
             await send(message)
 
         try:
             await self.app(scope, receive, send_with_headers)
+            report_refusal(scope, status)
         except Exception:
             # The path only: never the query string or body, which can hold secrets.
             logger.exception(
@@ -168,7 +372,10 @@ class RequestContext:
                 redact_path(scope["path"]),
                 request_id,
             )
+            security_event("unexpected_error", level=logging.ERROR, method=scope["method"], route=_route_of(scope))
             if response_started:
                 raise  # Too late to send a different answer
             response = JSONResponse({"detail": ERROR_MESSAGE, "request_id": request_id}, status_code=500)
             await response(scope, receive, send_with_headers)
+        finally:
+            request_id_var.reset(id_token)

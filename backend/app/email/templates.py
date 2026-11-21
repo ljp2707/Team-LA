@@ -184,7 +184,7 @@ def weekly_digest(week_of: str, first_name: str, overdue: list[TaskLine], upcomi
     html_parts = [_p(f"Hi {first_name}, here is what is on your list.")]
     text_parts = [f"Hi {first_name}, here is what is on your list."]
     if overdue:
-        html_parts.append(f'<h2 style="margin:16px 0 8px;font-size:16px;color:#a3460e;">Overdue</h2>')
+        html_parts.append('<h2 style="margin:16px 0 8px;font-size:16px;color:#a3460e;">Overdue</h2>')
         html_parts.append(_task_list_html(overdue))
         text_parts.append("OVERDUE\n" + _task_list_text(overdue))
     if upcoming:

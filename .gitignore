@@ -15,3 +15,18 @@ frontend/dist/
 
 # Built frontend, copied here by the Dockerfile
 backend/app/static/
+
+# Playwright browser test output
+frontend/test-results/
+frontend/playwright-report/
+
+# Editor, OS and build leftovers (findings F38)
+.DS_Store
+*.tsbuildinfo
+.claude/launch.json
+.claude/settings.local.json
+
+# Test coverage data
+.coverage
+coverage.xml
+htmlcov/

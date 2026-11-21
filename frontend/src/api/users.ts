@@ -22,6 +22,10 @@ export const updatePerson = (
   body: Partial<Omit<PersonInput, "email">> & { status?: "Active" | "Inactive" },
 ) => send<Person>("PATCH", `/api/users/${id}`, body);
 
+/** Admins only. Ends every session the person has, on every device. They can sign in again. */
+export const signOutEverywhere = (id: string) =>
+  send<{ signed_out: boolean }>("POST", `/api/users/${id}/sign-out-everywhere`);
+
 /** For a deletion request. The person must be deactivated and have no open tasks. */
 export const erasePerson = (id: string) =>
   send<{ erased: boolean; history_rows: number }>("POST", `/api/users/${id}/erase`);

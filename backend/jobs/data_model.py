@@ -28,6 +28,7 @@ TABLES: dict[str, tuple[str, str]] = {
     "ActivityLog": ("Every change and every note. Notes are rows with Type Note.", "Project history, notes, Move Day 1 undo, Archive"),
     "Links": ("Google Drive, Canva and other links on tasks and programs.", "Task page, Project page"),
     "Reminders": ("Custom reminders people set, and a log of every reminder email sent, failed or skipped.", "Reminders panel, the daily job"),
+    "AuditLog": ("One row per admin action, for the audit trail (findings F34). Append only: the app never edits or deletes rows, and nobody should by hand. Holds record IDs only, never names or emails.", "Audit page; written after every successful admin change"),
     "TemplateVersions": ("A frozen copy of a template's steps for each published version, plus the current draft.", "Templates: drafts, publishing, version history"),
 }
 
@@ -68,6 +69,7 @@ FIELDS: dict[tuple[str, str], str] = {
     ("Work", "COMPLETED_DATE"): "Set when the task is marked Done.",
     ("Work", "COMPLETED_BY"): "Who marked it Done.",
     ("Users", "CALENDAR_FEED_TOKEN"): "The secret in this person's calendar feed link. Blank means their feed is off. Treat it like a password.",
+    ("Users", "SESSION_VERSION"): "Raised by one to sign this person out on every device. The app changes it; do not edit it by hand. Blank means 0.",
     ("Work", "CALENDAR_EVENT_ID"): "The task's Google Calendar event. Written only by the Airtable calendar automations; the app reads it and never writes it.",
     ("Work", "CALENDAR_SYNCED_KEY"): "What the calendar event showed when it was last written. Written only by the Airtable calendar automations.",
     ("Work", "CALENDAR_LAST_SYNCED"): "Last modified time of the two calendar fields, made by hand. Shown when hovering over a task's calendar mark.",
@@ -85,6 +87,12 @@ FIELDS: dict[tuple[str, str], str] = {
     ("Links", "KIND"): "Google Drive, Canva or Other, worked out from the address.",
     ("Reminders", "KIND"): "7 Days Before, Due Date, Custom, Weekly Digest, Assignment or Welcome.",
     ("Reminders", "STATUS"): "Scheduled, Sent, Failed, Skipped or Cancelled. A Sent row stops the same email going out twice.",
+    ("AuditLog", "ACTION"): "The method and route, such as PATCH /api/users/{user_id}. The Audit page shows it in plain words.",
+    ("AuditLog", "WHEN"): "When it happened (UTC).",
+    ("AuditLog", "ACTOR"): "The admin's Users record ID.",
+    ("AuditLog", "TARGET"): "The record IDs in the address, such as user_id=rec123.",
+    ("AuditLog", "STATUS"): "The HTTP status the app answered with.",
+    ("AuditLog", "REQUEST_ID"): "Matches the X-Request-ID header and the server log lines for the same request.",
     ("TemplateVersions", "STATUS"): "Draft, Live or Retired.",
     ("TemplateVersions", "STEPS_JSON"): "Every step in that version, saved as JSON.",
 }

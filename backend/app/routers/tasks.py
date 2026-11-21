@@ -4,15 +4,17 @@ Staff can open any task, but only change their own. Partners only see tasks in
 projects they are listed on. Viewers change nothing.
 """
 
+import logging
 from datetime import timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 
-from app import permissions
+from app import audit, permissions
 from app.airtable import client
 from app.airtable.schema import Links, Reminders, Work
 from app.auth.deps import current_user, require_admin, require_can_edit
 from app.config import get_settings
+from app.security import RECORD_ID_PATTERN
 from app.email.templates import TaskLine, task_url
 from app.models.task import AssignIn, LinkIn, NoteIn, NudgeIn, ReassignIn, ReminderIn, TaskUpdateIn
 from app.models.user import CurrentUser
@@ -23,6 +25,7 @@ from app.services.timeline import find_cycle
 from app.services.views import World, check_project_access, link_dict, note_dict, task_row
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+logger = logging.getLogger(__name__)
 
 DONE_RECENT_DAYS = 7
 STAFF_STATUSES = {"Not Started", "In Progress", "Blocked", "Done"}
@@ -47,7 +50,7 @@ def _require_edit(task: TaskRec, user: CurrentUser) -> None:
 @router.get("/mine")
 def my_tasks(
     filter: str | None = Query(None, pattern="^(week|overdue)$"),
-    project: str | None = None,
+    project: str | None = Query(None, pattern=RECORD_ID_PATTERN),
     state: str | None = Query(None, max_length=50),
     city: str | None = Query(None, max_length=100),
     program_type: str | None = Query(None, max_length=200),
@@ -399,11 +402,12 @@ def _last_nudge(world: World, task: TaskRec) -> dict | None:
 
 
 @router.post("/{task_id}/nudge")
-def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_admin)):
+def nudge_task(task_id: str, body: NudgeIn, request: Request, user: CurrentUser = Depends(require_admin)):
     """Admin only: email everyone on an open task a reminder now, with an optional message.
 
-    Each person can be nudged about the same task once every 24 hours. The per-admin
-    hourly cap is in rate_limit.py. Nothing is sent while REMINDERS_DRY_RUN is on.
+    Each person can be nudged about the same task once every 24 hours, and gets at most
+    3 nudges a day in total (reminders.nudge_blocks). The per-admin hourly cap is in
+    rate_limit.py. Nothing is sent while REMINDERS_DRY_RUN is on.
     """
     if not permissions.can_nudge(user.actor):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admins can nudge")
@@ -418,44 +422,49 @@ def nudge_task(task_id: str, body: NudgeIn, user: CurrentUser = Depends(require_
     if not people:
         raise HTTPException(status.HTTP_409_CONFLICT, "Nobody active is assigned to this task. Assign someone first.")
 
-    now = clock.now()
-    recent = reminders.recent_nudges(safe(load_reminders), task.id, now)
-    to_send = [p for p in people if p.id not in recent]
-    if not to_send:
-        again = min(recent[p.id] for p in people) + timedelta(hours=reminders.NUDGE_EVERY_HOURS)
-        again = again.astimezone(clock.tz())
-        who = people[0].short_name if len(people) == 1 else "Everyone on this task"
-        when = f"{again.strftime('%I:%M %p').lstrip('0')} on {logic.fmt_date(again.date(), world.today)}"
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            f"{who} was already nudged about this task in the last day. You can nudge again after {when}.",
-        )
-    names = lambda ps: logic.name_list([p.short_name for p in ps], 3)  # noqa: E731
-    skipped = [p for p in people if p.id in recent]
-    if get_settings().REMINDERS_DRY_RUN:
-        return {
-            "sent": [],
-            "skipped": [p.short_name for p in skipped],
-            "message": "Email is in dry run mode, so nothing was sent.",
-        }
+    # F21: one nudge at a time, from the check until the Reminders rows are written.
+    with reminders.NUDGE_LOCK:
+        now = clock.now()
+        blocks = reminders.nudge_blocks(safe(load_reminders), task.id, [p.id for p in people], now)
+        to_send = [p for p in people if p.id not in blocks]
+        if not to_send:
+            again = min(b.until for b in blocks.values()).astimezone(clock.tz())
+            when = f"{again.strftime('%I:%M %p').lstrip('0')} on {logic.fmt_date(again.date(), world.today)}"
+            who = people[0].short_name if len(people) == 1 else "Everyone on this task"
+            if all(b.reason == reminders.SAME_TASK for b in blocks.values()):
+                why = f"{who} was already nudged about this task in the last day."
+            elif len(people) == 1:
+                why = f"{who} has already had {reminders.NUDGES_PER_PERSON_PER_DAY} reminders today, the most anyone gets in a day."
+            else:
+                why = "Everyone on this task has already been nudged about it or has had the most reminders anyone gets in a day."
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, f"{why} You can nudge again after {when}.")
+        names = lambda ps: logic.name_list([p.short_name for p in ps], 3)  # noqa: E731
+        skipped = [p for p in people if p.id in blocks]
+        if get_settings().REMINDERS_DRY_RUN:
+            audit.nothing_changed(request)  # Nothing was sent, so nothing to audit (F34)
+            return {
+                "sent": [],
+                "skipped": [p.short_name for p in skipped],
+                "message": "Email is in dry run mode, so nothing was sent.",
+            }
 
-    line = TaskLine(
-        name=task.name,
-        site=world.site_name(project),
-        due_text=logic.due_text(task, world.today),
-        url=task_url(task.id),
-    )
-    sent, errors = reminders.send_nudges(line, task.id, to_send, user.name, body.message)
-    if not sent:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"The reminder was not sent. {errors[0]}")
-    # The message itself is not stored or logged: only who nudged whom.
-    history.log_event(project.id, task.id, user.id, history.NUDGE, f"nudged {names(sent)} about {task.name}")
-    message = f"Reminder sent to {names(sent)}."
-    if skipped:
-        message += f" {names(skipped)} {'was' if len(skipped) == 1 else 'were'} already nudged today, so not again."
-    if len(sent) < len(to_send):
-        message += f" It could not be sent to everyone: {errors[0]}"
-    return {"sent": [p.short_name for p in sent], "skipped": [p.short_name for p in skipped], "message": message}
+        line = TaskLine(
+            name=task.name,
+            site=world.site_name(project),
+            due_text=logic.due_text(task, world.today),
+            url=task_url(task.id),
+        )
+        sent, errors = reminders.send_nudges(line, task.id, to_send, user.name, body.message)
+        if not sent:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"The reminder was not sent. {errors[0]}")
+        # The message itself is not stored or logged: only who nudged whom.
+        history.log_event(project.id, task.id, user.id, history.NUDGE, f"nudged {names(sent)} about {task.name}")
+        message = f"Reminder sent to {names(sent)}."
+        if skipped:
+            message += f" {names(skipped)} {'was' if len(skipped) == 1 else 'were'} skipped, having been nudged enough today."
+        if len(sent) < len(to_send):
+            message += f" It could not be sent to everyone: {errors[0]}"
+        return {"sent": [p.short_name for p in sent], "skipped": [p.short_name for p in skipped], "message": message}
 
 
 @router.delete("/{task_id}")
@@ -489,20 +498,35 @@ def delete_task(task_id: str, user: CurrentUser = Depends(require_admin)):
         f"deleted the task {task.name} (due {due}, assigned to {people})",
         task.name,
     )
-    client.update_records(
-        Work.TABLE,
-        [{"id": t.id, "fields": {Work.DEPENDS_ON: [d for d in t.depends_on if d != task.id]}} for t in waiting],
-    )
-    reminders.cancel_custom_for_task(task.id)
-    client.update_records(
-        Links.TABLE,
-        [
-            {"id": link.id, "fields": {Links.WORK: [], Links.SESSION: [project.id]}}
-            for link in world.links
-            if link.work_id == task.id
-        ],
-    )
-    client.delete_records(Work.TABLE, [task.id])
+    # F22: if Airtable fails part way, say so in the history and to the admin, instead of
+    # leaving a "deleted" entry for a task that still exists. Every step below is safe to
+    # run again, so trying the delete again finishes the job.
+    try:
+        client.update_records(
+            Work.TABLE,
+            [{"id": t.id, "fields": {Work.DEPENDS_ON: [d for d in t.depends_on if d != task.id]}} for t in waiting],
+        )
+        reminders.cancel_custom_for_task(task.id)
+        client.update_records(
+            Links.TABLE,
+            [
+                {"id": link.id, "fields": {Links.WORK: [], Links.SESSION: [project.id]}}
+                for link in world.links
+                if link.work_id == task.id
+            ],
+        )
+        client.delete_records(Work.TABLE, [task.id])
+    except Exception as error:  # noqa: BLE001 - any Airtable failure gets the same handling
+        logger.warning("Deleting task %s did not finish: %s", task.id, type(error).__name__)
+        try:
+            history.log_event(
+                project.id, task.id, user.id, "System", f"could not finish deleting the task {task.name}"
+            )
+        except Exception:  # noqa: BLE001 - Airtable is down; the warning above is the record
+            logger.warning("Could not record the unfinished delete of task %s", task.id)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "The task was not fully deleted. Please try again."
+        ) from None
     return {"deleted": True, "no_longer_waiting": [t.name for t in waiting]}
 
 

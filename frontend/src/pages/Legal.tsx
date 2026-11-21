@@ -130,7 +130,7 @@ export function PrivacyPolicy() {
       <section aria-labelledby="cookies">
         <h2 id="cookies">Cookies</h2>
         <p>
-          NMU Programs uses one cookie, <code>nmu_session</code>, to keep you signed in. It lasts up to 7 days, or until you
+          NMU Programs uses one cookie, <code>__Host-nmu_session</code>, to keep you signed in. It lasts up to 7 days, or until you
           sign out. The app cannot work without it, so there is nothing to opt in to. There are no analytics, advertising or
           tracking cookies, and no tracking pixels in emails. Fonts are served by the app itself, so loading a page does not
           contact any other company.

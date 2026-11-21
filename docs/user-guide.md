@@ -10,6 +10,8 @@ The **Privacy** and **Terms** links at the bottom of the menu, and on the home p
 
 Go to the NMU Programs address and click **Sign in with Google**. Use the Google account your admin added. There is no password to set.
 
+To sign out, click **Sign out** at the bottom of the menu. If you used a shared computer or lost a laptop or phone, click **Sign out of all devices** instead (from any device where you are still signed in): every session you have ends, and you sign in again with Google.
+
 If you see "You do not have access yet", the account you used is not on the list. The page shows which email it tried. Click **Use a different account** to pick another one, or ask an admin to add you.
 
 ### My Tasks
@@ -117,8 +119,8 @@ On a program's page:
 - **Add task** adds a task with its own name, due date, role and person. To put it between two tasks, pick what it **Needs first** and what it **Comes before**. The task after it then waits on the new one.
 - Changing a due date, or adding a task in between, never moves other tasks. If a task ends up due before a task it needs first, the app warns you on the program page, on the task, and in the dialog before you save. Change whichever date is wrong.
 - Click a task's status tag to change it, or open the task to change its due date, rename it, reassign it or skip it for this program.
-- **Nudge** (at the top of a task's page) emails everyone on the task a reminder right away, on top of the automatic ones. It shows for open tasks that have at least one active person on them. Add a short message if you like (up to 500 characters), then click **Send reminder**. Each person can be nudged about the same task once a day, and each admin can send up to 20 nudges an hour. The task then shows **Last nudged by [name], [date]**, and the history says who nudged whom. Your message goes only in the email; it is not saved. To reach a person's task from **Assignments**, click their name, then the task.
-- **Delete task** (in a task's status menu, or on the task's page) removes a task for good. The dialog lists any tasks waiting on it; they stop waiting. The history keeps a line saying what was deleted, its due date, who it was assigned to and who deleted it. Its notes stay in the history, and its links and files move to the program's Links and files. It cannot be undone, so if you might need the task later, **skip** it instead. Closed programs cannot have tasks deleted.
+- **Nudge** (at the top of a task's page) emails everyone on the task a reminder right away, on top of the automatic ones. It shows for open tasks that have at least one active person on them. Add a short message if you like (up to 500 characters), then click **Send reminder**. Each person can be nudged about the same task once a day, and gets at most 3 nudges a day in total from all admins, and each admin can send up to 20 nudges an hour. The task then shows **Last nudged by [name], [date]**, and the history says who nudged whom. Your message goes only in the email; it is not saved. To reach a person's task from **Assignments**, click their name, then the task.
+- **Delete task** (in a task's status menu, or on the task's page) removes a task for good. The dialog lists any tasks waiting on it; they stop waiting. The history keeps a line saying what was deleted, its due date, who it was assigned to and who deleted it. Its notes stay in the history, and its links and files move to the program's Links and files. It cannot be undone, so if you might need the task later, **skip** it instead. Closed programs cannot have tasks deleted. If you see "The task was not fully deleted", Airtable had a problem part way through: click **Delete task** again to finish.
 - A task can have more than one person. Open it, click **Change** next to **Assigned to**, and click **Add another person**. Everyone on it sees it in My Tasks, can update it and gets its reminders. Only the people you add get a new-task email.
 - **Edit details** changes the program name, hours, location, instructors, partner contact, shipping address, Drive folder and partner access.
 - **History** lists every change. **See all** opens the full list.
@@ -146,6 +148,10 @@ A task name that starts with `=`, `+`, `-` or `@` is saved with an apostrophe in
 
 **Archive** lists every closed program with how many tasks were finished on time. Search by site name or pick a date range. Click a program to see its numbers and each task's planned and actual dates. **Start a new program from this** opens Start a program with that program's tasks.
 
+### The audit trail
+
+**Audit** lists every change made with admin access, newest first: when, which admin, what they did (for example "Changed a person" or "Deleted a task") and which person, program or task it was about. Pick an admin or a period to narrow it. Nobody can edit or delete these entries, not even admins, so it is the place to check who changed someone's access or deleted something. Hover over an entry to see its technical name and request number, which help when reporting a problem.
+
 ### Templates
 
 A template is the list of tasks for one kind of program, with when each is due and which role does it.
@@ -167,7 +173,8 @@ Lists every active person, busiest first, with how many open tasks they have. Cl
 
 - Click a person's name (or **Edit**) to change their name, access level and roles.
 - **Add a person** with their Google email, access level and roles. They get a welcome email and can sign in straight away.
-- **Edit** changes someone's name, access level and roles, or deactivates them so they can no longer sign in. You cannot remove your own admin access, and the last admin cannot be removed.
+- **Edit** changes someone's name, access level and roles, or deactivates them so they can no longer sign in. You cannot remove your own admin access, and the last admin cannot be removed. Changing someone's access level, taking a role away or deactivating them also signs them out everywhere, so they sign in again with their new access.
+- **Sign out everywhere** (in **Edit**) ends every session that person has, on every device. Use it if they lose a laptop or phone or think someone else used their account. They can sign in again straight away.
 - **Manage roles** adds, renames and deactivates roles. A role that tasks or teams use cannot be deleted, only made inactive.
 - **Hand off tasks** moves all of one person's open tasks to someone else, for example when they go on leave. Anyone else on those tasks stays on them.
 - **Remove personal details** appears on a deactivated person. Use it when someone asks for their information to be deleted. Their name and email become "Former team member" everywhere, and it cannot be undone. The admin runbook has the full steps. It shows the tasks first. Leave **Also put them on those program teams** ticked so future reminders go to the new person too.

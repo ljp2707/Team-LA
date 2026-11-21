@@ -242,7 +242,7 @@ def write_plan(session_id: str, planned: list[PlannedTask]) -> dict[str, str]:
     created = client.create_records(
         Work.TABLE, [work_fields(session_id, p) for p in planned], typecast=True
     )
-    key_to_id = {p.key: rec["id"] for p, rec in zip(planned, created)}
+    key_to_id = {p.key: rec["id"] for p, rec in zip(planned, created, strict=True)}
     updates = []
     for p in planned:
         deps = [key_to_id[k] for k in p.depends_on if k in key_to_id]

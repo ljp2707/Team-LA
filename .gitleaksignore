@@ -1,0 +1,4 @@
+# Findings reviewed and accepted (findings F42). One fingerprint per line, with the reason above it.
+# An old .env.example held the Airtable base ID. A base ID only names the base; reading or
+# changing it needs a token, so it is not a secret. The current .env.example leaves it blank.
+6d64f585300a7413408eee667dbcfd3f112355b4:.env.example:airtable-api-key:9

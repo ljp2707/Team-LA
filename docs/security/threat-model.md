@@ -1,7 +1,9 @@
 # NMU Launches threat model
 
 Reviewed 2026-11-19 against the code in this repo and the live deployment at
-`https://team-la-production.up.railway.app` (read-only requests only). No code was changed.
+`https://team-la-production.up.railway.app` (read-only requests only). Updated 2026-11-20 after
+the hardening on branch `production-hardening` (F20 to F42): the ratings below show the
+controls as they are now.
 Concrete issues are in [findings.md](findings.md); this file explains what we protect, from
 whom, and where an attacker could get in.
 
@@ -12,7 +14,7 @@ whom, and where an attacker could get in.
 - **Database:** Airtable, through one personal access token. Reads are cached in memory for
   about 30 seconds (`app/airtable/client.py`).
 - **Sign-in:** Google OAuth (authlib). The Airtable Users table decides who gets in. The session
-  is a signed cookie (`nmu_session`, Starlette `SessionMiddleware`).
+  is a signed cookie (`__Host-nmu_session` in production, `nmu_session` on localhost; Starlette `SessionMiddleware`).
 - **Email:** Gmail API, using a refresh token for one sender account.
 - **Cron:** the same image runs `python -m jobs.send_reminders` on a schedule.
 
@@ -63,10 +65,12 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | GET | `/auth/callback` | Anyone | Session; may create the first Admin row (`BOOTSTRAP_ADMIN_EMAILS`) | Needs `email_verified` and an Active Users row. Clears the session before signing in |
 | GET | `/auth/denied` | Anyone | Session | Returns the refused email stored in the caller's own session |
 | POST | `/auth/logout` | Anyone | Session | Signs out. POST only (findings F8) |
+| POST | `/auth/logout-everywhere` | Anyone (acts only on a valid session) | Yes (Users > Session Version) | F30. Ends every session of the signed-in person. POST only, Origin-checked |
 | GET | `/auth/logout` | Anyone | No | Old links: goes home without signing out |
 | GET | `/api/health` | Anyone | No | Railway health check |
 | GET | `/api/public/season-stats` | Anyone | No | Three counts for the home page, cached for 5 minutes |
 | GET | `/api/public/about` | Anyone | No | Org name, contact email, address, app URL |
+| POST | `/api/security/csp-report` | Anyone | No (writes one cleaned log line per report) | F25. No Origin check (browsers send reports on their own). 64 KB body cap, 20 reports per request, 30 a minute per address. Logs only directive, blocked site or keyword, and page path |
 | GET | `/calendar/{token}.ics` | Anyone holding the token | No | Token is 32 random bytes, checked with a regex and then `hmac.compare_digest`. Unknown token → 404 |
 | GET | `/docs`, `/redoc`, `/openapi.json`, `/docs/oauth2-redirect` | Anyone, local development only | No | Turned off in production (F2) |
 | GET | `/{path}` | Anyone | No | Static frontend; path is resolved and must stay inside `static/` |
@@ -87,7 +91,7 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 | Method | Path | Role | Changes data | Notes |
 |---|---|---|---|---|
 | GET | `/api/projects` | current_user | No | Partners: only their launches. `status=closed` needs Admin |
-| GET | `/api/projects/{id}` | current_user | No | `check_project_access` (partners get 404 for other launches). History hidden from partners; edit block admin only |
+| GET | `/api/projects/{id}` | current_user | No | `check_project_access` (partners get 404 for other programs). History hidden from partners; edit block admin only. Changed 2026-11-20: overdue tasks move into `overdue_tasks`, the same task list split differently, so nothing new is shown |
 | GET | `/api/projects/{id}/history` | require_internal | No | |
 | POST | `/api/projects/preview` | Admin | No | |
 | POST | `/api/projects` | Admin | Yes; sends assignment emails | |
@@ -106,10 +110,10 @@ task") are listed under Notes. "Changes data" means it writes to Airtable or sen
 
 | Method | Path | Role | Changes data | Notes |
 |---|---|---|---|---|
-| GET | `/api/tasks/mine` | current_user | No | Own tasks on launches the caller can see |
-| GET | `/api/tasks/{id}` | current_user | No | `_visible_task` (partner launch check). Notes filtered by visibility. People list only for admins |
+| GET | `/api/tasks/mine` | current_user | No | Own tasks on programs the caller can see. Changed 2026-11-20: `project` must be a record ID (F23); optional `state` (max 50), `city` (max 100), `program_type` (max 200) and `sort` (`due`, `program` or `location` only) only narrow that list; filter choices come from the caller's own tasks |
+| GET | `/api/tasks/{id}` | current_user | No | `_visible_task` (partner program check). Notes filtered by visibility. People list only for admins. Changed 2026-11-20: adds `can_delete` and `can_nudge` (admin view only) and `last_nudge` (hidden from partners) |
 | PATCH | `/api/tasks/{id}` | require_can_edit | Yes | Status: only assignees (or Admin); Skip, due date, name and depends-on: Admin only |
-| POST | `/api/tasks/{id}/nudge` | Admin | Yes; email | Open task, open program, Active assignees only. Once per person per task per day (from Reminders); 20 per admin per hour. Message escaped, not stored |
+| POST | `/api/tasks/{id}/nudge` | Admin | Yes; email | Open task, open program, Active assignees only. Once per person per task per day and 3 per person per day across all tasks (both from Reminders); 20 per admin per hour (its own rule, so it does not also count toward the 60 a minute write limit). Message escaped, not stored. See F20 and F21 |
 | DELETE | `/api/tasks/{id}` | Admin | Yes (deletes) | Refused on closed programs. History row written first; dependencies cleared; scheduled reminders cancelled; links moved to the program |
 | POST | `/api/tasks/{id}/assign` | Admin | Yes; email | Only existing, active users |
 | POST | `/api/tasks/reassign` | Admin | Yes; email | All-or-nothing; open tasks on open launches only |
@@ -139,8 +143,10 @@ All of these use `require_admin`. Every one except the GETs changes data.
 | PATCH, DELETE | `/api/users/{id}` (self-demotion, self-deactivation and zero-admin all refused) |
 | GET | `/api/users/{id}/work` |
 | POST | `/api/users/hand-off`, `/api/users/{id}/erase` (sends welcome email on POST `/api/users`) |
+| POST | `/api/users/{id}/sign-out-everywhere` (F30: raises their Session Version; also raised by deactivate, access level change, role removal and erase) |
 | GET, POST | `/api/roles`; PATCH `/api/roles/{id}` |
 | GET | `/api/archive`, `/api/archive/{id}` |
+| GET | `/api/audit` (F35: read only; no route changes or deletes audit rows) |
 | GET, POST | `/api/sites`; GET `/api/sites/{id}`; GET `/api/instructors` |
 | GET | `/api/health/airtable`, `/api/health/auth` |
 | POST | `/api/admin/test-email` (to the caller only) |
@@ -171,7 +177,7 @@ Ratings are for this deployment as it stands today, after the existing controls.
 | T | Session fixation | Session cleared before the user is stored | Low |
 | R | No record of who signed in when | Nothing logged on success | Low |
 | I | OAuth `code` and `state` written to the access log | Single use, short lived | Low |
-| D | Repeated sign-in attempts hammer Airtable | Airtable cache; no rate limit (F5) | Medium |
+| D | Repeated sign-in attempts hammer Airtable | Airtable cache; rate limit on sign-in routes per address (F5) | Low |
 | E | `DEV_LOGIN_EMAIL` in production | Config refuses unless `APP_URL` is `http://localhost` and not production | Low |
 
 ### 5.2 Session cookie and `/api/me/view`
@@ -179,11 +185,11 @@ Ratings are for this deployment as it stands today, after the existing controls.
 | | Threat | Existing control | Rating |
 |---|---|---|---|
 | S | Forged cookie | HMAC-signed with `SESSION_SECRET` (32+ characters enforced in production) | Low |
-| S | Stolen cookie reused after logout | Logout only deletes the browser copy; cookie valid up to 7 days. Deactivation takes effect within 30 seconds | Low (F15) |
-| E | Staff or Viewer switches to admin view | Refused unless Admin, **or `DEV_ALLOW_VIEW_SWITCH=true`, which nothing stops in production** | Medium (F4) |
+| S | Stolen cookie reused after logout | 24-hour idle and 7-day limits; **Sign out of all devices**, admin **Sign out everywhere**, and deactivation, access level or role changes end every session at once through Session Version; new session ID at sign-in and view change; `__Host-` cookie | Low (F15, F29 to F31) |
+| E | Staff or Viewer switches to admin view | Refused unless Admin; production refuses to start with `DEV_ALLOW_VIEW_SWITCH=true` | Low (F4) |
 | E | Partner switches to staff view | Refused | Low |
-| T | CSRF on state-changing routes | SameSite=Lax cookie; JSON bodies need `application/json` (FastAPI strict content type), which forces a CORS preflight; no CORS allowed. No Origin check | Low (F9) |
-| T | Forced logout | `GET /auth/logout` works from any site | Low (F8) |
+| T | CSRF on state-changing routes | SameSite=Lax cookie; Origin checked on every change; no CORS allowed | Low (F9) |
+| T | Forced logout | Sign out is POST only, with the Origin check; `GET /auth/logout` just goes home | Low (F8) |
 
 ### 5.3 Projects and tasks (`/api/projects*`, `/api/tasks*`)
 
@@ -195,10 +201,10 @@ Ratings are for this deployment as it stands today, after the existing controls.
 | I | Partner reads Internal notes or history | `visible_to`; history route is `require_internal` | Low |
 | I | Staff shares someone else's Internal note with partners | Allowed when the Staff member is on the task | Low (F11) |
 | I | Partner learns staff names via assignee labels and the team list | By design (names only, no emails) | Low |
-| T | Stored XSS through a link URL | API accepts `https://` only. **URLs typed directly into Airtable are not checked** and no CSP | Medium (F7) |
+| T | Stored XSS through a link URL | API accepts `https://` only; links from Airtable are scheme-checked before display; enforced CSP | Low (F7, F28) |
 | T | CSV formula injection in exports | Cells starting with `= + - @` are prefixed | Low |
 | R | Who changed what | Activity Log row on every change | Low |
-| D | Many writes exhaust Airtable's 5 requests/second | No rate limit | Medium (F5) |
+| D | Many writes exhaust Airtable's 5 requests/second | Write rate limit per person (60 a minute) and per address | Low (F5) |
 
 ### 5.4 File uploads (`POST /api/tasks/{id}/files`, `POST /api/projects/{id}/files`) and `GET /api/links/{id}/file`
 
@@ -206,7 +212,7 @@ Ratings are for this deployment as it stands today, after the existing controls.
 |---|---|---|---|
 | T | Script or HTML uploaded and run on the app's origin | Extension allowlist; files live on Airtable's CDN, not our origin | Low |
 | T | File content does not match its extension (for example, an executable named `.pdf`) | None | Low (F10) |
-| D | Very large upload fills disk or memory | 5 MB check runs only after the whole multipart body is parsed. **The body is parsed before authentication runs**, and there is no request size limit | Medium (F6) |
+| D | Very large upload fills disk or memory | Request size limit enforced while reading, before parsing and before sign-in is needed; 413 logged as `request_too_large` | Low (F6) |
 | I | Old file URL shared outside the app | Airtable URLs expire after a few hours; the app re-checks access on every open | Low |
 
 ### 5.5 Public calendar feed (`GET /calendar/{token}.ics`)
@@ -214,7 +220,7 @@ Ratings are for this deployment as it stands today, after the existing controls.
 | | Threat | Existing control | Rating |
 |---|---|---|---|
 | S | Guess a token | 32 random bytes; format check; constant-time compare | Low |
-| I | Token leaks through logs | **uvicorn's access log writes the full path, token included, to Railway logs** | Medium (F3) |
+| I | Token leaks through logs | Calendar tokens and OAuth codes redacted from the access log; **Reset link** makes a new token | Low (F3) |
 | I | Token leaks through caches or search engines | `Cache-Control: private`, `X-Robots-Tag: noindex` | Low |
 | I | Feed shows tasks from launches the person may no longer see | Same partner filter as My Tasks | Low |
 | D | Flooding the feed | Airtable reads are cached; no rate limit | Low |
@@ -233,7 +239,7 @@ Ratings are for this deployment as it stands today, after the existing controls.
 | E | Non-admin raises their own access level or edits their own Users row | All user changes are `require_admin`; level must be in the `AccessLevel` list | Low |
 | E | Admin locks everyone out | Self-demotion and zero-admin refused | Low |
 | I | `/api/health/auth` reveals settings | Admin only; shows flags and the sender address, never secrets | Low |
-| I | API structure published | `/docs`, `/redoc`, `/openapi.json` public in production | Medium (F2) |
+| I | API structure published | `/docs`, `/redoc`, `/openapi.json` off in production (verified on the production image) | Low (F2) |
 
 ### 5.8 Cron job and secrets
 
@@ -241,15 +247,15 @@ Ratings are for this deployment as it stands today, after the existing controls.
 |---|---|---|---|
 | I | Recipient emails in cron and dry-run logs | None | Low (F13) |
 | I | Secrets committed to git | `.env` is gitignored; history scan found only placeholders | Low |
-| E | Leaked Airtable token gives full base access | Token kept in Railway only | Medium (scope it; see findings, manual steps) |
+| E | Leaked Airtable token gives full base access | Token kept in Railway only; data scopes only, structure changes need a separate migration token that production refuses; a too-broad token is logged as `airtable_token_too_broad`; rotation in `secrets-runbook.md` | Medium until the new 2-scope token is made (F37, manual step) |
 | D | Gmail refresh token expires weekly (OAuth app in Testing) | Failures logged to Reminders | Medium (operational) |
 
 ### 5.9 Platform (headers, proxy, errors)
 
 | | Threat | Existing control | Rating |
 |---|---|---|---|
-| T | XSS has no second line of defence | `nosniff`, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy. **No CSP** | Medium (F1) |
-| T | SSL stripping on first visit | Railway redirects HTTP to HTTPS (verified). **No HSTS** | Medium (F1) |
+| T | XSS has no second line of defence | Enforced CSP (`script-src 'self'`, tested in a browser on every page), violation reports, `nosniff`, `X-Frame-Options: DENY`, COOP, CORP, Referrer-Policy, Permissions-Policy | Low (F1, F25 to F28) |
+| T | SSL stripping on first visit | Railway redirects HTTP to HTTPS; HSTS for a year; production refuses `http://` addresses | Low (F1, F33) |
 | S | Spoofed `X-Forwarded-For` or `Host` | Not trusted (uvicorn trusts only 127.0.0.1); URLs come from `APP_URL`, never the Host header | Low (F14) |
 | I | Stack traces in error responses | FastAPI returns a plain "Internal Server Error"; known errors are short sentences | Low |
-| E | Production protections switched off by a missing `ENV` | `ENV` defaults to `development`, which turns off the Secure cookie and the secret-strength check | Low today: verified `Secure` on the live cookie (F12) |
+| E | Production protections switched off by a missing `ENV` | An `https://` `APP_URL` counts as production for these checks, so a missing `ENV` still gets the Secure cookie and the secret-strength check | Low (F12) |

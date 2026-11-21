@@ -116,11 +116,25 @@ def test_hsts_in_production(client, settings):
     assert client.get("/api/health").headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
 
 
-def test_csp_is_report_only_by_default(client):
+def test_csp_is_enforced_by_default(client):
+    """F28: enforce is the default now the browser test shows every page works under it."""
+    headers = client.get("/api/health").headers
+    assert "content-security-policy-report-only" not in headers
+    policy = headers["content-security-policy"]
+    assert "default-src 'self'" in policy and "frame-ancestors 'none'" in policy
+
+
+def test_csp_default_setting_is_enforce():
+    from app.config import Settings
+
+    assert Settings.model_fields["CSP_MODE"].default == "enforce"
+
+
+def test_csp_report_only_is_still_an_option(client, settings):
+    settings(CSP_MODE="report-only")
     headers = client.get("/api/health").headers
     assert "content-security-policy" not in headers
-    policy = headers["content-security-policy-report-only"]
-    assert "default-src 'self'" in policy and "frame-ancestors 'none'" in policy
+    assert "script-src 'self'" in headers["content-security-policy-report-only"]
 
 
 def test_csp_can_be_enforced(client, settings):

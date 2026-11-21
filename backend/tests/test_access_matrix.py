@@ -110,11 +110,15 @@ ROWS: list[Row] = [
     Row("GET", "/auth/denied", everyone(200)),
     Row("POST", "/auth/logout", everyone(303)),
     Row("GET", "/auth/logout", everyone(302)),
+    Row("POST", "/auth/logout-everywhere", everyone(303), note="Signs out every device of a valid session (F30)"),
     Row("GET", "/api/health", everyone(200)),
     Row("GET", "/api/health/airtable", admin_only(200)),
     Row("GET", "/api/health/auth", admin_only(200)),
     Row("GET", "/api/public/season-stats", everyone(200)),
     Row("GET", "/api/public/about", everyone(200)),
+    Row("POST", "/api/security/csp-report", everyone(204),
+        json={"csp-report": {"effective-directive": "img-src", "blocked-uri": "data"}},
+        note="Browsers send CSP reports on their own; it only logs (F25)"),
     Row("GET", "/calendar/{token}.ics", everyone(404), url="/calendar/" + "A" * 43 + ".ics"),
     # The signed-in person (4.2)
     Row("GET", "/api/me", signed_in(200)),
@@ -200,6 +204,8 @@ ROWS: list[Row] = [
     Row("POST", "/api/users/hand-off", admin_only(200),
         json={"from_user": "recStaff", "to_user": "recLead", "preview": True}),
     Row("POST", "/api/users/{user_id}/erase", admin_only(200), url="/api/users/recGone/erase"),
+    Row("GET", "/api/audit", admin_only(200)),
+    Row("POST", "/api/users/{user_id}/sign-out-everywhere", admin_only(200), url="/api/users/recStaff/sign-out-everywhere"),
     Row("GET", "/api/roles", admin_only(200)),
     Row("POST", "/api/roles", admin_only(201), json={"name": "Coach"}),
     Row("PATCH", "/api/roles/{role_id}", admin_only(200), url="/api/roles/recRoleOps", json={"name": "Ops"}),
@@ -379,7 +385,12 @@ def test_partner_cannot_read_another_programs_history(client, world, as_role):
     assert client.get("/api/projects/recOther/history").status_code == 403
 
 
-VIEWER_WRITES = [r for r in ROWS if r.method != "GET" and not r.route.startswith(("/auth/", "/api/me/view"))]
+# The CSP report endpoint accepts anyone and writes nothing (test_csp_reports.py checks that).
+VIEWER_WRITES = [
+    r
+    for r in ROWS
+    if r.method != "GET" and not r.route.startswith(("/auth/", "/api/me/view", "/api/security/csp-report"))
+]
 
 
 @pytest.mark.parametrize("role", ["viewer", "lead"])
@@ -415,3 +426,44 @@ def test_admin_in_staff_view_gets_staff_results_everywhere():
         staff, as_staff = row.expect["staff"], row.expect["admin_as_staff"]
         if staff >= 400:
             assert as_staff >= 400, f"{row.method} {row.route}: admin in staff view is allowed, staff is not"
+
+
+# --- F34: every admin-only change leaves an audit row ----------------------------------
+
+ADMIN_CHANGES = [
+    r
+    for r in ROWS
+    if r.method != "GET"
+    and r.expect.get("admin", 0) < 400
+    and r.expect.get("staff", 0) == 403
+    and r.expect.get("admin_as_staff", 0) == 403
+]
+
+
+# These matrix calls change nothing (two previews, and a nudge in dry run mode), so they
+# leave no audit row. test_audit.py checks that their real versions are audited.
+CHANGES_NOTHING = {
+    ("POST", "/api/projects/preview"),
+    ("POST", "/api/projects/{project_id}/move-day-one"),
+    ("POST", "/api/tasks/{task_id}/nudge"),
+}
+
+
+def test_admin_changes_are_found():
+    assert len(ADMIN_CHANGES) >= 20
+
+
+@pytest.mark.parametrize("row", ADMIN_CHANGES, ids=lambda r: f"{r.method} {r.target}")
+def test_every_admin_change_is_audited(client, world, as_role, row):
+    as_role("admin")
+    before = len(world.writes_to("Audit Log"))
+    response = call(client, row.method, row.target, row.json, row.upload)
+    assert response.status_code == row.expect["admin"]
+    rows = world.writes_to("Audit Log")[before:]
+    if (row.method, row.route) in CHANGES_NOTHING:
+        assert rows == []
+        return
+    assert len(rows) == 1, f"{row.method} {row.route} left {len(rows)} audit rows"
+    fields = rows[0][3]
+    assert fields["Action"] == f"{row.method} {row.route}"
+    assert fields["Actor ID"] == "recAdmin"

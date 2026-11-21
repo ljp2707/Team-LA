@@ -128,3 +128,17 @@ def test_choices_never_leak_other_peoples_places(client, sign_in, fake):
     add_task(fake, "recP2", "Ada's task", date(2026, 11, 3), project="recPdx", assigned="recAdmin")
     sign_in("staff@example.org")
     assert "OR" not in _mine(client)["filters"]["states"]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["recProj'", "Proj", "rec", "rec" + "x" * 40, "recProj OR 1=1", "recProj/../x", "recPro\nj"],
+)
+def test_project_filter_must_look_like_a_record_id(sam, bad):
+    """F23: the project filter takes only a record ID, like the other inputs on this route."""
+    assert sam.get("/api/tasks/mine", params={"project": bad}).status_code == 422
+
+
+def test_project_filter_still_works_with_a_real_shaped_id(sam):
+    assert sam.get("/api/tasks/mine", params={"project": "recAbCdEfGhIjKlMn"}).status_code == 200
+    assert _ids(_mine(sam, project="recKent")) == ["recK1"]

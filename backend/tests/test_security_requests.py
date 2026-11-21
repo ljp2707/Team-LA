@@ -125,7 +125,7 @@ def _sign_in_bare(bare_client):
 def _assert_security_headers(response):
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
-    assert "content-security-policy-report-only" in response.headers
+    assert "content-security-policy" in response.headers  # Enforced by default (F28)
     assert len(response.headers["x-request-id"]) == 32
 
 

@@ -90,7 +90,8 @@
     min-width: 0;
   }
 
-  .filter-grid {
+  .filter-grid,
+  .filter-grid.filter-grid--audit {
     grid-template-columns: minmax(0, 1fr);
   }
 

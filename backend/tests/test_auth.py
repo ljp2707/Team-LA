@@ -5,14 +5,14 @@ from app.auth.google import oauth
 
 
 def test_bootstrap_admin_row_is_created_when_missing(client, sign_in, settings, fake):
-    settings(BOOTSTRAP_ADMIN_EMAILS="avanthi.arun@gmail.com, other@example.org")
-    response = sign_in("Avanthi.Arun@gmail.com", given_name="Avanthi", family_name="Arun")
+    settings(BOOTSTRAP_ADMIN_EMAILS="first.admin@example.org, other@example.org")
+    response = sign_in("First.Admin@Example.org", given_name="Fran", family_name="Admin")
     assert response.headers["location"].endswith("/dashboard")
-    row = next(r for r in fake.rows(Users.TABLE) if r["fields"][Users.EMAIL] == "avanthi.arun@gmail.com")
+    row = next(r for r in fake.rows(Users.TABLE) if r["fields"][Users.EMAIL] == "first.admin@example.org")
     assert row["fields"][Users.ACCESS_LEVEL] == "Admin"
     assert row["fields"][Users.STATUS] == "Active"
-    assert row["fields"][Users.FIRST_NAME] == "Avanthi"
-    assert row["fields"][Users.LAST_NAME] == "Arun"
+    assert row["fields"][Users.FIRST_NAME] == "Fran"
+    assert row["fields"][Users.LAST_NAME] == "Admin"
     assert client.get("/api/me").json()["view"] == "admin"
 
 
@@ -25,7 +25,7 @@ def test_existing_bootstrap_row_is_never_changed(client, sign_in, settings, fake
 
 
 def test_email_not_on_the_list_is_refused_and_shown(client, sign_in, settings, fake):
-    settings(BOOTSTRAP_ADMIN_EMAILS="avanthi.arun@gmail.com")
+    settings(BOOTSTRAP_ADMIN_EMAILS="first.admin@example.org")
     response = sign_in("stranger@gmail.com")
     assert response.headers["location"].endswith("/not-authorized")
     assert not fake.writes_to(Users.TABLE)
