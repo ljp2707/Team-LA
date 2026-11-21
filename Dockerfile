@@ -12,7 +12,7 @@ RUN npm run build
 # Stage 2: the Python app, which also serves the built frontend.
 # The slim image has no compilers; only the app, its locked packages and the built
 # frontend go in. Tests, dev requirements and source maps stay out (.dockerignore).
-FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 # Debian security fixes that are newer than the pinned base image (Trivy in CI fails the
 # build on any fixable HIGH or CRITICAL issue, findings F42). Nothing new is installed.
