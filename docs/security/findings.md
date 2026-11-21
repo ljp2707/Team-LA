@@ -1084,6 +1084,9 @@ ignore CI.
 **Tests** (`test_ci_workflow.py`): Dependabot never proposes major updates (fails if any
 ecosystem lacks the rule); pip is not in Dependabot and the weekly schedule is in the workflow.
 
+**Later change.** Dependabot now checks monthly instead of weekly, to cut down on email. The
+weekly CI run still catches new vulnerabilities in the meantime.
+
 **Manual step.** After merging, close Dependabot PRs #3 to #6 if Dependabot has not closed
 them itself.
 
