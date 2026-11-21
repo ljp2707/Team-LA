@@ -1,5 +1,5 @@
 # Dependabot opens a pull request when a dependency has an update (findings F42, F43).
-# CI must pass before merging. Updates come weekly, grouped, after a 7-day wait so a bad
+# CI must pass before merging. Updates come monthly, grouped, after a 7-day wait so a bad
 # release has time to be caught first.
 #
 # Only minor and patch updates are proposed. Major updates (React 18 to 19, Node 24 to 26,
@@ -15,7 +15,7 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     ignore:
@@ -28,7 +28,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     ignore:
@@ -43,7 +43,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     cooldown:
       default-days: 7
     ignore:
