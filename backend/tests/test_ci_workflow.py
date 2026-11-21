@@ -56,5 +56,16 @@ def test_python_tools_come_from_the_hash_locked_file():
 
 
 def test_dependabot_watches_everything():
-    for ecosystem in ("pip", "npm", "github-actions", "docker"):
+    for ecosystem in ("npm", "github-actions", "docker"):
         assert f"package-ecosystem: {ecosystem}" in DEPENDABOT
+    # Python packages are checked by the weekly CI run instead (F43): Dependabot's rewrite of
+    # requirements.txt drops the platform markers and breaks installs on Windows.
+    assert "package-ecosystem: pip" not in DEPENDABOT
+    assert re.search(r"^  schedule:\n    - cron: ", WORKFLOW, re.M)
+
+
+def test_dependabot_never_proposes_major_updates():
+    blocks = DEPENDABOT.split("- package-ecosystem:")[1:]
+    assert blocks
+    for block in blocks:
+        assert '"version-update:semver-major"' in block, block.split()[0]
